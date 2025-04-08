@@ -1,0 +1,150 @@
+
+## This file creates the data for the mark-resight multi-event model with both sexes, run in SSL_CJS.Rmd. 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r set up}
+
+library(here) #v1.0.1
+library(dplyr) #v1.0.5
+library(lubridate) #v1.7.20
+library(reshape2) #v1.4.4
+library(Hmisc) #v4.5-0; %nin%
+
+```
+
+
+```{r create CH}
+
+data_raw <- read.csv(here::here('data', "2025_CCEP_Zc_CH.csv"), 
+                  header = T, stringsAsFactors = F)
+
+ch_dat_f <- data_raw %>%
+  dplyr::select(brand:Y2024) %>%
+  filter(sex != 'M')
+
+ch_dat_m <- data_raw %>%
+  dplyr::select(brand:Y2024) %>%
+  filter(sex == 'M')
+
+areas_f <- data_raw %>%
+  filter(sex != 'M') %>%
+  dplyr::select(brand, cohort, area11991:area22024)
+
+areas_m <- data_raw %>%
+  filter(sex == 'M') %>%
+  dplyr::select(brand, cohort, area11991:area22024)
+
+repro_f <- data_raw %>%
+  filter(sex != 'M') %>%
+  dplyr::select(brand, cohort, repro1993:repro2024)
+
+repro_m <- data_raw %>%
+  filter(sex == 'M') %>%
+  dplyr::select(brand, cohort, repro1993:repro2024)
+
+##melt to get into ages/states instead of just 1's and 0's
+res_long <- ch_dat_f %>%
+  dplyr::select(-c(AgeAtFirstResight, LastYearSeen, TotaltimesResighted)) %>%
+  reshape2::melt(id.vars = c('brand', 'cohort', 'sex', 'wt')) %>%
+  transform(variable = as.numeric(gsub('Y', '', variable))) %>%
+  transform(years_old = variable-cohort) %>%
+  filter(years_old >= 0) %>%
+  #add 1 so pup is z == 1
+  transform(ch = years_old+1) %>%
+  #plus group <= 17, says 18 since added one in line above
+  transform(ch_cat = ifelse(ch >= 18, 18, ch)) %>%
+  #now add back the not detected using "value" 0 or 1 from raw dat
+  transform(ch_cat = ifelse(value == 1, ch_cat, NA)) %>%
+  #remove intermediate columns and recast using variable/year
+  dplyr::select(-c(years_old, value, ch)) 
+
+res_dat_f <- res_long %>%
+  reshape2::dcast(brand + cohort + sex + wt ~ variable, value.var = 'ch_cat', fill = 19) %>%
+  arrange(cohort, brand)
+
+res_long_m <- ch_dat_m %>%
+  dplyr::select(-c(AgeAtFirstResight, LastYearSeen, TotaltimesResighted)) %>%
+  reshape2::melt(id.vars = c('brand', 'cohort', 'sex', 'wt')) %>%
+  transform(variable = as.numeric(gsub('Y', '', variable))) %>%
+  transform(years_old = variable-cohort) %>%
+  filter(years_old >= 0) %>%
+  #add 1 so pup is z == 1
+  transform(ch = years_old+1) %>%
+  #plus group <= 17, says 18 since added one in line above
+  transform(ch_cat = ifelse(ch >= 18, 18, ch)) %>%
+  #now add back the not detected using "value" 0 or 1 from raw dat
+  transform(ch_cat = ifelse(value == 1, ch_cat, NA)) %>%
+  #remove intermediate columns and recast using variable/year
+  dplyr::select(-c(years_old, value, ch)) 
+
+res_dat_m <- res_long_m %>%
+  reshape2::dcast(brand + cohort + sex + wt ~ variable, value.var = 'ch_cat', fill = 19) %>%
+  arrange(cohort, brand)
+
+
+```
+
+```{r write csvs}
+
+## ALL INDIVIDUALS
+
+write.csv(res_dat_f,
+          file = here::here('data', 'res_dat_f.csv'), row.names = F)
+# write.csv(num_resight,
+#           file = paste(here::here('data', 'ProcData'), '/num_resight.csv', sep = ''),
+#           row.names = F)
+write.csv(res_dat_m,
+          file = here::here('data', 'res_dat_m.csv'), row.names = F)
+
+
+
+```
+
+```{r brands per year}
+
+#table of n_ids by year and region
+brands <- inits %>%
+  dplyr::select(AnimalID, t_0, reg_0) %>% distinct() %>%
+  reshape2::dcast(reg_0 ~ t_0, value.var = 'AnimalID') %>%
+  transform(reg_0 = factor(reg_0, levels = c('E GULF', 'C GULF', 'E ALEU', 'C ALEU', 'W ALEU'))) %>%
+  arrange(reg_0)
+
+```
+
+```{r weights by region}
+
+weights_f <- resights %>%
+  distinct(AnimalID, Mass_kg, reg_0, Sex)
+
+weights_m <- resights_m %>%
+  distinct(AnimalID, Mass_kg, reg_0, Sex)
+
+weights <- rbind(weights_f, weights_m) %>%
+  transform(reg = ifelse(reg_0 %in% c('C ALEU', 'W ALEU'), 'western', 'eastern'))
+
+ggplot(weights, aes(reg, Mass_kg, col = Sex, group = Sex)) +
+  geom_violin(draw_quantiles = c(0.025, 0.5, 0.975)) +
+  facet_grid(~reg)
+
+weights_sum <- weights %>%
+  group_by(Sex, reg) %>%
+  dplyr::summarize(mean = mean(Mass_kg), sd = sd(Mass_kg))
+
+```
+
+```{r non natal resights}
+
+res_all <- bind_rows(resights, resights_m) 
+
+res_nonNat <- res_all %>% 
+  filter(Region != reg_0) 
+
+#17% of individuals ever sighted outside of non-natal region
+n_distinct(res_nonNat$AnimalID)/n_distinct(res_all$AnimalID)
+
+
+```
+
