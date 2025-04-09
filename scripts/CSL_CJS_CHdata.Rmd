@@ -19,7 +19,8 @@ library(Hmisc) #v4.5-0; %nin%
 ```{r create CH}
 
 data_raw <- read.csv(here::here('data', "2025_CCEP_Zc_CH.csv"), 
-                  header = T, stringsAsFactors = F)
+                  header = T, stringsAsFactors = F) %>%
+  filter(cohort > 1999)
 
 ch_dat_f <- data_raw %>%
   dplyr::select(brand:Y2024) %>%
