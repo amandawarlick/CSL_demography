@@ -25,16 +25,14 @@ source(here::here('scripts', 'PlotTheme.R'))
 
 Survival rates were estimated for ages P, 1, 2, juveniles (ages 3-4) adults (ages 5+), with fixed effects estimating the effect of pup mass and the differences between sex and natal region on survival over 19 years of data. The sample sizes for natal region were imbalanced, with more samples from Pyramid Rock (*n* = 1395) than South Seal Rock (*n* = 290). Fixed effects of sex were estimated for each age group while those of natal region were estimated for pups, yearlings, shared for juveniles (ages 3-4) and adults (ages 5+). Temporal variance was estimated using a random effect of year with a penalized complexity prior, with the random effect estimated for pups, yearlings, and pooled for juveniles (ages 3-4) and adults (ages 5+) jointly for both sex and natal region (i.e., trends were not estimated for each sex nor region but for age groups in the eDPS as a whole). Detection rates were estimated for each age as above with temporal variance constructed in the same fashion, but detection was assumed to be constant across sexes, natal regions, and resight location.  
 
-#### Survival across sex
-```{r phi by sex}
+#### null model
+```{r null model}
 
-out <- readRDS(here::here('results', 'simpleAge', 'out_ME.RDS'))
+out <- readRDS(here::here('results', 'out_null.RDS'))
+out <- readRDS(here::here('results', 'out_RE.RDS'))
 
 all_pars <- colnames(out[[1]])
-noZ <- all_pars[which(!grepl('z', all_pars))]
-
-posts <- out[,noZ]
-outmat <- as.matrix(posts)
+outmat <- as.matrix(out)
 
 post_sum <- data.frame(
   med = apply(outmat, 2, function(x) quantile(x, probs = 0.5, na.rm = T, names = F)),
@@ -43,103 +41,80 @@ post_sum <- data.frame(
 post_sum$variable <- row.names(post_sum)
 
 #mean rates
-sex.pars <- all_pars[which(grepl('b.sex', all_pars))]
+# sex.pars <- all_pars[which(grepl('b.sex', all_pars))]
 mu.pars <- all_pars[which(grepl('mu.', all_pars))]
 
-pars <- c(sex.pars, mu.pars)
-
-mu.vals <- post_sum %>%
-  filter(variable %in% mu.pars) %>%
-  transform(age = gsub('mu.', '', variable)) 
-
-b.sex <- post_sum %>% filter(grepl('b.sex', variable) & med != 0) %>%
-  transform(age = ifelse(grepl('sexP', variable), 'P', 
-                         ifelse(grepl('sex1', variable), '1',
-                                ifelse(grepl('sex2', variable), '2', 
-                                       ifelse(grepl('sex3', variable), '3', 
-                                              ifelse(grepl('sexJ', variable), 'J', 'A'))))))
-
-#Female back transformed values
-mean.phi.sex.vals <- mu.vals %>%
-  merge(b.sex, by = 'age', suffixes = c('', '.sex'), all = T) %>%
-  #fill b.sex for older age intercepts
-  # transform(med.sex = ifelse(is.na(med.sex), b.sex[b.sex$age == 'A', 'med'], med.sex),
-  #           lower.sex = ifelse(is.na(lower.sex), b.sex[b.sex$age == 'A', 'lower'], lower.sex),
-  #           upper.sex = ifelse(is.na(upper.sex), b.sex[b.sex$age == 'A', 'upper'], upper.sex)) %>%
-  transform(med = 1/(1+exp(-(med + med.sex))),
-            lower = 1/(1+exp(-(lower + lower.sex))),
-            upper = 1/(1+exp(-(upper + upper.sex)))) %>%
-  transform(sex = 'Female') %>%
-  dplyr::select(c(med, lower, upper, variable, age, sex)) %>%
-  bind_rows(
-    post_sum %>%
-  filter(grepl('int.phi', variable)) %>%
-  transform(age = gsub('int.phi', '', variable), sex = 'Male')) %>%
-  transform(age = factor(age, levels = c('P', '1', '2', '3', 'J', 'A'),
-                         labels = c('P', '1', '2', '3', 'J', 'A'))) 
-
-ggplot(mean.phi.sex.vals, aes(age, med, col = sex, group = sex)) +
-  geom_point(position = position_dodge(0.5)) +
-  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.25, position = position_dodge(0.5)) +
-  xlab('') + ylab(expression(paste('Survival probability ',  '(', phi, ')'))) +
+b.mass_sum <- post_sum %>% filter(grepl('b.mass', variable)) %>%
+  # transform(var_name = ifelse(grepl('b.mass.f', variable), '1', 
+  #                                    ifelse(grepl('b.mass.m', variable), '1M',
+                  transform(var_name = ifelse(grepl('b.mass1', variable), '1', 
+                       ifelse(grepl('b.massP', variable), 'P', NA))) %>%
+  transform(sex = ifelse(grepl('M', variable), 'M', 'F')) %>%
+  transform(var_name = factor(var_name, levels = c('P', '1'))) 
+  
+ggplot(b.mass_sum,
+       aes(x = var_name, y = med, col = sex, group = sex)) +
+  geom_errorbar(aes(x = var_name, ymin=lower, ymax=upper),
+                position = position_dodge(0.5),
+                width = 0.5, show.legend = F) +
+  geom_point(size = 0.8, position = position_dodge(0.5)) +
+  geom_hline(aes(yintercept = 0), linetype = 'dashed') +
+  xlab('') + ylab(expression(paste('Logit-scale effect of handling mass'))) +
   ggtitle('') +
   plot_theme(legend.position = 'top', panel.border = element_rect(fill = NA),
+             plot.title = element_text(hjust = 0.5)) 
+
+#intercept
+#survival
+int_dat <- post_sum %>% filter(grepl('int.phi', variable)) %>%
+  # bind_rows(post_sum %>% filter(grepl('int.psi', variable))) %>%
+  transform(variable = gsub('int.', '', variable)) %>%
+  transform(variable = factor(variable, levels = c('phiP', 'phiPM', 'phi1', 
+                                                   'phi1M', 'phi2.3', 'phi2.3M',
+                            'phi4.6', 'phi4.6M', 'phi7.9', 'phi7.9M', 'phi10.12', 'phi10.12M',
+                            'phi13.16', 'phi13.16M', 'phiA', 'phiAM'))) %>%
+  transform(sex = ifelse(grepl('M', variable), 'M', 'F')) 
+  
+ggplot(int_dat %>% filter(grepl('phi', variable)),
+       aes(variable, med, color = sex)) +
+  geom_errorbar(aes(x = variable, ymin=lower, ymax=upper),
+                position = position_dodge(0.5),
+                width = 0.5, show.legend = F) +
+  geom_point(size = 0.8, position = position_dodge(0.5)) +
+  xlab('') + ylab(expression(paste('Survival probability ',  '(', phi, ')'))) +
+  ggtitle('') +
+  facet_wrap(~sex, scales = 'free_x', drop = T) +
+  plot_theme(legend.position = 'none', 
+             panel.border = element_rect(fill = NA),
              plot.title = element_text(hjust = 0.5)) +
-  guides(color = guide_legend("", nrow = 1, byrow = T)) +
-  scale_color_manual(values = rainbow2[c(2,5)], name = '') 
+  scale_color_manual(values = rainbow2[c(2,5,6,7,8)], name = '')
+
+#detection
+int_dat <- post_sum %>% filter(grepl('int.p', variable)) %>%
+  # bind_rows(post_sum %>% filter(grepl('int.psi', variable))) %>%
+  transform(variable = gsub('int.', '', variable)) %>%
+  filter(!grepl('phi', variable)) %>%
+  transform(variable = factor(variable, levels = c('p1', 'p2.3', 'p4.6', 'p4.6M', 
+                                                   'p7.12', 'p7.12M', 'pA', 'pAM'))) %>%
+  transform(sex = ifelse(grepl('M', variable), 'M', 'F')) 
+
+ggplot(int_dat,
+       aes(variable, med, color = sex)) +
+  geom_errorbar(aes(x = variable, ymin=lower, ymax=upper),
+                position = position_dodge(0.5),
+                width = 0.5, show.legend = F) +
+  geom_point(size = 0.8, position = position_dodge(0.5)) +
+  xlab('') + ylab(expression(paste('Survival probability ',  '(', phi, ')'))) +
+  ggtitle('') +
+  facet_wrap(~sex, scales = 'free_x', drop = T) +
+  plot_theme(legend.position = 'none', 
+             panel.border = element_rect(fill = NA),
+             plot.title = element_text(hjust = 0.5)) +
+  scale_color_manual(values = rainbow2[c(2,5,6,7,8)], name = '')
+
 
 ```
 
-#### Survival by site  
-```{r phi by site}
-
-#mean rates
-site.pars <- all_pars[which(grepl('b.site', all_pars))]
-mu.pars <- all_pars[which(grepl('mu.', all_pars))]
-
-pars <- c(site.pars, mu.pars)
-
-mu.vals <- post_sum %>%
-  filter(variable %in% mu.pars) %>%
-  transform(age = gsub('mu.', '', variable)) 
-
-b.site <- post_sum %>% filter(grepl('b.site', variable) & med != 0) %>%
-  transform(age = ifelse(grepl('siteP', variable), 'P', 
-                         ifelse(grepl('site1', variable), '1',
-                                ifelse(grepl('site2', variable), '2', 
-                                       ifelse(grepl('siteJ', variable), 'J', 'A')))))
-
-#male back transformed values
-mean.phi.vals <- mu.vals %>%
-  merge(b.site, by = 'age', suffixes = c('', '.site'), all.x = T) %>%
-  #fill b.sex for older age intercepts
-  transform(med.site = ifelse(is.na(med.site) & age %in% c(3), b.site[b.site$age == 'J', 'med'], med.site),
-            lower.site = ifelse(is.na(lower.site) & age %in% c(3), b.site[b.site$age == 'J', 'lower'], lower.site),
-            upper.site = ifelse(is.na(upper.site) & age %in% c(3), b.site[b.site$age == 'J', 'upper'], upper.site)) %>%
-  transform(med = 1/(1+exp(-(med + med.site))),
-            lower = 1/(1+exp(-(lower + lower.site))),
-            upper = 1/(1+exp(-(upper + upper.site)))) %>%
-  transform(site = 'South Seal Rock') %>%
-  dplyr::select(c(med, lower, upper, variable, age, site)) %>%
-  bind_rows(
-    post_sum %>%
-  filter(grepl('int.phi', variable)) %>%
-  transform(age = gsub('int.phi', '', variable), site = 'Pyramid Rock')) %>%
-  transform(age = factor(age, levels = c('P', '1', '2', '3', 'J', 'A'),
-                         labels = c('P', '1', '2', '3', 'J', 'A'))) 
-
-ggplot(mean.phi.vals, aes(age, med, col = site, group = site)) +
-  geom_point(position = position_dodge(0.5)) +
-  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.25, position = position_dodge(0.5)) +
-  xlab('') + ylab(expression(paste('Survival probability ',  '(', phi, ')'))) +
-  ggtitle('') +
-  plot_theme(legend.position = 'top', panel.border = element_rect(fill = NA),
-             plot.title = element_text(hjust = 0.5)) +
-  guides(color = guide_legend("", nrow = 1, byrow = T)) +
-  scale_color_manual(values = rainbow2[c(2,5)], name = '') 
-
-
-```
 
 #### Survival over time
 
