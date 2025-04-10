@@ -104,7 +104,7 @@ ch_dat_f <- read.csv(here::here('data', 'res_dat_f.csv'),
                    header = T, stringsAsFactors = F) %>% 
   transform(sex == 'Fem') %>%
   filter(cohort > filter_yr) %>%
-  # filter(cohort == 2000) %>%
+  filter(cohort < 2004) %>%
   # filter(cohort < 1990) %>%
     # filter(cohort > 2009) %>%
   dplyr::select(-sex)
@@ -112,7 +112,7 @@ ch_dat_f <- read.csv(here::here('data', 'res_dat_f.csv'),
 ch_dat_m <- read.csv(here::here('data', 'res_dat_m.csv'),
                    header = T, stringsAsFactors = F) %>% 
   filter(cohort > filter_yr) %>%
-  # filter(cohort == 2000) %>%
+  filter(cohort < 2004) %>%
   # filter(cohort > 2009) %>%
     # filter(cohort < 1990) %>%
   dplyr::select(-sex)
@@ -140,6 +140,37 @@ sst_raw <- read.csv(here('data', '2025_CCEP_sst.csv'), stringsAsFactors = F, hea
 #use nonpupJulytoJune: survival of non-pup age classes - sea lion "year"
 
 sst_dat <- sst_raw %>% filter(time > filter_yr) %>% filter(time > 1999)
+
+#correlation between sst and mass?
+plot_dat_f <- ch_dat_f %>%
+  dplyr::select(brand, wt, cohort) %>%
+  group_by(cohort) %>%
+  dplyr::summarize(mean_wt = mean(wt)) %>%
+  merge(sst_dat %>% rename(cohort = time), by = 'cohort') %>%
+  transform(sex = 'Female')
+
+plot_dat_m <- ch_dat_m %>%
+  dplyr::select(brand, wt, cohort) %>%
+  group_by(cohort) %>%
+  dplyr::summarize(mean_wt = mean(wt)) %>%
+  merge(sst_dat %>% rename(cohort = time), by = 'cohort') %>%
+  transform(sex = 'Male')
+
+plot_dat <- bind_rows(plot_dat_f, plot_dat_m)
+ 
+#pups (female) are lighter in warmer years (late gestation)
+ggplot(plot_dat, aes(pupApriltoSeptSSTAnomalies, mean_wt, col = sex)) +
+  geom_point() +
+  geom_smooth(method = 'lm') +
+  facet_grid(~sex) +
+  theme_bw()
+
+#pups (female) are lighter in warmer years (non-breeding yr foraging)
+ggplot(plot_dat, aes(nonpupJulytoJuneSSTAnomalies, mean_wt, col = sex)) +
+  geom_point() +
+  geom_smooth(method = 'lm') +
+  facet_grid(~sex) +
+  theme_bw()
 
 
 ```
@@ -233,6 +264,376 @@ z.init.m = as.matrix(cjs.init(ch_m, fc_m))
 ```
 
 
+```{r null model DEBUGGING}
+
+CSL_CJS <- nimbleCode({
+
+# Priors and constraints
+  for (i in 1:n_f) {
+    for (t in 1:(n_occasions - 1)) {
+      logit(phiP[i,t]) <- mu.P + b.massP*mass_f[i] #+ epsP[t] + b.siteP[site[i]]
+      logit(p1[i,t]) <- mu.p1 #+ eps.p1[t]
+    # } #t
+
+    # for (t in 2:(n_occasions-1)) {
+      logit(phi1[i,t]) <- mu.1 + b.mass1*mass_f[i] #+ eps1[t] + b.site1[site[i]]
+      logit(p2[i,t]) <- mu.p2.3  #+ eps.p2[t]
+    # }
+
+    # for (t in 3:(n_occasions-1)) {
+      logit(phi2[i,t]) <- mu.2.3 #+ eps2[t] + b.site2[site[i]]
+      logit(p3[i,t]) <- mu.p2.3 #+ eps.pJ[t]
+    # }
+
+    # for (t in 4:(n_occasions-1)) {
+      logit(phi3[i,t]) <- mu.2.3 #+ epsJ[t] + b.siteJ[site[i]]
+      logit(p4[i,t]) <- mu.p4.6 #+ eps.pJ[t]
+    # } #t psi
+
+    # for (t in 5:(n_occasions-1)) {
+      logit(phi4[i,t]) <- mu.4.6 #+ epsJ[t] + b.siteJ[site[i]]
+      logit(p5[i,t]) <- mu.p4.6 #+ eps.pA[t]
+    # } #t
+
+    # for (t in 6:(n_occasions-1)) {
+      logit(phi5[i,t]) <- mu.4.6 #+ epsA[t]
+      logit(p6[i,t]) <- mu.p4.6 #+ eps.pA[t]
+    # } #t
+
+    # for (t in 7:(n_occasions-1)) {
+      logit(phi6[i,t]) <- mu.4.6 #+ epsA[t]
+      logit(p7[i,t]) <- mu.p7.12 #+ eps.pA[t]
+    # } #t
+
+    # for (t in 8:(n_occasions-1)) {
+      logit(phi7[i,t]) <- mu.7.9 #+ epsA[t]
+      logit(p8[i,t]) <- mu.p7.12 #+ eps.pA[t]
+    # } #t
+
+    # for (t in 9:(n_occasions-1)) {
+      logit(phi8[i,t]) <- mu.7.9 #+ epsA[t]
+      logit(p9[i,t]) <- mu.p7.12 #+ eps.pA[t]
+    # } #t
+
+    # for (t in 10:(n_occasions-1)) {
+      logit(phi9[i,t]) <- mu.7.9 #+ epsA[t]
+      logit(p10[i,t]) <- mu.p7.12 #+ eps.pA[t]
+    # } #t
+
+    # for (t in 11:(n_occasions-1)) {
+      logit(phi10[i,t]) <- mu.10.12 # + epsA[t]
+      logit(p11[i,t]) <- mu.p7.12 #+ eps.pA[t]
+    # } #t
+
+    # for (t in 12:(n_occasions-1)) {
+      logit(phi11[i,t]) <- mu.10.12 # + epsA[t]
+      logit(p12[i,t]) <- mu.p7.12 #+ eps.pA[t]
+    # } #t
+
+        # for (t in 13:(n_occasions-1)) {
+      logit(phi12[i,t]) <- mu.10.12 # + epsA[t]
+      logit(p13[i,t]) <- mu.pA #+ eps.pA[t]
+    # } #t
+
+        # for (t in 14:(n_occasions-1)) {
+      logit(phi13[i,t]) <- mu.13.16 # + epsA[t]
+      logit(p14[i,t]) <- mu.pA
+    # } #t
+
+        # for (t in 15:(n_occasions-1)) {
+      logit(phi14[i,t]) <- mu.13.16 # + epsA[t]
+      logit(p15[i,t]) <- mu.pA
+    # } #t
+
+        # for (t in 16:(n_occasions-1)) {
+      logit(phi15[i,t]) <- mu.13.16 # + epsA[t]
+      logit(p16[i,t]) <- mu.pA
+    # } #t
+
+        # for (t in 17:(n_occasions-1)) {
+      logit(phi16[i,t]) <- mu.13.16 # + epsA[t]
+      logit(pA[i,t]) <- mu.pA
+    # } #t
+
+        # for (t in 18:(n_occasions-1)) {
+      logit(phiA[i,t]) <- mu.A # + epsA[t]
+    } #t
+  } #females
+  
+  
+  #males
+  #   for (i in 1:n_m) { 
+  #   for (t in 1:(n_occasions - 1)) {
+  #     logit(phiPM[i,t]) <- mu.PM + b.massPM*mass_m[i] #+ epsP[t]
+  #     logit(p1M[i,t]) <- mu.p1 #+ eps.p1[t]
+  #   # } #t 
+  #   
+  #   # for (t in 2:(n_occasions-1)) {
+  #     logit(phi1M[i,t]) <- mu.1M + b.mass1M*mass_m[i] #+ eps1[t] 
+  #     logit(p2M[i,t]) <- mu.p2.3 # + eps.p2.3[t]
+  #   # }
+  #   
+  #   # for (t in 3:(n_occasions-1)) {
+  #     logit(phi2M[i,t]) <- mu.2.3M #+ eps2.3[t]
+  #     logit(p3M[i,t]) <- mu.p2.3 #+ eps.p2.3[t]
+  #   # }
+  #   
+  #   # for (t in 4:(n_occasions-1)) { 
+  #     logit(phi3M[i,t]) <- mu.2.3M #+ eps2.3[t] 
+  #     logit(p4M[i,t]) <- mu.p4.6M #+ eps.p4.6[t]
+  #   # } #t psi
+  #   
+  #   # for (t in 5:(n_occasions-1)) {
+  #     logit(phi4M[i,t]) <- mu.4.6M #+ eps4.6[t] 
+  #     logit(p5M[i,t]) <- mu.p4.6M #+ eps.p4.6[t]
+  #   # } #t 
+  #   
+  #   # for (t in 6:(n_occasions-1)) {  
+  #     logit(phi5M[i,t]) <- mu.4.6M #+ eps4.6[t] 
+  #     logit(p6M[i,t]) <- mu.p4.6M #+ eps.p4.6[t]
+  #   # } #t 
+  #   
+  #   # for (t in 7:(n_occasions-1)) {  
+  #     logit(phi6M[i,t]) <- mu.4.6M #+ eps4.6[t] 
+  #     logit(p7M[i,t]) <- mu.p7.12M #+ eps.pAM[t]
+  #   # } #t 
+  #   
+  #   # for (t in 8:(n_occasions-1)) {  
+  #     logit(phi7M[i,t]) <- mu.7.9M #+ epsAM[t] 
+  #     logit(p8M[i,t]) <- mu.p7.12M #+ eps.pAM[t]
+  #   # } #t 
+  #   
+  #   # for (t in 9:(n_occasions-1)) {  
+  #     logit(phi8M[i,t]) <- mu.7.9M #+ epsAM[t] 
+  #     logit(p9M[i,t]) <- mu.p7.12M #+ eps.pAM[t]
+  #   # } #t 
+  #   
+  #   # for (t in 10:(n_occasions-1)) {  
+  #     logit(phi9M[i,t]) <- mu.7.9M #+ epsAM[t] 
+  #     logit(p10M[i,t]) <- mu.p7.12M #+ eps.pAM[t]
+  #   # } #t 
+  #   
+  #   # for (t in 11:(n_occasions-1)) {  
+  #     logit(phi10M[i,t]) <- mu.10.12M #+ epsAM[t] 
+  #     logit(p11M[i,t]) <- mu.p7.12M #+ eps.pAM[t]
+  #   # } #t 
+  # 
+  #   # for (t in 12:(n_occasions-1)) {  
+  #     logit(phi11M[i,t]) <- mu.10.12M #+ epsAM[t] 
+  #     logit(p12M[i,t]) <- mu.p7.12M #+ eps.pAM[t]
+  #   # } #t   
+  #   
+  #       # for (t in 13:(n_occasions-1)) {  
+  #     logit(phi12M[i,t]) <- mu.10.12M #+ epsAM[t] 
+  #     logit(p13M[i,t]) <- mu.pAM #+ eps.pAM[t]
+  #   # } #t  
+  #   
+  #       # for (t in 14:(n_occasions-1)) {  
+  #     logit(phi13M[i,t]) <- mu.13.16M #+ epsAM[t] 
+  #      logit(p14M[i,t]) <- mu.pAM 
+  #   # } #t  
+  #   
+  #       # for (t in 15:(n_occasions-1)) {  
+  #     logit(phi14M[i,t]) <- mu.13.16M #+ epsAM[t]
+  #      logit(p15M[i,t]) <- mu.pAM 
+  #   # } #t  
+  #   
+  #       # for (t in 16:(n_occasions-1)) {  
+  #     logit(phi15M[i,t]) <- mu.13.16M #+ epsAM[t] 
+  #      logit(p16M[i,t]) <- mu.pAM 
+  #   # } #t  
+  #   
+  #       # for (t in 17:(n_occasions-1)) {  
+  #     logit(phi16M[i,t]) <- mu.13.16M #+ epsAM[t] 
+  #      logit(pAM[i,t]) <- mu.pAM 
+  #   # } #t  
+  #   
+  #       # for (t in 18:(n_occasions-1)) {  
+  #     logit(phiAM[i,t]) <- mu.AM #+ epsAM[t] 
+  #   } #t  
+  # } #males
+    
+   
+### Priors
+    #p
+    mu.p1 <- log(int.p1/(1 - int.p1))
+    mu.p2.3 <- log(int.p2.3/(1 - int.p2.3))
+    mu.p4.6 <- log(int.p4.6/(1 - int.p4.6))
+    mu.p7.12 <- log(int.p7.12/(1 - int.p7.12))
+    mu.pA <- log(int.pA/(1 - int.pA))
+
+    int.p1 ~ dunif(0,1)
+    int.p2.3 ~ dunif(0,1)
+    int.p4.6 ~ dunif(0,1)
+    int.p7.12 ~ dunif(0,1)
+    int.pA ~ dunif(0,1)
+    
+    mu.p4.6M <- log(int.p4.6M/(1 - int.p4.6M))
+    mu.p7.12M <- log(int.p7.12M/(1 - int.p7.12M))
+    mu.pAM <- log(int.pAM/(1 - int.pAM))
+
+    int.p4.6M ~ dunif(0,1)
+    int.p7.12M ~ dunif(0,1)
+    int.pAM ~ dunif(0,1)
+
+    #survival
+    mu.P <- log(int.phiP/(1 - int.phiP))
+    mu.1 <- log(int.phi1/(1 - int.phi1))
+    mu.2.3 <- log(int.phi2.3/(1 - int.phi2.3))
+    mu.4.6 <- log(int.phi4.6/(1 - int.phi4.6))
+    mu.7.9 <- log(int.phi7.9/(1 - int.phi7.9))
+    mu.10.12 <- log(int.phi10.12/(1 - int.phi10.12))
+    mu.13.16 <- log(int.phi13.16/(1 - int.phi13.16))
+    mu.A <- log(int.phiA/(1 - int.phiA))
+    
+    int.phiP ~ dunif(0,1)
+    int.phi1 ~ dunif(0,1)
+    int.phi2.3 ~ dunif(0,1)
+    int.phi4.6 ~ dunif(0,1)
+    int.phi7.9 ~ dunif(0,1)
+    int.phi10.12 ~ dunif(0,1)
+    int.phi13.16 ~ dunif(0,1)
+    int.phiA ~ dunif(0,1)
+    
+    #males
+    mu.PM <- log(int.phiPM/(1 - int.phiPM))
+    mu.1M <- log(int.phi1M/(1 - int.phi1M))
+    mu.2.3M <- log(int.phi2.3M/(1 - int.phi2.3M))
+    mu.4.6M <- log(int.phi4.6M/(1 - int.phi4.6M))
+    mu.7.9M <- log(int.phi7.9M/(1 - int.phi7.9M))
+    mu.10.12M <- log(int.phi10.12M/(1 - int.phi10.12M))
+    mu.13.16M <- log(int.phi13.16M/(1 - int.phi13.16M))
+    mu.AM <- log(int.phiAM/(1 - int.phiAM))
+    
+    int.phiPM ~ dunif(0,1)
+    int.phi1M ~ dunif(0,1)
+    int.phi2.3M ~ dunif(0,1)
+    int.phi4.6M ~ dunif(0,1)
+    int.phi7.9M ~ dunif(0,1)
+    int.phi10.12M ~ dunif(0,1)
+    int.phi13.16M ~ dunif(0,1)
+    int.phiAM ~ dunif(0,1)
+    
+    b.massP ~ dnorm(0, sd = s.mass)
+    b.mass1 ~ dnorm(0, sd = s.mass)
+    b.massPM ~ dnorm(0, sd = s.mass)
+    b.mass1M ~ dnorm(0, sd = s.mass)
+    s.mass ~ dexp(1)
+  
+    #likelihood
+for (i in 1:n_f) { #females
+    z[i, fc[i]:fc[i]] <- 1 #pups at first capture
+
+for (t in (fc[i] + 1):n_occasions) {
+      z[i,t] ~ dcat(state_probs[i,t-1,1:19])
+      y[i,t] ~ dcat(event_probs[i,t,1:19])
+
+    state_probs[i,t-1,1:19] <- getPHI(z = z[i,t-1],
+                                      phiP = phiP[i,t-1], phi1 = phi1[i,t-1], phi2 = phi2[i,t-1],
+                                      phi3 = phi3[i,t-1], phi4 = phi4[i,t-1], phi5 = phi5[i,t-1],
+                                      phi6 = phi6[i,t-1], phi7 = phi7[i,t-1], phi8 = phi8[i,t-1],
+                                      phi9 = phi9[i,t-1], phi10 = phi10[i,t-1],
+                                      phi11 = phi11[i,t-1], phi12 = phi12[i,t-1],
+                                      phi13 = phi13[i,t-1], phi14 = phi14[i,t-1],
+                                      phi15 = phi15[i,t-1], phi16 = phi16[i,t-1],
+                                      phiA = phiA[i,t-1])
+
+    event_probs[i,t,1:19] <- getP(z = z[i,t],
+                                    p1 = p1[i,t-1], p2 = p2[i,t-1], p3 = p3[i,t-1],
+                                    p4 = p4[i,t-1], p5 = p5[i,t-1], p6 = p6[i,t-1],
+                                    p7 = p7[i,t-1], p8 = p8[i,t-1], p9 = p9[i,t-1],
+                                  p10 = p10[i,t-1], p11 = p11[i,t-1], p12 = p12[i,t-1],
+                                  p13 = p13[i,t-1], p14 = p14[i,t-1], p15 = p15[i,t-1],
+                                    p16 = p16[i,t-1], pA = pA[i,t-1])
+    } #t likelihood
+} #i likelihood
+    
+#     for (i in 1:n_m) { #males
+#     zm[i, fc_m[i]:fc_m[i]] <- 1 #pups at first capture
+# 
+# for (t in (fc_m[i] + 1):n_occasions) {
+#       zm[i,t] ~ dcat(state_probsM[i,t-1,1:19])
+#       ym[i,t] ~ dcat(event_probsM[i,t,1:19])
+#       
+#     state_probsM[i,t-1,1:19] <- getPHI(z = zm[i,t-1], 
+#                                       phiP = phiPM[i,t-1], phi1 = phi1M[i,t-1], 
+#                                       phi2 = phi2M[i,t-1], 
+#                                       phi3 = phi3M[i,t-1], 
+#                                       phi4 = phi4M[i,t-1], phi5 = phi5M[i,t-1], 
+#                                       phi6 = phi6M[i,t-1], phi7 = phi7M[i,t-1], 
+#                                       phi8 = phi8M[i,t-1], phiA = phiAM[i,t-1],
+#                                       phi9 = phi9M[i,t-1], phi10 = phi10M[i,t-1],
+#                                       phi11 = phi11M[i,t-1], phi12 = phi12M[i,t-1],
+#                                       phi13 = phi13M[i,t-1], phi14 = phi14M[i,t-1],
+#                                       phi15 = phi15M[i,t-1], phi16 = phi16M[i,t-1])
+#     
+#     event_probsM[i,t,1:19] <- getP(z = zm[i,t], 
+#                                     p1 = p1M[i,t-1], p2 = p2M[i,t-1], p3 = p3M[i,t-1], 
+#                                     p4 = p4M[i,t-1], p5 = p5M[i,t-1], p6 = p6M[i,t-1],
+#                                     p7 = p7M[i,t-1], p8 = p8M[i,t-1], p9 = p9M[i,t-1],
+#                                     p10 = p10M[i,t-1], p11 = p11M[i,t-1], p12 = p12M[i,t-1], 
+#                                   p13 = p13M[i,t-1],
+#                                   p14 = p14M[i,t-1], p15 = p15M[i,t-1], p16 = p16M[i,t-1], 
+#                                   pA = pAM[i,t-1])
+#     } #t likelihood 
+# } #i likelihood 
+    
+}) # mod   
+
+##### run model ####
+nim.data <- list(y = y, ym = ym)
+
+nim.constants <- list(n_f = dim(y)[1], n_m = dim(ym)[1], 
+                      n_occasions = n_occasions,
+                      mass_f = mass_f, mass_m = mass_m, #site = rook, sex = sex,
+                      fc = fc, fc_m = fc_m)
+
+inits <- list(int.phiP = 0.9, int.phi1 = 0.9, int.phi2.3 = 0.9, int.phi4.6 = 0.9, int.phi7.9 = 0.9, 
+              int.phi10.12 = 0.9, int.phi13.16 = 0.8, int.phiA = 0.6,
+              int.phiPM = 0.9, int.phi1M = 0.9, int.phi2.3M = 0.9, int.phi4.6M = 0.9, int.phi7.9M = 0.9, 
+              int.phi10.12M = 0.9, int.phi13.16M = 0.8, int.phiAM = 0.6,
+              int.p1 = 0.4, int.p2.3 = 0.4, int.p4.6 = 0.5, int.p7.12 = 0.7, int.pA = 0.8,
+              int.p4.6M = 0.5, int.p7.12M = 0.7, int.pAM = 0.8,
+              b.massP = 0, b.mass1 = 0, b.massPM = 0, b.mass1M = 0, 
+              z = z.init, zm = z.init.m)
+
+### parameters
+params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA', 'int.p7.12M', 'int.pAM',
+            'b.massP', 'b.mass1', 'b.massPM', 'b.mass1M',
+            'int.phiP', 'int.phi1', 'int.phi2.3', 'int.phi4.6', 'int.phi7.9',
+            'int.phi10.12', 'int.phi13.16', 'int.phiA',
+            'int.phiPM', 'int.phi1M', 'int.phi2.3M', 'int.phi4.6M', 'int.phi7.9M',
+            'int.phi10.12M', 'int.phi13.16M', 'int.phiAM')
+
+### run model
+# n.iter = 3500; n.chains = 3; n.burnin = 2000; nthin = 3; nAdapt = 20
+n.iter = 15000; n.chains = 3; n.burnin = 9000; nthin = 3; nAdapt = 20
+n.iter = 400; n.chains = 1; n.burnin = 100; nthin = 2; nAdapt = 20
+
+
+start <- Sys.time()
+
+Rmodel <- nimbleModel(code = CSL_CJS, 
+                      constants = nim.constants, data = nim.data, 
+                      calculate = F, check = F, inits = inits)
+
+conf <- configureMCMC(Rmodel, monitors = params, control = list(adaptInterval = nAdapt), 
+                      thin = nthin, useConjugacy = FALSE)
+
+Rmcmc <- buildMCMC(conf)  #produce uncompiled R mcmc function
+Cmodel <- compileNimble(Rmodel)
+Cmcmc <- compileNimble(Rmcmc, project = Rmodel)
+
+out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin, nchains = n.chains, inits = inits,
+                 setSeed = FALSE, progressBar = TRUE,
+               samplesAsCodaMCMC = TRUE)
+
+# saveRDS(out, here::here('results', 'out_null.RDS')) 
+
+```
+
+
+
 ```{r null model}
 
 CSL_CJS <- nimbleCode({
@@ -242,89 +643,89 @@ CSL_CJS <- nimbleCode({
     for (t in 1:(n_occasions - 1)) {
       logit(phiP[i,t]) <- mu.P + b.massP*mass_f[i] #+ epsP[t] + b.siteP[site[i]]
       logit(p1[i,t]) <- mu.p1 #+ eps.p1[t]
-    } #t 
+    # } #t 
     
-    for (t in 2:(n_occasions-1)) {
+    # for (t in 2:(n_occasions-1)) {
       logit(phi1[i,t]) <- mu.1 + b.mass1*mass_f[i] #+ eps1[t] + b.site1[site[i]]
       logit(p2[i,t]) <- mu.p2.3  #+ eps.p2[t]
-    }
+    # }
     
-    for (t in 3:(n_occasions-1)) {
+    # for (t in 3:(n_occasions-1)) {
       logit(phi2[i,t]) <- mu.2.3 #+ eps2[t] + b.site2[site[i]]
       logit(p3[i,t]) <- mu.p2.3 #+ eps.pJ[t]
-    }
+    # }
     
-    for (t in 4:(n_occasions-1)) { 
+    # for (t in 4:(n_occasions-1)) { 
       logit(phi3[i,t]) <- mu.2.3 #+ epsJ[t] + b.siteJ[site[i]]
       logit(p4[i,t]) <- mu.p4.6 #+ eps.pJ[t]
-    } #t psi
+    # } #t psi
     
-    for (t in 5:(n_occasions-1)) {
+    # for (t in 5:(n_occasions-1)) {
       logit(phi4[i,t]) <- mu.4.6 #+ epsJ[t] + b.siteJ[site[i]]
       logit(p5[i,t]) <- mu.p4.6 #+ eps.pA[t]
-    } #t 
+    # } #t 
     
-    for (t in 6:(n_occasions-1)) {  
+    # for (t in 6:(n_occasions-1)) {  
       logit(phi5[i,t]) <- mu.4.6 #+ epsA[t] 
       logit(p6[i,t]) <- mu.p4.6 #+ eps.pA[t]
-    } #t 
+    # } #t 
     
-    for (t in 7:(n_occasions-1)) {  
+    # for (t in 7:(n_occasions-1)) {  
       logit(phi6[i,t]) <- mu.4.6 #+ epsA[t] 
       logit(p7[i,t]) <- mu.p7.12 #+ eps.pA[t]
-    } #t 
+    # } #t 
     
-    for (t in 8:(n_occasions-1)) {  
+    # for (t in 8:(n_occasions-1)) {  
       logit(phi7[i,t]) <- mu.7.9 #+ epsA[t] 
       logit(p8[i,t]) <- mu.p7.12 #+ eps.pA[t]
-    } #t 
+    # } #t 
     
-    for (t in 9:(n_occasions-1)) {  
+    # for (t in 9:(n_occasions-1)) {  
       logit(phi8[i,t]) <- mu.7.9 #+ epsA[t] 
       logit(p9[i,t]) <- mu.p7.12 #+ eps.pA[t]
-    } #t 
+    # } #t 
     
-    for (t in 10:(n_occasions-1)) {  
+    # for (t in 10:(n_occasions-1)) {  
       logit(phi9[i,t]) <- mu.7.9 #+ epsA[t] 
       logit(p10[i,t]) <- mu.p7.12 #+ eps.pA[t]
-    } #t 
+    # } #t 
     
-    for (t in 11:(n_occasions-1)) {  
+    # for (t in 11:(n_occasions-1)) {  
       logit(phi10[i,t]) <- mu.10.12 # + epsA[t] 
       logit(p11[i,t]) <- mu.p7.12 #+ eps.pA[t]
-    } #t 
+    # } #t 
   
-    for (t in 12:(n_occasions-1)) {  
+    # for (t in 12:(n_occasions-1)) {  
       logit(phi11[i,t]) <- mu.10.12 # + epsA[t] 
       logit(p12[i,t]) <- mu.p7.12 #+ eps.pA[t]
-    } #t   
+    # } #t   
     
-        for (t in 13:(n_occasions-1)) {  
+        # for (t in 13:(n_occasions-1)) {  
       logit(phi12[i,t]) <- mu.10.12 # + epsA[t] 
       logit(p13[i,t]) <- mu.pA #+ eps.pA[t]
-    } #t  
+    # } #t  
     
-        for (t in 14:(n_occasions-1)) {  
+        # for (t in 14:(n_occasions-1)) {  
       logit(phi13[i,t]) <- mu.13.16 # + epsA[t] 
       logit(p14[i,t]) <- mu.pA
-    } #t  
+    # } #t  
     
-        for (t in 15:(n_occasions-1)) {  
+        # for (t in 15:(n_occasions-1)) {  
       logit(phi14[i,t]) <- mu.13.16 # + epsA[t] 
       logit(p15[i,t]) <- mu.pA
-    } #t  
+    # } #t  
     
-        for (t in 16:(n_occasions-1)) {  
+        # for (t in 16:(n_occasions-1)) {  
       logit(phi15[i,t]) <- mu.13.16 # + epsA[t] 
       logit(p16[i,t]) <- mu.pA
-    } #t  
+    # } #t  
     
-        for (t in 17:(n_occasions-1)) {  
+        # for (t in 17:(n_occasions-1)) {  
       logit(phi16[i,t]) <- mu.13.16 # + epsA[t] 
       logit(pA[i,t]) <- mu.pA
-    } #t  
+    # } #t  
     
-        for (t in 18:(n_occasions-1)) {  
+        # for (t in 18:(n_occasions-1)) {  
       logit(phiA[i,t]) <- mu.A # + epsA[t] 
     } #t  
   } #females
@@ -335,89 +736,89 @@ CSL_CJS <- nimbleCode({
     for (t in 1:(n_occasions - 1)) {
       logit(phiPM[i,t]) <- mu.PM + b.massPM*mass_m[i] #+ epsP[t]
       logit(p1M[i,t]) <- mu.p1 #+ eps.p1[t]
-    } #t 
+    # } #t 
     
-    for (t in 2:(n_occasions-1)) {
+    # for (t in 2:(n_occasions-1)) {
       logit(phi1M[i,t]) <- mu.1M + b.mass1M*mass_m[i] #+ eps1[t] 
       logit(p2M[i,t]) <- mu.p2.3 # + eps.p2.3[t]
-    }
+    # }
     
-    for (t in 3:(n_occasions-1)) {
+    # for (t in 3:(n_occasions-1)) {
       logit(phi2M[i,t]) <- mu.2.3M #+ eps2.3[t]
       logit(p3M[i,t]) <- mu.p2.3 #+ eps.p2.3[t]
-    }
+    # }
     
-    for (t in 4:(n_occasions-1)) { 
+    # for (t in 4:(n_occasions-1)) { 
       logit(phi3M[i,t]) <- mu.2.3M #+ eps2.3[t] 
       logit(p4M[i,t]) <- mu.p4.6M #+ eps.p4.6[t]
-    } #t psi
+    # } #t psi
     
-    for (t in 5:(n_occasions-1)) {
+    # for (t in 5:(n_occasions-1)) {
       logit(phi4M[i,t]) <- mu.4.6M #+ eps4.6[t] 
       logit(p5M[i,t]) <- mu.p4.6M #+ eps.p4.6[t]
-    } #t 
+    # } #t 
     
-    for (t in 6:(n_occasions-1)) {  
+    # for (t in 6:(n_occasions-1)) {  
       logit(phi5M[i,t]) <- mu.4.6M #+ eps4.6[t] 
       logit(p6M[i,t]) <- mu.p4.6M #+ eps.p4.6[t]
-    } #t 
+    # } #t 
     
-    for (t in 7:(n_occasions-1)) {  
+    # for (t in 7:(n_occasions-1)) {  
       logit(phi6M[i,t]) <- mu.4.6M #+ eps4.6[t] 
       logit(p7M[i,t]) <- mu.p7.12M #+ eps.pAM[t]
-    } #t 
+    # } #t 
     
-    for (t in 8:(n_occasions-1)) {  
+    # for (t in 8:(n_occasions-1)) {  
       logit(phi7M[i,t]) <- mu.7.9M #+ epsAM[t] 
       logit(p8M[i,t]) <- mu.p7.12M #+ eps.pAM[t]
-    } #t 
+    # } #t 
     
-    for (t in 9:(n_occasions-1)) {  
+    # for (t in 9:(n_occasions-1)) {  
       logit(phi8M[i,t]) <- mu.7.9M #+ epsAM[t] 
       logit(p9M[i,t]) <- mu.p7.12M #+ eps.pAM[t]
-    } #t 
+    # } #t 
     
-    for (t in 10:(n_occasions-1)) {  
+    # for (t in 10:(n_occasions-1)) {  
       logit(phi9M[i,t]) <- mu.7.9M #+ epsAM[t] 
       logit(p10M[i,t]) <- mu.p7.12M #+ eps.pAM[t]
-    } #t 
+    # } #t 
     
-    for (t in 11:(n_occasions-1)) {  
+    # for (t in 11:(n_occasions-1)) {  
       logit(phi10M[i,t]) <- mu.10.12M #+ epsAM[t] 
       logit(p11M[i,t]) <- mu.p7.12M #+ eps.pAM[t]
-    } #t 
+    # } #t 
   
-    for (t in 12:(n_occasions-1)) {  
+    # for (t in 12:(n_occasions-1)) {  
       logit(phi11M[i,t]) <- mu.10.12M #+ epsAM[t] 
       logit(p12M[i,t]) <- mu.p7.12M #+ eps.pAM[t]
-    } #t   
+    # } #t   
     
-        for (t in 13:(n_occasions-1)) {  
+        # for (t in 13:(n_occasions-1)) {  
       logit(phi12M[i,t]) <- mu.10.12M #+ epsAM[t] 
       logit(p13M[i,t]) <- mu.pAM #+ eps.pAM[t]
-    } #t  
+    # } #t  
     
-        for (t in 14:(n_occasions-1)) {  
+        # for (t in 14:(n_occasions-1)) {  
       logit(phi13M[i,t]) <- mu.13.16M #+ epsAM[t] 
        logit(p14M[i,t]) <- mu.pAM 
-    } #t  
+    # } #t  
     
-        for (t in 15:(n_occasions-1)) {  
+        # for (t in 15:(n_occasions-1)) {  
       logit(phi14M[i,t]) <- mu.13.16M #+ epsAM[t]
        logit(p15M[i,t]) <- mu.pAM 
-    } #t  
+    # } #t  
     
-        for (t in 16:(n_occasions-1)) {  
+        # for (t in 16:(n_occasions-1)) {  
       logit(phi15M[i,t]) <- mu.13.16M #+ epsAM[t] 
        logit(p16M[i,t]) <- mu.pAM 
-    } #t  
+    # } #t  
     
-        for (t in 17:(n_occasions-1)) {  
+        # for (t in 17:(n_occasions-1)) {  
       logit(phi16M[i,t]) <- mu.13.16M #+ epsAM[t] 
        logit(pAM[i,t]) <- mu.pAM 
-    } #t  
+    # } #t  
     
-        for (t in 18:(n_occasions-1)) {  
+        # for (t in 18:(n_occasions-1)) {  
       logit(phiAM[i,t]) <- mu.AM #+ epsAM[t] 
     } #t  
   } #males
@@ -564,7 +965,7 @@ inits <- list(int.phiP = 0.9, int.phi1 = 0.9, int.phi2.3 = 0.9, int.phi4.6 = 0.9
               int.p1 = 0.4, int.p2.3 = 0.4, int.p4.6 = 0.5, int.p7.12 = 0.7, int.pA = 0.8,
               int.p4.6M = 0.5, int.p7.12M = 0.7, int.pAM = 0.8,
               b.massP = 0, b.mass1 = 0, b.massPM = 0, b.mass1M = 0, 
-              z = z.init)
+              z = z.init, zm = z.init.m)
 
 ### parameters
 params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA', 'int.p7.12M', 'int.pAM',
@@ -577,7 +978,7 @@ params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA', 'int.p7.12M
 ### run model
 # n.iter = 3500; n.chains = 3; n.burnin = 2000; nthin = 3; nAdapt = 20
 n.iter = 15000; n.chains = 3; n.burnin = 9000; nthin = 3; nAdapt = 20
-# n.iter = 400; n.chains = 1; n.burnin = 100; nthin = 2; nAdapt = 20
+n.iter = 400; n.chains = 1; n.burnin = 100; nthin = 2; nAdapt = 20
 
 
 start <- Sys.time()
@@ -597,7 +998,7 @@ out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin, nchains = n.chains, in
                  setSeed = FALSE, progressBar = TRUE,
                samplesAsCodaMCMC = TRUE)
 
-saveRDS(out, here::here('results', 'out_null.RDS')) 
+# saveRDS(out, here::here('results', 'out_null.RDS')) 
 
 ```
 
@@ -941,7 +1342,7 @@ inits <- list(int.phiP = 0.9, int.phi1 = 0.9, int.phi2.3 = 0.9, int.phi4.6 = 0.9
               int.p1 = 0.4, int.p2.3 = 0.4, int.p4.6 = 0.5, int.p7.12 = 0.7, int.pA = 0.8,
               int.p4.6M = 0.5, int.p7.12M = 0.7, int.pAM = 0.8,
               b.massP = 0, b.mass1 = 0, b.massPM = 0, b.mass1M = 0, 
-              z = z.init)
+              z = z.init, zm = z.init.m)
 
 ### parameters
 params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA', 'int.p7.12M', 'int.pAM',
@@ -1394,7 +1795,7 @@ inits <- list(int.phiP = 0.9, int.phi1 = 0.9, int.phi2.3 = 0.9, int.phi4.6 = 0.9
               # mu.p1 = qlogis(0.7), mu.p2 = qlogis(0.6), mu.p3 = qlogis(0.6),
               # mu.pJ = qlogis(0.6), mu.pA = qlogis(0.6),
               b.massP = 0, b.mass1 = 0, b.massPM = 0, b.mass1M = 0,
-              z = z.init)
+              z = z.init, zm = z.init.m)
 
 ### parameters
 params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA', 'int.p7.12M', 'int.pAM',
@@ -1418,7 +1819,7 @@ params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA', 'int.p7.12M
 ### run model
 # n.iter = 3500; n.chains = 3; n.burnin = 2000; nthin = 3; nAdapt = 20
 n.iter = 15000; n.chains = 3; n.burnin = 8000; nthin = 3; nAdapt = 20
-# n.iter = 400; n.chains = 2; n.burnin = 100; nthin = 2; nAdapt = 20
+n.iter = 400; n.chains = 2; n.burnin = 100; nthin = 2; nAdapt = 20
 
 
 start <- Sys.time()
@@ -1438,7 +1839,7 @@ out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin, nchains = n.chains, in
                  setSeed = FALSE, progressBar = TRUE,
                samplesAsCodaMCMC = TRUE)
 
-saveRDS(out, here::here('results', 'out_RE.RDS')) 
+# saveRDS(out, here::here('results', 'out_RE.RDS')) 
 
 ```
 
