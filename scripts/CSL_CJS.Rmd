@@ -614,6 +614,16 @@ n.iter = 15000; n.chains = 3; n.burnin = 9000; nthin = 3; nAdapt = 20
 
 start <- Sys.time()
 
+cores=detectCores() 
+used.cores = min(n.chains, cores) 
+cl <- makeCluster(n.chains, setup_strategy = "sequential") 
+registerDoParallel(cl) 
+
+foreach(i = 1:n.chains) %dopar% { 
+  library(nimble)
+  library(here)
+  source(here("scripts", "nimbleFunctions.R"))
+
 Rmodel <- nimbleModel(code = CSL_CJS, 
                       constants = nim.constants, data = nim.data, 
                       calculate = F, check = F, inits = inits)
@@ -625,9 +635,24 @@ Rmcmc <- buildMCMC(conf)  #produce uncompiled R mcmc function
 Cmodel <- compileNimble(Rmodel)
 Cmcmc <- compileNimble(Rmcmc, project = Rmodel)
 
-out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin, nchains = n.chains, inits = inits,
+out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin, 
+               # nchains = n.chains, 
+               nchains = 1,
+               inits = inits,
                  setSeed = FALSE, progressBar = TRUE,
                samplesAsCodaMCMC = TRUE)
+
+
+  saveRDS(out, here('results', paste("out.parallel_null_", i, ".RDS", sep = ""))) 
+  
+} # closes parallel loop
+
+out_1 <- readRDS(here::here('results', paste("out.parallel_null_", "1.RDS", sep = "")))
+out_2 <- readRDS(here::here('results', paste("out.parallel_null_", "2.RDS", sep = "")))
+out_3 <- readRDS(here::here('results', paste("out.parallel_null_", "3.RDS", sep = "")))
+
+library(coda)
+out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
 
 saveRDS(out, here::here('results', 'out_null.RDS'))
 
@@ -993,6 +1018,16 @@ n.iter = 15000; n.chains = 3; n.burnin = 9000; nthin = 3; nAdapt = 20
 
 start <- Sys.time()
 
+cores=detectCores() 
+used.cores = min(n.chains, cores) 
+cl <- makeCluster(n.chains, setup_strategy = "sequential") 
+registerDoParallel(cl) 
+
+foreach(i = 1:n.chains) %dopar% { 
+  library(nimble)
+  library(here)
+  source(here("scripts", "nimbleFunctions.R"))
+
 Rmodel <- nimbleModel(code = CSL_CJS, 
                       constants = nim.constants, data = nim.data, 
                       calculate = F, check = F, inits = inits)
@@ -1004,9 +1039,24 @@ Rmcmc <- buildMCMC(conf)  #produce uncompiled R mcmc function
 Cmodel <- compileNimble(Rmodel)
 Cmcmc <- compileNimble(Rmcmc, project = Rmodel)
 
-out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin, nchains = n.chains, inits = inits,
+out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin, 
+               # nchains = n.chains, 
+               nchains = 1,
+               inits = inits,
                  setSeed = FALSE, progressBar = TRUE,
                samplesAsCodaMCMC = TRUE)
+
+
+  saveRDS(out, here('results', paste("out.parallel_sst_", i, ".RDS", sep = ""))) 
+  
+} # closes parallel loop
+
+out_1 <- readRDS(here::here('results', paste("out.parallel_sst_", "1.RDS", sep = "")))
+out_2 <- readRDS(here::here('results', paste("out.parallel_sst_", "2.RDS", sep = "")))
+out_3 <- readRDS(here::here('results', paste("out.parallel_sst_", "3.RDS", sep = "")))
+
+library(coda)
+out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
 
 saveRDS(out, here::here('results', 'out_sst.RDS')) 
 
@@ -1461,6 +1511,16 @@ n.iter = 15000; n.chains = 3; n.burnin = 8000; nthin = 3; nAdapt = 20
 
 start <- Sys.time()
 
+cores=detectCores() 
+used.cores = min(n.chains, cores) 
+cl <- makeCluster(n.chains, setup_strategy = "sequential") 
+registerDoParallel(cl) 
+
+foreach(i = 1:n.chains) %dopar% { 
+  library(nimble)
+  library(here)
+  source(here("scripts", "nimbleFunctions.R"))
+
 Rmodel <- nimbleModel(code = CSL_CJS, 
                       constants = nim.constants, data = nim.data, 
                       calculate = F, check = F, inits = inits)
@@ -1472,9 +1532,24 @@ Rmcmc <- buildMCMC(conf)  #produce uncompiled R mcmc function
 Cmodel <- compileNimble(Rmodel)
 Cmcmc <- compileNimble(Rmcmc, project = Rmodel)
 
-out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin, nchains = n.chains, inits = inits,
+out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin, 
+               # nchains = n.chains, 
+               nchains = 1,
+               inits = inits,
                  setSeed = FALSE, progressBar = TRUE,
                samplesAsCodaMCMC = TRUE)
+
+
+  saveRDS(out, here('results', paste("out.parallel_RE_", i, ".RDS", sep = ""))) 
+  
+} # closes parallel loop
+
+out_1 <- readRDS(here::here('results', paste("out.parallel_RE_", "1.RDS", sep = "")))
+out_2 <- readRDS(here::here('results', paste("out.parallel_RE_", "2.RDS", sep = "")))
+out_3 <- readRDS(here::here('results', paste("out.parallel_RE_", "3.RDS", sep = "")))
+
+library(coda)
+out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
 
 saveRDS(out, here::here('results', 'out_RE.RDS'))
 
