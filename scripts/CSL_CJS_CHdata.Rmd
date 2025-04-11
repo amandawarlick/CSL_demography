@@ -20,7 +20,7 @@ library(Hmisc) #v4.5-0; %nin%
 
 data_raw <- read.csv(here::here('data', "2025_CCEP_Zc_CH.csv"), 
                   header = T, stringsAsFactors = F) %>%
-  filter(cohort > 1999)
+  filter(cohort > 1993)
 
 ch_dat_f <- data_raw %>%
   dplyr::select(brand:Y2024) %>%
@@ -93,12 +93,12 @@ res_dat_m <- res_long_m %>%
 ## ALL INDIVIDUALS
 
 write.csv(res_dat_f,
-          file = here::here('data', 'res_dat_f.csv'), row.names = F)
+          file = here::here('data', 'res_dat_f_1994.csv'), row.names = F)
 # write.csv(num_resight,
 #           file = paste(here::here('data', 'ProcData'), '/num_resight.csv', sep = ''),
 #           row.names = F)
 write.csv(res_dat_m,
-          file = here::here('data', 'res_dat_m.csv'), row.names = F)
+          file = here::here('data', 'res_dat_m_1994.csv'), row.names = F)
 
 
 
