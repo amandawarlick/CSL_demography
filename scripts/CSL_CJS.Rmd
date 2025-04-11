@@ -100,7 +100,7 @@ getP <- nimbleFunction(
 filter_yr <- 1993
 
 ## capture histories
-ch_dat_f <- read.csv(here::here('data', 'res_dat_f.csv'),
+ch_dat_f <- read.csv(here::here('data', 'res_dat_f_1994.csv'),
                    header = T, stringsAsFactors = F) %>% 
   transform(sex == 'Fem') %>%
   # filter(cohort > filter_yr) %>%
@@ -109,7 +109,7 @@ ch_dat_f <- read.csv(here::here('data', 'res_dat_f.csv'),
     # filter(cohort > 2009) %>%
   dplyr::select(-sex)
 
-ch_dat_m <- read.csv(here::here('data', 'res_dat_m.csv'),
+ch_dat_m <- read.csv(here::here('data', 'res_dat_m_1994.csv'),
                    header = T, stringsAsFactors = F) %>% 
   # filter(cohort > filter_yr) %>%
   # filter(cohort < 2004) %>%
@@ -139,7 +139,7 @@ sst_raw <- read.csv(here('data', '2025_CCEP_sst.csv'), stringsAsFactors = F, hea
 #use pupAprtoSept: pup survival via gestational foraging success/pup weight effects
 #use nonpupJulytoJune: survival of non-pup age classes - sea lion "year"
 
-sst_dat <- sst_raw %>% filter(time > filter_yr) %>% filter(time > 1999)
+sst_dat <- sst_raw %>% filter(time > filter_yr) #%>% filter(time > 1993)
 
 #correlation between sst and mass?
 plot_dat_f <- ch_dat_f %>%
@@ -1565,8 +1565,8 @@ HMM_code <- nimbleCode({
    for (i in 1:n_f) { 
     for (t in 1:(n_occasions - 1)) {
       logit(phiP[i,t]) <- mu.P + 
-        b.sst.P*sst_pupForage[t] +
-        b.massP*mass_f[i] #+ epsP[t] + b.siteP[site[i]]
+        b.sst.P*sst_pupForage[t] #+
+        #b.massP*mass_f[i] #+ epsP[t] + b.siteP[site[i]]
       logit(p1[i,t]) <- mu.p1 #+ eps.p1[t]
     } #t 
     

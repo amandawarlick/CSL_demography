@@ -93,12 +93,12 @@ res_dat_m <- res_long_m %>%
 ## ALL INDIVIDUALS
 
 write.csv(res_dat_f,
-          file = here::here('data', 'res_dat_f.csv'), row.names = F)
+          file = here::here('data', 'res_dat_f_1994.csv'), row.names = F)
 # write.csv(num_resight,
 #           file = paste(here::here('data', 'ProcData'), '/num_resight.csv', sep = ''),
 #           row.names = F)
 write.csv(res_dat_m,
-          file = here::here('data', 'res_dat_m.csv'), row.names = F)
+          file = here::here('data', 'res_dat_m_1994.csv'), row.names = F)
 
 
 
