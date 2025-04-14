@@ -18,9 +18,11 @@ library(Hmisc) #v4.5-0; %nin%
 
 ```{r create CH}
 
+filter_yr <- 1999
+
 data_raw <- read.csv(here::here('data', "2025_CCEP_Zc_CH.csv"), 
                   header = T, stringsAsFactors = F) %>%
-  filter(cohort > 1993)
+  filter(cohort > 1999)
 
 ch_dat_f <- data_raw %>%
   dplyr::select(brand:Y2024) %>%
@@ -62,9 +64,19 @@ res_long <- ch_dat_f %>%
   #remove intermediate columns and recast using variable/year
   dplyr::select(-c(years_old, value, ch)) 
 
-res_dat_f <- res_long %>%
+#fill grid for 2020 surveys that are missing
+fill_grid <- expand.grid(brand = unique(res_long$brand),
+                         variable = c((filter_yr+1):2024))
+
+# test <- res_long %>% #filter(brand == '9102') %>% 
+#   merge(fill_grid, by = c('brand', 'variable'), all = T) 
+
+res_dat_f <- res_long %>% #filter(brand == '9102') %>% 
+  merge(fill_grid, by = c('brand', 'variable'), all = T) %>% 
   reshape2::dcast(brand + cohort + sex + wt ~ variable, value.var = 'ch_cat', fill = 19) %>%
-  arrange(cohort, brand)
+  arrange(cohort, brand) %>%
+  #filters out awkward blanks in wt, cohort, sex when expanded grid for 2020
+  filter(!is.na(cohort))
 
 res_long_m <- ch_dat_m %>%
   dplyr::select(-c(AgeAtFirstResight, LastYearSeen, TotaltimesResighted)) %>%
@@ -81,9 +93,16 @@ res_long_m <- ch_dat_m %>%
   #remove intermediate columns and recast using variable/year
   dplyr::select(-c(years_old, value, ch)) 
 
-res_dat_m <- res_long_m %>%
+fill_grid <- expand.grid(brand = unique(res_long_m$brand),
+                         variable = c((filter_yr+1):2024))
+
+
+res_dat_m <- res_long_m %>% 
+  merge(fill_grid, by = c('brand', 'variable'), all = T) %>%
   reshape2::dcast(brand + cohort + sex + wt ~ variable, value.var = 'ch_cat', fill = 19) %>%
-  arrange(cohort, brand)
+  arrange(cohort, brand) %>%
+  #filters out awkward blanks in wt, cohort, sex when expanded grid for 2020
+  filter(!is.na(cohort))
 
 
 ```
@@ -93,12 +112,12 @@ res_dat_m <- res_long_m %>%
 ## ALL INDIVIDUALS
 
 write.csv(res_dat_f,
-          file = here::here('data', 'res_dat_f_1994.csv'), row.names = F)
+          file = here::here('data', 'res_dat_f_2000.csv'), row.names = F)
 # write.csv(num_resight,
 #           file = paste(here::here('data', 'ProcData'), '/num_resight.csv', sep = ''),
 #           row.names = F)
 write.csv(res_dat_m,
-          file = here::here('data', 'res_dat_m_1994.csv'), row.names = F)
+          file = here::here('data', 'res_dat_m_2000.csv'), row.names = F)
 
 
 

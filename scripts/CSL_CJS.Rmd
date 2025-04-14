@@ -99,22 +99,22 @@ getP <- nimbleFunction(
 
 #consider filtering for brands starting in 1994; at least 1990
 
-filter_yr <- 1993
+filter_yr <- 1999
 
 ## capture histories
-ch_dat_f <- read.csv(here::here('data', 'res_dat_f_1994.csv'),
+ch_dat_f <- read.csv(here::here('data', 'res_dat_f_2000.csv'),
                    header = T, stringsAsFactors = F) %>% 
   transform(sex == 'Fem') %>%
   filter(cohort > filter_yr) %>%
-  # filter(cohort < 2004) %>%
+  # filter(cohort < 2006) %>%
   # filter(cohort < 1990) %>%
     # filter(cohort > 2009) %>%
   dplyr::select(-sex)
 
-ch_dat_m <- read.csv(here::here('data', 'res_dat_m_1994.csv'),
+ch_dat_m <- read.csv(here::here('data', 'res_dat_m_2000.csv'),
                    header = T, stringsAsFactors = F) %>% 
   filter(cohort > filter_yr) %>%
-  # filter(cohort < 2004) %>%
+  # filter(cohort < 2006) %>%
   # filter(cohort > 2009) %>%
     # filter(cohort < 1990) %>%
   dplyr::select(-sex)
@@ -141,7 +141,7 @@ sst_raw <- read.csv(here('data', '2025_CCEP_sst.csv'), stringsAsFactors = F, hea
 #use pupAprtoSept: pup survival via gestational foraging success/pup weight effects
 #use nonpupJulytoJune: survival of non-pup age classes - sea lion "year"
 
-sst_dat <- sst_raw %>% filter(time > filter_yr) #%>% filter(time > 1993)
+sst_dat <- sst_raw %>% filter(time > filter_yr) #%>% filter(time > 2010)
 
 #correlation between sst and mass?
 plot_dat_f <- ch_dat_f %>%
@@ -611,7 +611,7 @@ params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA', 'int.p4.6M'
 ### run model
 # n.iter = 3500; n.chains = 3; n.burnin = 2000; nthin = 3; nAdapt = 20
 n.iter = 15000; n.chains = 3; n.burnin = 9000; nthin = 3; nAdapt = 20
-n.iter = 400; n.chains = 2; n.burnin = 100; nthin = 2; nAdapt = 20
+n.iter = 700; n.chains = 1; n.burnin = 100; nthin = 2; nAdapt = 20
 
 
 start <- Sys.time()
@@ -621,10 +621,10 @@ used.cores = min(n.chains, cores)
 cl <- makeCluster(n.chains, setup_strategy = "sequential") 
 registerDoParallel(cl) 
 
-foreach(i = 1:n.chains) %dopar% { 
-  library(nimble)
-  library(here)
-  source(here("scripts", "nimbleFunctions.R"))
+# foreach(i = 1:n.chains) %dopar% { 
+#   library(nimble)
+#   library(here)
+#   source(here("scripts", "nimbleFunctions.R"))
 
 Rmodel <- nimbleModel(code = CSL_CJS, 
                       constants = nim.constants, data = nim.data, 
@@ -638,23 +638,26 @@ Cmodel <- compileNimble(Rmodel)
 Cmcmc <- compileNimble(Rmcmc, project = Rmodel)
 
 out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin, 
-               # nchains = n.chains, 
-               nchains = 1,
+               nchains = n.chains,
+               # nchains = 1,
                inits = inits,
                  setSeed = FALSE, progressBar = TRUE,
                samplesAsCodaMCMC = TRUE)
 
 
-  saveRDS(out, here('results', paste("out.parallel_null_", i, ".RDS", sep = ""))) 
+  # saveRDS(out, here('results', paste("out.parallel_null_", i, ".RDS", sep = ""))) 
   
-} # closes parallel loop
+# } # closes parallel loop
 
-out_1 <- readRDS(here::here('results', paste("out.parallel_null_", "1.RDS", sep = "")))
-out_2 <- readRDS(here::here('results', paste("out.parallel_null_", "2.RDS", sep = "")))
-out_3 <- readRDS(here::here('results', paste("out.parallel_null_", "3.RDS", sep = "")))
+# out_1 <- readRDS(here::here('results', paste("out.parallel_null_", "1.RDS", sep = "")))
+# out_2 <- readRDS(here::here('results', paste("out.parallel_null_", "2.RDS", sep = "")))
+# out_3 <- readRDS(here::here('results', paste("out.parallel_null_", "3.RDS", sep = "")))
+# 
+# library(coda)
+# out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
+# 
+# out <- list(`out_1`, `out_2`) %>% as.mcmc.list()
 
-library(coda)
-out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
 
 # saveRDS(out, here::here('results', 'out_null.RDS'))
 
@@ -1015,7 +1018,7 @@ params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA', 'int.p4.6M'
 ### run model
 # n.iter = 3500; n.chains = 3; n.burnin = 2000; nthin = 3; nAdapt = 20
 n.iter = 15000; n.chains = 3; n.burnin = 9000; nthin = 3; nAdapt = 20
-# n.iter = 400; n.chains = 1; n.burnin = 100; nthin = 2; nAdapt = 20
+n.iter = 400; n.chains = 1; n.burnin = 100; nthin = 2; nAdapt = 20
 
 
 start <- Sys.time()
@@ -1508,7 +1511,7 @@ params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA', 'int.p4.6M'
 ### run model
 # n.iter = 3500; n.chains = 3; n.burnin = 2000; nthin = 3; nAdapt = 20
 n.iter = 15000; n.chains = 3; n.burnin = 8000; nthin = 3; nAdapt = 20
-n.iter = 1000; n.chains = 2; n.burnin = 400; nthin = 2; nAdapt = 20
+n.iter = 700; n.chains = 1; n.burnin = 300; nthin = 2; nAdapt = 20
 
 
 start <- Sys.time()
@@ -1518,10 +1521,10 @@ used.cores = min(n.chains, cores)
 cl <- makeCluster(n.chains, setup_strategy = "sequential") 
 registerDoParallel(cl) 
 
-foreach(i = 1:n.chains) %dopar% { 
-  library(nimble)
-  library(here)
-  source(here("scripts", "nimbleFunctions.R"))
+# foreach(i = 1:n.chains) %dopar% { 
+  # library(nimble)
+  # library(here)
+  # source(here("scripts", "nimbleFunctions.R"))
 
 Rmodel <- nimbleModel(code = CSL_CJS, 
                       constants = nim.constants, data = nim.data, 
@@ -1535,23 +1538,23 @@ Cmodel <- compileNimble(Rmodel)
 Cmcmc <- compileNimble(Rmcmc, project = Rmodel)
 
 out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin, 
-               # nchains = n.chains, 
-               nchains = 1,
+               nchains = n.chains,
+               # nchains = 1,
                inits = inits,
                  setSeed = FALSE, progressBar = TRUE,
                samplesAsCodaMCMC = TRUE)
 
 
-  saveRDS(out, here('results', paste("out.parallel_RE_", i, ".RDS", sep = ""))) 
+  # saveRDS(out, here('results', paste("out.parallel_RE_2000-2003_", i, ".RDS", sep = ""))) 
   
-} # closes parallel loop
+# } # closes parallel loop
 
-out_1 <- readRDS(here::here('results', paste("out.parallel_RE_", "1.RDS", sep = "")))
-out_2 <- readRDS(here::here('results', paste("out.parallel_RE_", "2.RDS", sep = "")))
-out_3 <- readRDS(here::here('results', paste("out.parallel_RE_", "3.RDS", sep = "")))
-
-library(coda)
-out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
+# out_1 <- readRDS(here::here('results', paste("out.parallel_RE_2000-2003_", "1.RDS", sep = "")))
+# out_2 <- readRDS(here::here('results', paste("out.parallel_RE_2000-2003_", "2.RDS", sep = "")))
+# out_3 <- readRDS(here::here('results', paste("out.parallel_RE_2000-2003_", "3.RDS", sep = "")))
+# 
+# library(coda)
+# out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
 
 # saveRDS(out, here::here('results', 'out_RE.RDS'))
 

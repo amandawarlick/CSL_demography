@@ -31,7 +31,7 @@ Survival rates were estimated for ages P, 1, 2, juveniles (ages 3-4) adults (age
 out <- readRDS(here::here('results', 'out_null.RDS'))
 out <- readRDS(here::here('results', 'out_RE.RDS'))
 
-all_pars <- colnames(out[[1]])
+# all_pars <- colnames(out[[1]])
 outmat <- as.matrix(out)
 
 post_sum <- data.frame(
