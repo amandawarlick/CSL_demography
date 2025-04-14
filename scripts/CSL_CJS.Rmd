@@ -1510,8 +1510,8 @@ params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA', 'int.p4.6M'
 
 ### run model
 # n.iter = 3500; n.chains = 3; n.burnin = 2000; nthin = 3; nAdapt = 20
-n.iter = 15000; n.chains = 3; n.burnin = 8000; nthin = 3; nAdapt = 20
-n.iter = 700; n.chains = 1; n.burnin = 300; nthin = 2; nAdapt = 20
+n.iter = 10000; n.chains = 2; n.burnin = 4000; nthin = 3; nAdapt = 20
+# n.iter = 700; n.chains = 1; n.burnin = 300; nthin = 2; nAdapt = 20
 
 
 start <- Sys.time()
@@ -1521,10 +1521,10 @@ used.cores = min(n.chains, cores)
 cl <- makeCluster(n.chains, setup_strategy = "sequential") 
 registerDoParallel(cl) 
 
-# foreach(i = 1:n.chains) %dopar% { 
-  # library(nimble)
-  # library(here)
-  # source(here("scripts", "nimbleFunctions.R"))
+foreach(i = 1:n.chains) %dopar% {
+library(nimble)
+library(here)
+source(here("scripts", "nimbleFunctions.R"))
 
 Rmodel <- nimbleModel(code = CSL_CJS, 
                       constants = nim.constants, data = nim.data, 
@@ -1538,25 +1538,25 @@ Cmodel <- compileNimble(Rmodel)
 Cmcmc <- compileNimble(Rmcmc, project = Rmodel)
 
 out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin, 
-               nchains = n.chains,
-               # nchains = 1,
+               # nchains = n.chains,
+               nchains = 1,
                inits = inits,
                  setSeed = FALSE, progressBar = TRUE,
                samplesAsCodaMCMC = TRUE)
 
 
-  # saveRDS(out, here('results', paste("out.parallel_RE_2000-2003_", i, ".RDS", sep = ""))) 
-  
-# } # closes parallel loop
+  saveRDS(out, here('results', paste("out.parallel_RE_", i, ".RDS", sep = "")))
 
-# out_1 <- readRDS(here::here('results', paste("out.parallel_RE_2000-2003_", "1.RDS", sep = "")))
-# out_2 <- readRDS(here::here('results', paste("out.parallel_RE_2000-2003_", "2.RDS", sep = "")))
-# out_3 <- readRDS(here::here('results', paste("out.parallel_RE_2000-2003_", "3.RDS", sep = "")))
-# 
-# library(coda)
-# out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
+} # closes parallel loop
 
-# saveRDS(out, here::here('results', 'out_RE.RDS'))
+out_1 <- readRDS(here::here('results', paste("out.parallel_RE_", "1.RDS", sep = "")))
+out_2 <- readRDS(here::here('results', paste("out.parallel_RE_", "2.RDS", sep = "")))
+out_3 <- readRDS(here::here('results', paste("out.parallel_RE_", "3.RDS", sep = "")))
+
+library(coda)
+out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
+
+saveRDS(out, here::here('results', 'out_RE.RDS'))
 
 ```
 
