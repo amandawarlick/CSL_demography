@@ -81,7 +81,7 @@ ggplot(int_dat %>% filter(grepl('phi', variable)),
                 position = position_dodge(0.5),
                 width = 0.5, show.legend = F) +
   geom_point(size = 0.8, position = position_dodge(0.5)) +
-  xlab('') + ylab(expression(paste('Survival probability ',  '(', phi, ')'))) +
+  xlab('') + ylab(expression(paste('Survival probability ',  ' (', phi, ')'))) +
   ggtitle('') +
   facet_wrap(~sex, scales = 'free_x', drop = T) +
   plot_theme(legend.position = 'none', 

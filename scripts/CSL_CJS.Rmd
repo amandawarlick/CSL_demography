@@ -656,7 +656,7 @@ out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin,
 # library(coda)
 # out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
 # 
-# out <- list(`out_1`, `out_2`) %>% as.mcmc.list()
+# out <- list(`out_1`) %>% as.mcmc.list()
 
 
 # saveRDS(out, here::here('results', 'out_null.RDS'))
