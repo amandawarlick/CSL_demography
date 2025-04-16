@@ -1072,18 +1072,20 @@ out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin,
                samplesAsCodaMCMC = TRUE)
 
 
-  saveRDS(out, here('results', paste("out.parallel_sst_", i, ".RDS", sep = ""))) 
+  # saveRDS(out, here('results', paste("out.parallel_sst_", i, ".RDS", sep = "")))
+
+saveRDS(out, here('results', paste("out.sst_test.RDS", sep = "")))
   
 # } # closes parallel loop
 
-out_1 <- readRDS(here::here('results', paste("out.parallel_sst_", "1.RDS", sep = "")))
-out_2 <- readRDS(here::here('results', paste("out.parallel_sst_", "2.RDS", sep = "")))
-out_3 <- readRDS(here::here('results', paste("out.parallel_sst_", "3.RDS", sep = "")))
-
-library(coda)
-out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
-
-saveRDS(out, here::here('results', 'out_sst.RDS')) 
+# out_1 <- readRDS(here::here('results', paste("out.parallel_sst_", "1.RDS", sep = "")))
+# out_2 <- readRDS(here::here('results', paste("out.parallel_sst_", "2.RDS", sep = "")))
+# out_3 <- readRDS(here::here('results', paste("out.parallel_sst_", "3.RDS", sep = "")))
+# 
+# library(coda)
+# out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
+# 
+# saveRDS(out, here::here('results', 'out_sst.RDS')) 
 
 ```
 

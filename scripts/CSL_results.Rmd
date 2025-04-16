@@ -104,7 +104,7 @@ ggplot(int_dat,
                 position = position_dodge(0.5),
                 width = 0.5, show.legend = F) +
   geom_point(size = 0.8, position = position_dodge(0.5)) +
-  xlab('') + ylab(expression(paste('Survival probability ',  '(', phi, ')'))) +
+  xlab('') + ylab(expression(paste('Detection probability ',  '(', p, ')'))) +
   ggtitle('') +
   facet_wrap(~sex, scales = 'free_x', drop = T) +
   plot_theme(legend.position = 'none', 
@@ -148,7 +148,7 @@ ggplot(phi.vals %>% filter(rate == 'Detection'),
   geom_point(size = 0.8, position = position_dodge(0.5)) +
   geom_line(size = 0.7, position = position_dodge(0.5)) +
   # geom_line(aes(year, med.mean), col = 'grey20', linetype = 'dotted') +
-  xlab('') + ylab(expression(paste('Survival probability ',  '(', phi, ')'))) +
+  xlab('') + ylab(expression(paste('Detection probability ',  '(', p, ')'))) +
   ggtitle('') +
     facet_grid(sex ~ age) +
   plot_theme(legend.position = 'top', panel.border = element_rect(fill = NA),
