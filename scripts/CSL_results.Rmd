@@ -32,7 +32,7 @@ out <- readRDS(here::here('results', 'out_null.RDS'))
 out <- readRDS(here::here('results', 'out_RE.RDS'))
 
 # all_pars <- colnames(out[[1]])
-outmat <- as.matrix(out)
+outmat <- as.matrix(out_1)
 
 post_sum <- data.frame(
   med = apply(outmat, 2, function(x) quantile(x, probs = 0.5, na.rm = T, names = F)),
@@ -56,61 +56,67 @@ ggplot(b.mass_sum,
        aes(x = var_name, y = med, col = sex, group = sex)) +
   geom_errorbar(aes(x = var_name, ymin=lower, ymax=upper),
                 position = position_dodge(0.5),
-                width = 0.5, show.legend = F) +
+                width = 0.25, show.legend = F) +
   geom_point(size = 0.8, position = position_dodge(0.5)) +
   geom_hline(aes(yintercept = 0), linetype = 'dashed') +
-  xlab('') + ylab(expression(paste('Logit-scale effect of handling mass'))) +
+  xlab('Age class') + ylab(expression(paste('Logit-scale effect of handling mass'))) +
   ggtitle('') +
   plot_theme(legend.position = 'top', panel.border = element_rect(fill = NA),
-             plot.title = element_text(hjust = 0.5)) 
+             plot.title = element_text(hjust = 0.5)) +
+  scale_color_manual(values = rainbow2[c(2,5,6,7,8)], name = 'Sex')
 
 #intercept
 #survival
 int_dat <- post_sum %>% filter(grepl('int.phi', variable)) %>%
   # bind_rows(post_sum %>% filter(grepl('int.psi', variable))) %>%
   transform(variable = gsub('int.', '', variable)) %>%
-  transform(variable = factor(variable, levels = c('phiP', 'phiPM', 'phi1', 
-                                                   'phi1M', 'phi2.3', 'phi2.3M',
-                            'phi4.6', 'phi4.6M', 'phi7.9', 'phi7.9M', 'phi10.12', 'phi10.12M',
-                            'phi13.16', 'phi13.16M', 'phiA', 'phiAM'))) %>%
-  transform(sex = ifelse(grepl('M', variable), 'M', 'F')) 
+  transform(sex = ifelse(grepl('M', variable), 'M', 'F')) %>%
+  transform(age = gsub('phi', '', variable)) %>%
+  transform(age = gsub('M', '', age)) %>%
+   transform(age = factor(age, levels = c('P', 'PM', '1', 
+                                                   '1M', '2.3', '2.3M',
+                            '4.6', '4.6M', '7.9', '7.9M', '10.12', '10.12M',
+                            '13.16', '13.16M', 'A', 'AM'))) 
+  
   
 ggplot(int_dat %>% filter(grepl('phi', variable)),
-       aes(variable, med, color = sex)) +
-  geom_errorbar(aes(x = variable, ymin=lower, ymax=upper),
+       aes(age, med, color = sex)) +
+  geom_errorbar(aes(x = age, ymin=lower, ymax=upper),
                 position = position_dodge(0.5),
                 width = 0.5, show.legend = F) +
   geom_point(size = 0.8, position = position_dodge(0.5)) +
-  xlab('') + ylab(expression(paste('Survival probability ',  '(', phi, ')'))) +
+  xlab('Age class') + ylab(expression(paste('Survival probability ',  '(', phi, ')'))) +
   ggtitle('') +
-  facet_wrap(~sex, scales = 'free_x', drop = T) +
-  plot_theme(legend.position = 'none', 
+  # facet_wrap(~sex, scales = 'free_x', drop = T) +
+  plot_theme(legend.position = 'top', 
              panel.border = element_rect(fill = NA),
              plot.title = element_text(hjust = 0.5)) +
-  scale_color_manual(values = rainbow2[c(2,5,6,7,8)], name = '')
+  scale_color_manual(values = rainbow2[c(2,5,6,7,8)], name = 'Sex')
 
 #detection
 int_dat <- post_sum %>% filter(grepl('int.p', variable)) %>%
   # bind_rows(post_sum %>% filter(grepl('int.psi', variable))) %>%
   transform(variable = gsub('int.', '', variable)) %>%
   filter(!grepl('phi', variable)) %>%
-  transform(variable = factor(variable, levels = c('p1', 'p2.3', 'p4.6', 'p4.6M', 
-                                                   'p7.12', 'p7.12M', 'pA', 'pAM'))) %>%
-  transform(sex = ifelse(grepl('M', variable), 'M', 'F')) 
+    transform(sex = ifelse(grepl('M', variable), 'M', 'F')) %>%
+  transform(age = gsub('p', '', variable)) %>%
+  transform(age = gsub('M', '', age)) %>%
+    transform(age = factor(age, levels = c('1', '2.3', '4.6',  
+                                                   '7.12', 'A'))) 
 
 ggplot(int_dat,
-       aes(variable, med, color = sex)) +
-  geom_errorbar(aes(x = variable, ymin=lower, ymax=upper),
+       aes(age, med, color = sex)) +
+  geom_errorbar(aes(x = age, ymin=lower, ymax=upper),
                 position = position_dodge(0.5),
                 width = 0.5, show.legend = F) +
   geom_point(size = 0.8, position = position_dodge(0.5)) +
   xlab('') + ylab(expression(paste('Detection probability ',  '(', p, ')'))) +
   ggtitle('') +
-  facet_wrap(~sex, scales = 'free_x', drop = T) +
-  plot_theme(legend.position = 'none', 
+  # facet_wrap(~sex, scales = 'free_x', drop = T) +
+  plot_theme(legend.position = 'top', 
              panel.border = element_rect(fill = NA),
              plot.title = element_text(hjust = 0.5)) +
-  scale_color_manual(values = rainbow2[c(2,5,6,7,8)], name = '')
+  scale_color_manual(values = rainbow2[c(2,5,6,7,8)], name = 'Sex')
 
 
 ```
@@ -137,11 +143,23 @@ phi.vals <- post_sum %>%
                          ifelse(rate == 'Detection', gsub('p', '', age), NA))) %>%
   transform(sex = ifelse(grepl('M', age), 'Male', 'Female')) %>%
   transform(age = gsub('M', '', age)) %>%
-  transform(age = factor(age, levels = c('P', '1', '2.3', '4.6', '7.9', '10.12', '13.16', '7.12', 'A'))) #%>%
+  transform(age = factor(age, levels = c('P', '1', '2.3', '4.6', '7.9', '10.12', '13.16', '7.12', 'A'))) %>%
   # merge(mean.phi.vals %>% filter(site == 'Pyramid Rock'), by = c('age'), suffixes = c('', '.mean'))
+  transform(exclude_det = ifelse(age == '2.3' & year < 2, 'Y',
+                             ifelse(age == '2.3' & year < 2, 'Y',
+                                   ifelse(age == '4.6' & year < 4, 'Y',
+                                    ifelse(age == '7.12' & year < 7, 'Y',
+                                           ifelse(age == 'A' & year < 13, 'Y', 'N')))))) %>%
+  transform(exclude_phi = ifelse(age == '2.3' & year < 2, 'Y',
+                             ifelse(age == '2.3' & year < 2, 'Y',
+                                   ifelse(age == '4.6' & year < 4, 'Y',
+                                    ifelse(age == '7.9' & year < 7, 'Y',
+                                           ifelse(age == '10.12' & year < 10, 'Y',
+                                                  ifelse(age == '13.16' & year < 13, 'Y',
+                                           ifelse(age == 'A' & year < 16, 'Y', 'N'))))))))
 
 #temporal variance with mean rates; intercept represents female, so can't show males
-ggplot(phi.vals %>% filter(rate == 'Detection'),
+ggplot(phi.vals %>% filter(rate == 'Detection' & exclude_det != 'Y' & year != 20),
        aes(year, med)) +
   geom_errorbar(aes(x = year, ymin=lower, ymax=upper), position = position_dodge(0.5),
                 width = 0.5, show.legend = F) +
@@ -150,15 +168,15 @@ ggplot(phi.vals %>% filter(rate == 'Detection'),
   # geom_line(aes(year, med.mean), col = 'grey20', linetype = 'dotted') +
   xlab('') + ylab(expression(paste('Detection probability ',  '(', p, ')'))) +
   ggtitle('') +
-    facet_grid(sex ~ age) +
+    facet_grid(age ~ sex) +
   plot_theme(legend.position = 'top', panel.border = element_rect(fill = NA),
              plot.title = element_text(hjust = 0.5)) +
   guides(color = guide_legend("", nrow = 1, byrow = T)) +
-  scale_color_manual(values = rainbow2[c(2,3,5,6,7,8)], name = '') #+
-  # scale_x_continuous(breaks = c(seq(1, , by = 2)), labels = c(seq(2001, 2019, by = 2)))
+  scale_color_manual(values = rainbow2[c(2,3,5,6,7,8)], name = '') +
+  scale_x_continuous(breaks = c(seq(1, 25, by = 5)), labels = c(seq(2001, (2001+n_occasions-1), by = 5)))
 
 #survival
-ggplot(phi.vals %>% filter(rate == 'Survival'),
+ggplot(phi.vals %>% filter(rate == 'Survival' & exclude_phi != 'Y'),
        aes(year, med)) +
   geom_errorbar(aes(x = year, ymin=lower, ymax=upper), position = position_dodge(0.5),
                 width = 0.5, show.legend = F) +
@@ -167,12 +185,12 @@ ggplot(phi.vals %>% filter(rate == 'Survival'),
   # geom_line(aes(year, med.mean), col = 'grey20', linetype = 'dotted') +
   xlab('') + ylab(expression(paste('Survival probability ',  '(', phi, ')'))) +
   ggtitle('') +
-    facet_grid(sex ~ age) +
+    facet_grid(age ~ sex) +
   plot_theme(legend.position = 'top', panel.border = element_rect(fill = NA),
              plot.title = element_text(hjust = 0.5)) +
   guides(color = guide_legend("", nrow = 1, byrow = T)) +
-  scale_color_manual(values = rainbow2[c(2,3,5,6,7,8)], name = '') #+
-  # scale_x_continuous(breaks = c(seq(1, , by = 2)), labels = c(seq(2001, 2019, by = 2)))
+  scale_color_manual(values = rainbow2[c(2,3,5,6,7,8)], name = '') +
+  scale_x_continuous(breaks = c(seq(1, 25, by = 5)), labels = c(seq(2000, (2000+n_occasions-1), by = 5)))
 
 
 ```
