@@ -18,7 +18,7 @@ library(Hmisc) #v4.5-0; %nin%
 
 ```{r create CH}
 
-filter_yr <- 1993
+filter_yr <- 1989
 
 data_raw <- read.csv(here::here('data', "2025_CCEP_Zc_CH.csv"), 
                   header = T, stringsAsFactors = F) %>%
@@ -112,12 +112,12 @@ res_dat_m <- res_long_m %>%
 ## ALL INDIVIDUALS
 
 write.csv(res_dat_f,
-          file = here::here('data', 'res_dat_f_1994.csv'), row.names = F)
+          file = here::here('data', 'res_dat_f_1990.csv'), row.names = F)
 # write.csv(num_resight,
 #           file = paste(here::here('data', 'ProcData'), '/num_resight.csv', sep = ''),
 #           row.names = F)
 write.csv(res_dat_m,
-          file = here::here('data', 'res_dat_m_1994.csv'), row.names = F)
+          file = here::here('data', 'res_dat_m_1990.csv'), row.names = F)
 
 
 

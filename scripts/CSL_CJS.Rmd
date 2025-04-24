@@ -99,21 +99,21 @@ getP <- nimbleFunction(
 
 #consider filtering for brands starting in 1994; at least 1990
 
-filter_yr <- 1993
+filter_yr <- 1989
 
 ## capture histories
 ch_dat_f <- read.csv(here::here('data', 'res_dat_f_1994.csv'),
                    header = T, stringsAsFactors = F) %>% 
   transform(sex == 'Fem') %>%
-  filter(cohort ==  2000) %>%
+  # filter(cohort ==  2000) %>%
   # filter(cohort < 2006) %>%
   # filter(cohort < 1990) %>%
     # filter(cohort > 2009) %>%
   dplyr::select(-sex)
 
-ch_dat_m <- read.csv(here::here('data', 'res_dat_m_1994.csv'),
+ch_dat_m <- read.csv(here::here('data', 'res_dat_m_1990.csv'),
                    header = T, stringsAsFactors = F) %>% 
-  filter(cohort == 2000) %>%
+  # filter(cohort == 2000) %>%
   # filter(cohort < 2006) %>%
   # filter(cohort > 2009) %>%
     # filter(cohort < 1990) %>%
@@ -273,12 +273,12 @@ CSL_CJS <- nimbleCode({
 # Priors and constraints
   for (i in 1:n_f) { 
     for (t in 1:(n_occasions - 1)) {
-      logit(phiP[i,t]) <- mu.P + b.massP*mass_f[i] #+ epsP[t] + b.siteP[site[i]]
+      logit(phiP[i,t]) <- mu.P #+ b.massP*mass_f[i] #+ epsP[t] + b.siteP[site[i]]
       logit(p1[i,t]) <- mu.p1 #+ eps.p1[t]
     # } #t 
     
     # for (t in 2:(n_occasions-1)) {
-      logit(phi1[i,t]) <- mu.1 + b.mass1*mass_f[i] #+ eps1[t] + b.site1[site[i]]
+      logit(phi1[i,t]) <- mu.1 #+ b.mass1*mass_f[i] #+ eps1[t] + b.site1[site[i]]
       logit(p2[i,t]) <- mu.p2.3  #+ eps.p2[t]
     # }
     
@@ -366,12 +366,12 @@ CSL_CJS <- nimbleCode({
   #males
     for (i in 1:n_m) { 
     for (t in 1:(n_occasions - 1)) {
-      logit(phiPM[i,t]) <- mu.PM + b.massPM*mass_m[i] #+ epsP[t]
+      logit(phiPM[i,t]) <- mu.PM #+ b.massPM*mass_m[i] #+ epsP[t]
       logit(p1M[i,t]) <- mu.p1 #+ eps.p1[t]
     # } #t 
     
     # for (t in 2:(n_occasions-1)) {
-      logit(phi1M[i,t]) <- mu.1M + b.mass1M*mass_m[i] #+ eps1[t] 
+      logit(phi1M[i,t]) <- mu.1M #+ b.mass1M*mass_m[i] #+ eps1[t] 
       logit(p2M[i,t]) <- mu.p2.3 # + eps.p2.3[t]
     # }
     
@@ -610,7 +610,7 @@ params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA', 'int.p4.6M'
 
 ### run model
 # n.iter = 3500; n.chains = 3; n.burnin = 2000; nthin = 3; nAdapt = 20
-n.iter = 15000; n.chains = 3; n.burnin = 7000; nthin = 2; nAdapt = 20
+n.iter = 12000; n.chains = 3; n.burnin = 7000; nthin = 2; nAdapt = 20
 # n.iter = 700; n.chains = 1; n.burnin = 100; nthin = 2; nAdapt = 20
 
 
@@ -645,21 +645,21 @@ out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin,
                samplesAsCodaMCMC = TRUE)
 
 
-  saveRDS(out, here('results', paste("out.parallel_null_", i, ".RDS", sep = "")))
+  saveRDS(out, here('results', paste("out.parallel_null_null_", i, ".RDS", sep = "")))
   
 } # closes parallel loop
 
-out_1 <- readRDS(here::here('results', paste("out.parallel_null_", "1.RDS", sep = "")))
-out_2 <- readRDS(here::here('results', paste("out.parallel_null_", "2.RDS", sep = "")))
-out_3 <- readRDS(here::here('results', paste("out.parallel_null_", "3.RDS", sep = "")))
+out_1 <- readRDS(here::here('results', paste("out.parallel_null_null_", "1.RDS", sep = "")))
+out_2 <- readRDS(here::here('results', paste("out.parallel_null_null_", "2.RDS", sep = "")))
+out_3 <- readRDS(here::here('results', paste("out.parallel_null_null_", "3.RDS", sep = "")))
 # 
 library(coda)
-out <- list(as.mcmc(`out_1`), as.mcmc(`out_2`), as.mcmc(`out_3`)) %>% as.mcmc.list()
+out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
 # 
 # out <- list(`out_1`, `out_2`) %>% as.mcmc.list()
+# out <- out_3
 
-
-saveRDS(out, here::here('results', 'out_null.RDS'))
+saveRDS(out, here::here('results', 'out_null_null.RDS'))
 
 ```
 
@@ -671,94 +671,41 @@ CSL_CJS <- nimbleCode({
 # Priors and constraints
    for (i in 1:n_f) { 
     for (t in 1:(n_occasions - 1)) {
-      logit(phiP[i,t]) <- mu.P  + 
-        b.sst.P*sst_pupForage[t] #+ b.massP*mass_f[i] #+ epsP[t] + b.siteP[site[i]]
+      logit(phiP[i,t]) <- mu.P  + b.sst.P*sst_pupForage[t] 
       logit(p1[i,t]) <- mu.p1 #+ eps.p1[t]
-    # } #t 
-    
-    # for (t in 2:(n_occasions-1)) {
-      logit(phi1[i,t]) <- mu.1  + 
-        b.sst.1*sst_np[t] #+ b.mass1*mass_f[i] #+ eps1[t] + b.site1[site[i]]
+      logit(phi1[i,t]) <- mu.1  + b.sst.1*sst_np[t] 
       logit(p2[i,t]) <- mu.p2.3  #+ eps.p2[t]
-    # }
-    
-    # for (t in 3:(n_occasions-1)) {
-      logit(phi2[i,t]) <- mu.2.3 #+ eps2[t] + b.site2[site[i]]
+      logit(phi2[i,t]) <- mu.2.3 + b.sst.2.3*sst_np[t]#+ eps2[t] + b.site2[site[i]]
       logit(p3[i,t]) <- mu.p2.3 #+ eps.pJ[t]
-    # }
-    
-    # for (t in 4:(n_occasions-1)) { 
-      logit(phi3[i,t]) <- mu.2.3 #+ epsJ[t] + b.siteJ[site[i]]
+      logit(phi3[i,t]) <- mu.2.3 + b.sst.2.3*sst_np[t] #+ epsJ[t] + b.siteJ[site[i]]
       logit(p4[i,t]) <- mu.p4.6 #+ eps.pJ[t]
-    # } #t psi
-    
-    # for (t in 5:(n_occasions-1)) {
-      logit(phi4[i,t]) <- mu.4.6 #+ epsJ[t] + b.siteJ[site[i]]
+      logit(phi4[i,t]) <- mu.4.6 + b.sst.4.6*sst_np[t]#+ epsJ[t] + b.siteJ[site[i]]
       logit(p5[i,t]) <- mu.p4.6 #+ eps.pA[t]
-    # } #t 
-    
-    # for (t in 6:(n_occasions-1)) {  
-      logit(phi5[i,t]) <- mu.4.6 #+ epsA[t] 
+      logit(phi5[i,t]) <- mu.4.6 + b.sst.4.6*sst_np[t]#+ epsA[t] 
       logit(p6[i,t]) <- mu.p4.6 #+ eps.pA[t]
-    # } #t 
-    
-    # for (t in 7:(n_occasions-1)) {  
-      logit(phi6[i,t]) <- mu.4.6 #+ epsA[t] 
+      logit(phi6[i,t]) <- mu.4.6 + b.sst.4.6*sst_np[t] #+ epsA[t] 
       logit(p7[i,t]) <- mu.p7.12 #+ eps.pA[t]
-    # } #t 
-    
-    # for (t in 8:(n_occasions-1)) {  
-      logit(phi7[i,t]) <- mu.7.9 #+ epsA[t] 
+      logit(phi7[i,t]) <- mu.7.9 + b.sst.7.9*sst_np[t]#+ epsA[t] 
       logit(p8[i,t]) <- mu.p7.12 #+ eps.pA[t]
-    # } #t 
-    
-    # for (t in 9:(n_occasions-1)) {  
-      logit(phi8[i,t]) <- mu.7.9 #+ epsA[t] 
+      logit(phi8[i,t]) <- mu.7.9 + b.sst.7.9*sst_np[t]#+ epsA[t] 
       logit(p9[i,t]) <- mu.p7.12 #+ eps.pA[t]
-    # } #t 
-    
-    # for (t in 10:(n_occasions-1)) {  
-      logit(phi9[i,t]) <- mu.7.9 #+ epsA[t] 
+      logit(phi9[i,t]) <- mu.7.9 + b.sst.7.9*sst_np[t]#+ epsA[t] 
       logit(p10[i,t]) <- mu.p7.12 #+ eps.pA[t]
-    # } #t 
-    
-    # for (t in 11:(n_occasions-1)) {  
-      logit(phi10[i,t]) <- mu.10.12 # + epsA[t] 
+      logit(phi10[i,t]) <- mu.10.12 + b.sst.A*sst_np[t]# + epsA[t] 
       logit(p11[i,t]) <- mu.p7.12 #+ eps.pA[t]
-    # } #t 
-  
-    # for (t in 12:(n_occasions-1)) {  
-      logit(phi11[i,t]) <- mu.10.12 # + epsA[t] 
+      logit(phi11[i,t]) <- mu.10.12 + b.sst.A*sst_np[t]# + epsA[t] 
       logit(p12[i,t]) <- mu.p7.12 #+ eps.pA[t]
-    # } #t   
-    
-        # for (t in 13:(n_occasions-1)) {  
-      logit(phi12[i,t]) <- mu.10.12 # + epsA[t] 
+      logit(phi12[i,t]) <- mu.10.12 + b.sst.A*sst_np[t]# + epsA[t] 
       logit(p13[i,t]) <- mu.pA #+ eps.pA[t]
-    # } #t  
-    
-        # for (t in 14:(n_occasions-1)) {  
-      logit(phi13[i,t]) <- mu.13.16 # + epsA[t] 
+      logit(phi13[i,t]) <- mu.13.16 + b.sst.A*sst_np[t]# + epsA[t] 
       logit(p14[i,t]) <- mu.pA
-    # } #t  
-    
-        # for (t in 15:(n_occasions-1)) {  
-      logit(phi14[i,t]) <- mu.13.16 # + epsA[t] 
+      logit(phi14[i,t]) <- mu.13.16 + b.sst.A*sst_np[t]# + epsA[t] 
       logit(p15[i,t]) <- mu.pA
-    # } #t  
-    
-        # for (t in 16:(n_occasions-1)) {  
-      logit(phi15[i,t]) <- mu.13.16 # + epsA[t] 
+      logit(phi15[i,t]) <- mu.13.16 + b.sst.A*sst_np[t]# + epsA[t] 
       logit(p16[i,t]) <- mu.pA
-    # } #t  
-    
-        # for (t in 17:(n_occasions-1)) {  
-      logit(phi16[i,t]) <- mu.13.16 # + epsA[t] 
+      logit(phi16[i,t]) <- mu.13.16 + b.sst.A*sst_np[t]# + epsA[t] 
       logit(pA[i,t]) <- mu.pA
-    # } #t  
-    
-        # for (t in 18:(n_occasions-1)) {  
-      logit(phiA[i,t]) <- mu.A # + epsA[t] 
+      logit(phiA[i,t]) <- mu.A + b.sst.A*sst_np[t]# + epsA[t] 
     } #t  
   } #females
   
@@ -777,22 +724,22 @@ CSL_CJS <- nimbleCode({
     }
     
     for (t in 3:(n_occasions-1)) {
-      logit(phi2M[i,t]) <- mu.2.3M #+ b.sst.2.3*sst_np[t]#+ eps2.3[t]
+      logit(phi2M[i,t]) <- mu.2.3M + b.sst.2.3*sst_np[t]#+ eps2.3[t]
       logit(p3M[i,t]) <- mu.p2.3 #+ eps.p2.3[t]
     }
     
     for (t in 4:(n_occasions-1)) { 
-      logit(phi3M[i,t]) <- mu.2.3M #+ b.sst.2.3*sst_np[t] #+ eps2.3[t] 
+      logit(phi3M[i,t]) <- mu.2.3M + b.sst.2.3*sst_np[t] #+ eps2.3[t] 
       logit(p4M[i,t]) <- mu.p4.6M #+ eps.p4.6[t]
     } #t psi
     
     for (t in 5:(n_occasions-1)) {
-      logit(phi4M[i,t]) <- mu.4.6M #+ b.sst.4.6*sst_np[t]#+ eps4.6[t] 
+      logit(phi4M[i,t]) <- mu.4.6M + b.sst.4.6*sst_np[t]#+ eps4.6[t] 
       logit(p5M[i,t]) <- mu.p4.6M #+ eps.p4.6[t]
     } #t 
     
     for (t in 6:(n_occasions-1)) {  
-      logit(phi5M[i,t]) <- mu.4.6M #+ b.sst.4.6*sst_np[t] #+ eps4.6[t] 
+      logit(phi5M[i,t]) <- mu.4.6M + b.sst.4.6*sst_np[t] #+ eps4.6[t] 
       logit(p6M[i,t]) <- mu.p4.6M #+ eps.p4.6[t]
     } #t 
     
@@ -1024,8 +971,8 @@ params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA', 'int.p4.6M'
 
 ### run model
 # n.iter = 3500; n.chains = 3; n.burnin = 2000; nthin = 3; nAdapt = 20
-n.iter = 12000; n.chains = 3; n.burnin = 6000; nthin = 2; nAdapt = 20
-n.iter = 200; n.chains = 1; n.burnin = 50; nthin = 2; nAdapt = 20
+n.iter = 10000; n.chains = 3; n.burnin = 5000; nthin = 2; nAdapt = 20
+# n.iter = 200; n.chains = 1; n.burnin = 50; nthin = 2; nAdapt = 20
 
 
 start <- Sys.time()
@@ -1035,10 +982,10 @@ used.cores = min(n.chains, cores)
 cl <- makeCluster(n.chains, setup_strategy = "sequential") 
 registerDoParallel(cl) 
 
-# foreach(i = 1:n.chains) %dopar% {
-#   library(nimble)
-#   library(here)
-#   source(here("scripts", "nimbleFunctions.R"))
+foreach(i = 1:n.chains) %dopar% {
+  library(nimble)
+  library(here)
+  source(here("scripts", "nimbleFunctions.R"))
 
 Rmodel <- nimbleModel(code = CSL_CJS, 
                       constants = nim.constants, data = nim.data, 
@@ -1059,20 +1006,18 @@ out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin,
                samplesAsCodaMCMC = TRUE)
 
 
-  # saveRDS(out, here('results', paste("out.parallel_sst_", i, ".RDS", sep = "")))
+  saveRDS(out, here('results', paste("out.parallel_sst_", i, ".RDS", sep = "")))
 
-# saveRDS(out, here('results', paste("out.sst_test.RDS", sep = "")))
-  
-# } # closes parallel loop
+} # closes parallel loop
 
-# out_1 <- readRDS(here::here('results', paste("out.parallel_sst_", "1.RDS", sep = "")))
-# out_2 <- readRDS(here::here('results', paste("out.parallel_sst_", "2.RDS", sep = "")))
-# out_3 <- readRDS(here::here('results', paste("out.parallel_sst_", "3.RDS", sep = "")))
-# 
-# library(coda)
-# out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
-# 
-# saveRDS(out, here::here('results', 'out_sst.RDS')) 
+out_1 <- readRDS(here::here('results', paste("out.parallel_sst_", "1.RDS", sep = "")))
+out_2 <- readRDS(here::here('results', paste("out.parallel_sst_", "2.RDS", sep = "")))
+out_3 <- readRDS(here::here('results', paste("out.parallel_sst_", "3.RDS", sep = "")))
+
+library(coda)
+out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
+
+saveRDS(out, here::here('results', 'out_sst.RDS'))
 
 ```
 
@@ -1519,7 +1464,7 @@ params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA', 'int.p4.6M'
 
 ### run model
 # n.iter = 3500; n.chains = 3; n.burnin = 2000; nthin = 3; nAdapt = 20
-n.iter = 10000; n.chains = 2; n.burnin = 4000; nthin = 3; nAdapt = 20
+n.iter = 15000; n.chains = 2; n.burnin = 7000; nthin = 3; nAdapt = 20
 # n.iter = 700; n.chains = 1; n.burnin = 300; nthin = 2; nAdapt = 20
 
 
@@ -1554,18 +1499,18 @@ out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin,
                samplesAsCodaMCMC = TRUE)
 
 
-  saveRDS(out, here('results', paste("out.parallel_RE_1994_", i, ".RDS", sep = "")))
+  saveRDS(out, here('results', paste("out.parallel_RE_1990_", i, ".RDS", sep = "")))
 
 } # closes parallel loop
 
-out_1 <- readRDS(here::here('results', paste("out.parallel_RE_1994_", "1.RDS", sep = "")))
-out_2 <- readRDS(here::here('results', paste("out.parallel_RE_1994_", "2.RDS", sep = "")))
-out_3 <- readRDS(here::here('results', paste("out.parallel_RE_1994_", "3.RDS", sep = "")))
+out_1 <- readRDS(here::here('results', paste("out.parallel_RE_1990_", "1.RDS", sep = "")))
+out_2 <- readRDS(here::here('results', paste("out.parallel_RE_1990_", "2.RDS", sep = "")))
+out_3 <- readRDS(here::here('results', paste("out.parallel_RE_1990_", "3.RDS", sep = "")))
 
 library(coda)
 out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
 
-saveRDS(out, here::here('results', 'out_RE.RDS'))
+saveRDS(out, here::here('results', 'out_RE_1994.RDS'))
 
 ```
 

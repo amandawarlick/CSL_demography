@@ -1,5 +1,5 @@
 ---
-title: "SSL eDPS empirical estimates - Jan 2023"
+title: "CSL empirical estimates - spring 2025"
 output: html_document
 ---
 
@@ -30,9 +30,10 @@ Survival rates were estimated for ages P, 1, 2, juveniles (ages 3-4) adults (age
 
 out <- readRDS(here::here('results', 'out_null.RDS'))
 out <- readRDS(here::here('results', 'out_RE.RDS'))
+out <- readRDS(here::here('results', 'out_sst.RDS'))
 
 # all_pars <- colnames(out[[1]])
-outmat <- as.matrix(out_1)
+outmat <- as.matrix(out)
 
 post_sum <- data.frame(
   med = apply(outmat, 2, function(x) quantile(x, probs = 0.5, na.rm = T, names = F)),
@@ -64,6 +65,38 @@ ggplot(b.mass_sum,
   plot_theme(legend.position = 'top', panel.border = element_rect(fill = NA),
              plot.title = element_text(hjust = 0.5)) +
   scale_color_manual(values = rainbow2[c(2,5,6,7,8)], name = 'Sex')
+
+#sst
+b.sst_sum <- post_sum %>% filter(grepl('b.sst', variable)) %>%
+  # transform(var_name = ifelse(grepl('b.mass.f', variable), '1', 
+  #                                    ifelse(grepl('b.mass.m', variable), '1M',
+                  transform(var_name = gsub('b.sst.', '', variable)) %>%
+  transform(var_name = factor(var_name, levels = c('P', '1', '2.3', '4.6', '7.9', 'A'))) 
+  
+ggplot(b.sst_sum %>% filter(var_name %in% c('P', '1', '2.3', '4.6')),
+       aes(x = var_name, y = med)) +
+  geom_errorbar(aes(x = var_name, ymin=lower, ymax=upper),
+                position = position_dodge(0.5),
+                width = 0.25, show.legend = F) +
+  geom_point(size = 0.8, position = position_dodge(0.5)) +
+  geom_hline(aes(yintercept = 0), linetype = 'dashed') +
+  xlab('Age class') + ylab(expression(paste('Logit-scale effect of SST'))) +
+  ggtitle('') +
+  pres_theme(legend.position = 'top', #panel.border = element_rect(fill = NA),
+             plot.title = element_text(hjust = 0.5)) #+
+  # scale_color_manual(values = rainbow2[c(2,5,6,7,8)], name = 'Sex')
+
+ggplot(b.sst_sum, aes(x = var_name, y = med)) +
+  geom_errorbar(aes(x = var_name, ymin=lower, ymax=upper),
+                position = position_dodge(0.5),
+                width = 0.25, show.legend = F) +
+  geom_point(size = 0.8, position = position_dodge(0.5)) +
+  geom_hline(aes(yintercept = 0), linetype = 'dashed') +
+  xlab('Age class') + ylab(expression(paste('Logit-scale effect of SST'))) +
+  ggtitle('') +
+  pres_theme(legend.position = 'top', #panel.border = element_rect(fill = NA),
+             plot.title = element_text(hjust = 0.5))
+
 
 #intercept
 #survival
@@ -146,13 +179,12 @@ phi.vals <- post_sum %>%
   transform(age = factor(age, levels = c('P', '1', '2.3', '4.6', '7.9', '10.12', '13.16', '7.12', 'A'))) %>%
   # merge(mean.phi.vals %>% filter(site == 'Pyramid Rock'), by = c('age'), suffixes = c('', '.mean'))
   transform(exclude_det = ifelse(age == '2.3' & year < 2, 'Y',
-                             ifelse(age == '2.3' & year < 2, 'Y',
                                    ifelse(age == '4.6' & year < 4, 'Y',
                                     ifelse(age == '7.12' & year < 7, 'Y',
-                                           ifelse(age == 'A' & year < 13, 'Y', 'N')))))) %>%
-  transform(exclude_phi = ifelse(age == '2.3' & year < 2, 'Y',
-                             ifelse(age == '2.3' & year < 2, 'Y',
-                                   ifelse(age == '4.6' & year < 4, 'Y',
+                                           ifelse(age == 'A' & year < 13, 'Y', 'N'))))) %>%
+  transform(exclude_phi = ifelse(age == '1' & year < 2, 'Y',
+                             ifelse(age == '2.3' & year < 3, 'Y',
+                                   ifelse(age == '4.6' & year < 5, 'Y',
                                     ifelse(age == '7.9' & year < 7, 'Y',
                                            ifelse(age == '10.12' & year < 10, 'Y',
                                                   ifelse(age == '13.16' & year < 13, 'Y',
@@ -164,7 +196,7 @@ ggplot(phi.vals %>% filter(rate == 'Detection' & exclude_det != 'Y' & year != 20
   geom_errorbar(aes(x = year, ymin=lower, ymax=upper), position = position_dodge(0.5),
                 width = 0.5, show.legend = F) +
   geom_point(size = 0.8, position = position_dodge(0.5)) +
-  geom_line(size = 0.7, position = position_dodge(0.5)) +
+  geom_line(linewidth = 0.7, position = position_dodge(0.5)) +
   # geom_line(aes(year, med.mean), col = 'grey20', linetype = 'dotted') +
   xlab('') + ylab(expression(paste('Detection probability ',  '(', p, ')'))) +
   ggtitle('') +
@@ -173,7 +205,8 @@ ggplot(phi.vals %>% filter(rate == 'Detection' & exclude_det != 'Y' & year != 20
              plot.title = element_text(hjust = 0.5)) +
   guides(color = guide_legend("", nrow = 1, byrow = T)) +
   scale_color_manual(values = rainbow2[c(2,3,5,6,7,8)], name = '') +
-  scale_x_continuous(breaks = c(seq(1, 25, by = 5)), labels = c(seq(2001, (2001+n_occasions-1), by = 5)))
+  scale_x_continuous(breaks = c(seq(1, 25, by = 5)), 
+                     labels = c(seq(2001, (2001+n_occasions-1), by = 5)))
 
 #survival
 ggplot(phi.vals %>% filter(rate == 'Survival' & exclude_phi != 'Y'),
@@ -181,12 +214,30 @@ ggplot(phi.vals %>% filter(rate == 'Survival' & exclude_phi != 'Y'),
   geom_errorbar(aes(x = year, ymin=lower, ymax=upper), position = position_dodge(0.5),
                 width = 0.5, show.legend = F) +
   geom_point(size = 0.8, position = position_dodge(0.5)) +
-  geom_line(size = 0.7, position = position_dodge(0.5)) +
+  geom_line(linewidth = 0.7, position = position_dodge(0.5)) +
   # geom_line(aes(year, med.mean), col = 'grey20', linetype = 'dotted') +
   xlab('') + ylab(expression(paste('Survival probability ',  '(', phi, ')'))) +
   ggtitle('') +
     facet_grid(age ~ sex) +
   plot_theme(legend.position = 'top', panel.border = element_rect(fill = NA),
+             plot.title = element_text(hjust = 0.5)) +
+  guides(color = guide_legend("", nrow = 1, byrow = T)) +
+  scale_color_manual(values = rainbow2[c(2,3,5,6,7,8)], name = '') +
+  scale_x_continuous(breaks = c(seq(1, 25, by = 5)), labels = c(seq(2000, (2000+n_occasions-1), by = 5)))
+
+ggplot(phi.vals %>% filter(rate == 'Survival' & exclude_phi != 'Y' &
+                             age %in% c('P', '1') & sex == 'Female'),
+       aes(year, med)) +
+  geom_errorbar(aes(x = year, ymin=lower, ymax=upper), position = position_dodge(0.5),
+                width = 0.5, show.legend = F) +
+  geom_point(size = 0.8, position = position_dodge(0.5)) +
+  geom_line(linewidth = 0.7, position = position_dodge(0.5)) +
+  # geom_line(aes(year, med.mean), col = 'grey20', linetype = 'dotted') +
+  xlab('') + ylab(expression(paste('Survival probability ',  ' (', phi, ')'))) +
+  ggtitle('') +
+    facet_grid(age ~ sex) +
+  # theme_classic() +
+  pres_theme(legend.position = 'top', #panel.border = element_rect(fill = NA),
              plot.title = element_text(hjust = 0.5)) +
   guides(color = guide_legend("", nrow = 1, byrow = T)) +
   scale_color_manual(values = rainbow2[c(2,3,5,6,7,8)], name = '') +
