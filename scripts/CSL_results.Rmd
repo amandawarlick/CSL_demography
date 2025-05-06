@@ -205,8 +205,8 @@ ggplot(phi.vals %>% filter(rate == 'Detection' & exclude_det != 'Y' & year != 20
              plot.title = element_text(hjust = 0.5)) +
   guides(color = guide_legend("", nrow = 1, byrow = T)) +
   scale_color_manual(values = rainbow2[c(2,3,5,6,7,8)], name = '') +
-  scale_x_continuous(breaks = c(seq(1, 25, by = 5)), 
-                     labels = c(seq(2001, (2001+n_occasions-1), by = 5)))
+  scale_x_continuous(breaks = c(seq(1, 35, by = 5)), 
+                     labels = c(seq(1990, (1990+n_occasions-1), by = 5)))
 
 #survival
 ggplot(phi.vals %>% filter(rate == 'Survival' & exclude_phi != 'Y'),

@@ -1508,9 +1508,9 @@ out_2 <- readRDS(here::here('results', paste("out.parallel_RE_1990_", "2.RDS", s
 out_3 <- readRDS(here::here('results', paste("out.parallel_RE_1990_", "3.RDS", sep = "")))
 
 library(coda)
-out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
+out <- list(`out_1`, `out_2`) %>% as.mcmc.list()
 
-saveRDS(out, here::here('results', 'out_RE_1994.RDS'))
+saveRDS(out, here::here('results', 'out_RE_1990.RDS'))
 
 ```
 
