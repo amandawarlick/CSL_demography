@@ -123,6 +123,59 @@ write.csv(res_dat_m,
 
 ```
 
+```{r strandings for lepto/DA cases}
+
+library(lubridate)
+library(stringr)
+library(readr)
+library(ggplot2)
+
+strand_dat <- read.csv(here('data', 'CSL Strandings 2014-2025.csv'))
+
+dat <- strand_dat %>%
+  transform(Date.of.Examination = ifelse(Date.of.Examination == '', 
+                                         Died.Date, Date.of.Examination)) %>%
+  transform(date = mdy(Date.of.Examination)) %>%
+  transform(year = year(date)) %>%
+  select(year, Cause.of.Death, Other.Findings...Describe, 
+         Condition.Comments, Died.Comments, Additional.Remarks,
+         Rehab.Additional.Remarks) 
+
+colnames(dat) <- c('year', 'com1', 'com2', 'com3', 'com4', 'com5', 'com6')
+
+dat <- dat %>%
+  mutate(lep_yes = if_any(c(com1, com2, com3, com4, com5, 
+                            com6), ~ str_detect(.x, 'lep'))) %>%
+  mutate(DA_yes = if_any(c(com1, com2, com3, com4, com5, 
+                            com6), ~ str_detect(.x, 'domoic'))) 
+
+dat_yr <- dat %>%
+  filter(!is.na(year)) %>%
+  filter(year > 2013) %>%
+  group_by(year) %>%
+  dplyr::summarize(lep = mean(lep_yes),
+                   DA = mean(DA_yes))
+
+da_early <- read_tsv(here('data', 'DA.txt'))
+
+lep_early <- read_tsv(here('data', 'lepto.txt'))
+
+all_yrs <- dat_yr %>%
+  melt(id.vars = 'year') %>%
+  transform(variable = factor(variable, levels = c('lep', 'DA'),
+                              labels = c('Lepto', 'DA')))
+
+ggplot(all_yrs, aes(x = year, y = value, color = variable)) +
+  geom_point() +
+  geom_line() +
+  xlab('') + ylab('Proportion of stranding cases') +
+  theme_bw() +
+  theme(legend.position = 'top') +
+  scale_color_manual(values = c('dodgerblue3', 'goldenrod'), name = '')
+
+```
+
+
 ```{r brands per year}
 
 #table of n_ids by year and region
