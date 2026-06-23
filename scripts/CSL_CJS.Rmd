@@ -1079,6 +1079,73 @@ for (a in 1:24) {
 
 # print(init_pop_f)
 
+#stable age logic to initialize N_f and N_m
+# 1. Define safe, conservative survival guesses (should roughly match your mu inits)
+phi_P <- 0.60
+phi_1 <- 0.85
+phi_J <- 0.85 # Juveniles (Ages 2-5)
+phi_A <- 0.80 # Adults (Ages 6-24)
+
+# 2. Create empty tracking matrices (25 rows, n_occasions columns)
+N_f_track <- matrix(0, nrow = 25, ncol = n_occasions)
+N_m_track <- matrix(0, nrow = 25, ncol = n_occasions)
+
+# 3. Seed Year 1 with the census data and a Stable Age Distribution
+# (Assuming 50:50 sex ratio for pups)
+N_f_track[1, 1] <- round(pup_cnt_filled$US_PupCnt[1] / 2)
+N_m_track[1, 1] <- pup_cnt_filled$US_PupCnt[1] - N_f_track[1, 1]
+
+for (a in 1:24) {
+  # Pick the right survival rate for the age class
+  surv <- ifelse(a == 1, phi_P, 
+          ifelse(a == 2, phi_1, 
+          ifelse(a >= 3 & a <= 5, phi_J, phi_A)))
+          
+  N_f_track[a + 1, 1] <- round(N_f_track[a, 1] * surv)
+  N_m_track[a + 1, 1] <- round(N_m_track[a, 1] * surv)
+}
+
+# 4. Dynamically project the rest of the matrix forward through time!
+for (t in 1:(n_occasions - 1)) {
+  
+  # Insert the REAL pup count for the next year
+  N_f_track[1, t+1] <- round(pup_cnt_filled$US_PupCnt[t+1] / 2)
+  N_m_track[1, t+1] <- pup_cnt_filled$US_PupCnt[t+1] - N_f_track[1, t+1]
+  
+  # Pups transition to yearlings (Index 1 -> 2)
+  N_f_track[2, t+1] <- round(N_f_track[1, t] * phi_P)
+  N_m_track[2, t+1] <- round(N_m_track[1, t] * phi_P)
+  
+  # Yearlings transition to Age 2 (Index 2 -> 3)
+  N_f_track[3, t+1] <- round(N_f_track[2, t] * phi_1)
+  N_m_track[3, t+1] <- round(N_m_track[2, t] * phi_1)
+  
+  # Juveniles transition (Indices 3-5 -> 4-6)
+  for (a in 3:5) {
+    N_f_track[a+1, t+1] <- round(N_f_track[a, t] * phi_J)
+    N_m_track[a+1, t+1] <- round(N_m_track[a, t] * phi_J)
+  }
+  
+  # Adults transition (Indices 6-24 -> 7-25)
+  for (a in 6:24) {
+    N_f_track[a+1, t+1] <- round(N_f_track[a, t] * phi_A)
+    N_m_track[a+1, t+1] <- round(N_m_track[a, t] * phi_A)
+  }
+}
+
+# 5. Format for Nimble
+# Nimble will crash if you provide initial values for a deterministic node.
+# Since row 1 (pups) is assigned deterministically in the model, it MUST be NA in the inits.
+N_f_init <- N_f_track
+N_m_init <- N_m_track
+
+N_f_init[1, ] <- NA
+N_m_init[1, ] <- NA
+
+# Extract Year 1 to serve as the constant for your dpois() priors
+init_pop_f <- N_f_track[, 1]
+init_pop_m <- N_m_track[, 1]
+
 ```
 
 
@@ -1449,16 +1516,17 @@ for (t in (fc_m[i] + 1):n_occasions) {
 }) # mod   
 
 ##### run model ####
-nim.data <- list(y = y, ym = ym)
+nim.data <- list(y = y, ym = ym, y_pup_counts = pup_cnt_filled$US_PupCnt)
 
 nim.constants <- list(n_f = dim(y)[1], n_m = dim(ym)[1], 
                       n_occasions = n_occasions,
                       init_pop_size_f = init_pop_f, init_pop_size_m = init_pop_m,
-                      y_pup_counts = pup_cnt_filled$US_PupCnt,
                       sst_pupForage = sst_dat[,2],
                       sst_np = sst_dat[,4],
                       mass_f = mass_f, mass_m = mass_m, #site = rook, sex = sex,
                       fc = fc, fc_m = fc_m)
+
+N_f_init <- 
 
 inits <- list(int.phiP = 0.6, int.phi1 = 0.9, int.phi2.3 = 0.9, 
               int.phi4.6 = 0.9, int.phi7.9 = 0.9, 
@@ -1470,6 +1538,12 @@ inits <- list(int.phiP = 0.6, int.phi1 = 0.9, int.phi2.3 = 0.9,
               int.p4.6M = 0.5, int.p7.12M = 0.7, int.pAM = 0.8,
               b.massP = 0, b.mass1 = 0, b.massPM = 0, b.mass1M = 0, 
               b.sst.P = 0, b.sst.1 = 0,
+              beta.DD = 0.05, 
+              int.fec_low = 0.1, 
+              int.fec_high = 0.7,
+              b.sst.2.3 = 0, b.sst.4.6 = 0, b.sst.7.9 = 0, b.sst.A = 0,
+              b.sst.2.3M = 0, b.sst.4.6M = 0
+              N_f = N_f_init, N_m = N_m_init,
               z = z.init, zm = z.init.m)
 
 ### parameters
