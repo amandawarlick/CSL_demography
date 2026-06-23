@@ -1475,9 +1475,11 @@ inits <- list(int.phiP = 0.6, int.phi1 = 0.9, int.phi2.3 = 0.9,
 ### parameters
 params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA', 'int.p4.6M', 
             'int.p7.12M', 'int.pAM',
+            'N_f', 'N_m', 'beta.DD', 'N_total',
             # 'b.massP', 'b.mass1', 'b.massPM', 'b.mass1M',
             'b.sst.P', 'b.sst.1', 'b.sst.2.3', 'b.sst.4.6', 
             'b.sst.2.3M', 'b.sst.4.6M', 'b.sst.7.9', 'b.sst.A',
+            'int.fec_low', 'int.fec_high',
             'int.phiP', 'int.phi1', 'int.phi2.3', 'int.phi4.6', 'int.phi7.9',
             'int.phi10.12', 'int.phi13.16', 'int.phiA',
             'int.phiPM', 'int.phi1M', 'int.phi2.3M', 'int.phi4.6M', 'int.phi7.9M',
@@ -1489,14 +1491,14 @@ n.iter = 10000; n.chains = 3; n.burnin = 5000; nthin = 2; nAdapt = 20
 # n.iter = 200; n.chains = 1; n.burnin = 50; nthin = 2; nAdapt = 20
 
 
-start <- Sys.time()
+# start <- Sys.time()
+# 
+# cores=detectCores() 
+# used.cores = min(n.chains, cores) 
+# cl <- makeCluster(n.chains, setup_strategy = "sequential") 
+# registerDoParallel(cl) 
 
-cores=detectCores() 
-used.cores = min(n.chains, cores) 
-cl <- makeCluster(n.chains, setup_strategy = "sequential") 
-registerDoParallel(cl) 
-
-foreach(i = 1:n.chains) %dopar% {
+# foreach(i = 1:n.chains) %dopar% {
   library(nimble)
   library(here)
   source(here("scripts", "nimbleFunctions.R"))
@@ -1513,8 +1515,8 @@ Cmodel <- compileNimble(Rmodel)
 Cmcmc <- compileNimble(Rmcmc, project = Rmodel)
 
 out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin, 
-               # nchains = n.chains, 
-               nchains = 1,
+               nchains = n.chains,
+               # nchains = 1,
                inits = inits,
                  setSeed = FALSE, progressBar = TRUE,
                samplesAsCodaMCMC = TRUE)
@@ -1522,7 +1524,7 @@ out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin,
 
   # saveRDS(out, here('results', paste("out.parallel_sst_", i, ".RDS", sep = "")))
 
-} # closes parallel loop
+# } # closes parallel loop
 
 ##k and osp
 # Extract your MCMC matrix
