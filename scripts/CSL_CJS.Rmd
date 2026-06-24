@@ -1539,9 +1539,8 @@ CSL_CJS <- nimbleCode({
   
   beta.DD ~ dexp(1) 
   
-  # calculate Total Scaled Population for Density Dependence ---
+  # scaled population density dependence
   for (t in 1:(n_occasions - 1)) {
-    # We must estimate total population size here so it can feed into the CJS loops
     N_total[t] <- sum(N_f[1:25, t]) + sum(N_m[1:25, t])
     N_scaled[t] <- N_total[t] / 100000 
   }
@@ -1783,35 +1782,29 @@ for (t in (fc_m[i] + 1):n_occasions) {
     } #t likelihood 
 } #i likelihood 
     
-    #population model
-    # ================================================================= #
-  # IPM COMPONENT: POPULATION PROJECTION & OBSERVATION MODEL          #
-  # ================================================================= #
-  
-# Fecundity Priors
+###population model
+    
+# fecundity 
   int.fec_low ~ dunif(0, 1)  
   int.fec_high ~ dunif(0, 1) 
   
-  # Initial Population Size at t = 1 (Ages 2-24)
-  # (Age 1 pups are omitted here because they are set by the census below)
+  # initial pop size at t = 1 
+  # pups omitted here because they are set by the census below
   for(a in 2:25) {
     N_f[a, 1] ~ dpois(init_pop_size_f[a]) 
     N_m[a, 1] ~ dpois(init_pop_size_m[a])
   }
   
-  # --- NEW: Deterministic Pup Assignment ---
-  # Because it is a perfect census, we tell Nimble the true number of pups 
-  # exactly equals the count data. We divide by 2 assuming a 50:50 sex ratio.
+  # set number of pups
   for (t in 1:(n_occasions-1)) {
     N_f[1, t] <- round(y_pup_counts[t] / 2)
     N_m[1, t] <- y_pup_counts[t] - N_f[1, t]
   }
   
-  # Demographic Transitions (State-Space Model)
+  # demographic transitions 
   #minus 2 bc counts only go up to 2024, so 35 yrs of counts instead of the 36 MR data
   for (t in 1:(n_occasions - 2)) {
     
-    # --- SURVIVAL TRANSITIONS ---
     N_f[2, t+1] ~ dbin(phiP.prob[t], N_f[1, t]) #pups survived to become yearlings
     N_m[2, t+1] ~ dbin(phiPM.prob[t], N_m[1, t])
     
@@ -1884,15 +1877,11 @@ for (t in (fc_m[i] + 1):n_occasions) {
     N_f[25, t+1] ~ dbin(phiA.prob[t], N_f[24, t]) #24 is max allowable age
     N_m[25, t+1] ~ dbin(phiAM.prob[t], N_m[24, t])
     
-    
-    # --REPRODUCTION & LIKELIHOOD ---
-    # We calculate the total expected pups from the unobserved adults
+    # calculate the total expected pups from the unobserved adults
     expected_pups_tot[t+1] <- (sum(N_f[5:10, t+1]) * int.fec_low) + 
                               (sum(N_f[11:23, t+1]) * int.fec_high)
                             
-    # The Census Likelihood
-    # Instead of generating a latent population, we evaluate the biological 
-    # expected pups directly against the hard census data.
+    # evaluate the biological expected pups directly against the census data
     y_pup_counts[t+1] ~ dpois(expected_pups_tot[t+1]) 
   }
   
@@ -1991,153 +1980,196 @@ mcmc_matrix <- as.matrix(out)
 n_draws <- 1000 
 draw_indices <- sample(1:nrow(mcmc_matrix), n_draws)
 
-# Vector to store our K estimates
+# Vector to store K estimates
 K_estimates <- numeric(n_draws)
 
 # Run the simulation for each sampled posterior draw
 for (i in 1:n_draws) {
   row_idx <- draw_indices[i]
   
-  # 1. Extract vital rates for this specific MCMC draw
+  # extract vital rates for each MCMC draw
   mu_P   <- mcmc_matrix[row_idx, "mu.P"]
   beta_DD <- mcmc_matrix[row_idx, "beta.DD"]
   mu_1   <- mcmc_matrix[row_idx, "mu.1"]
-  # ... extract your other survival mu's (mu_2.3, mu_4.6, mu_A, etc.) ...
-  
+  mu_2.3   <- mcmc_matrix[row_idx, "mu.2.3"]
+  mu_4.6   <- mcmc_matrix[row_idx, "mu.4.6"]
+  mu_7.9   <- mcmc_matrix[row_idx, "mu.7.9"]
+  mu_10.12   <- mcmc_matrix[row_idx, "mu.10.12"]
+  mu_13.16   <- mcmc_matrix[row_idx, "mu.13.16"]
+  mu_A   <- mcmc_matrix[row_idx, "mu.A"]
   fec_low  <- mcmc_matrix[row_idx, "int.fec_low"]
   fec_high <- mcmc_matrix[row_idx, "int.fec_high"]
   
-  # 2. Convert baseline survival to probability scale (assuming SST = 0)
-  # using plogis() which is the inverse-logit function in R
+  # convert baseline survival to probability scale (assuming SST = 0)
   phi1 <- plogis(mu_1)
-  # ... convert other phi's ...
-  phiA <- plogis(mcmc_matrix[row_idx, "mu.A"]) 
+  phi2.3 <- plogis(mu_2.3)
+  phi4.6 <- plogis(mu_4.6)
+  phi7.9 <- plogis(mu_7.9)
+  phi10.12 <- plogis(mu_10.12)
+  phi13.16 <- plogis(mu_13.16)
+  phiA <- plogis(mu_A)
   
-  # 3. Initialize a starting population vector 
-  # (e.g., 50 females per age class to kickstart the simulation)
-  N_vec <- rep(50, 24) 
+  # initialize a starting population vector 
+  # (e.g., 50 females per age class to the simulation)
+  N_vec <- rep(50, 25) 
   
-  # 4. Project forward to reach equilibrium (K)
-  for (y in 1:200) { # 200 years is usually enough for a long-lived mammal to stabilize
+  # project forward to reach equilibrium (K)
+  for (y in 1:200) { # 200 years long enough?
     
-    N_tot <- sum(N_vec) # Assuming we are just modeling females here for simplicity, 
+    N_tot <- sum(N_vec) # just modeling females here for simplicity, 
                         # or multiply by 2 if assuming equal male population.
                         
-    # Calculate density-dependent pup survival for THIS year
-    # (Remembering to scale N exactly as we did in Nimble!)
-    phiP_current <- plogis(mu_P - beta_DD * ((N_tot * 2) / 100000))
+    # calculate density-dependent pup survival for THIS year
+    # scale N as in the model
+    phiP_current <- plogis(mu_P-beta_DD*((N_tot*2)/100000))
     
-    # Calculate total pups born
-    pups_born <- (sum(N_vec[4:9]) * fec_low * 0.5) + (sum(N_vec[10:22]) * fec_high * 0.5)
+    # calculate total pups born
+    pups_born <- (sum(N_vec[5:10])*fec_low*0.5) + (sum(N_vec[11:23])*fec_high*0.5)
     
     # Create the next year's population vector
-    N_vec_next <- numeric(24)
+    N_vec_next <- numeric(25)
     N_vec_next[1] <- pups_born
     N_vec_next[2] <- N_vec[1] * phiP_current
     N_vec_next[3] <- N_vec[2] * phi1
-    # ... apply your other age-class survival rates ...
-    
-    # Adult absorbing state (ages 17-23)
-    for (a in 17:23) {
+    N_vec_next[4] <- N_vec[3] * phi2.3
+    N_vec_next[5] <- N_vec[4] * phi2.3
+    N_vec_next[6] <- N_vec[5] * phi4.6
+    N_vec_next[7] <- N_vec[6] * phi4.6
+    N_vec_next[8] <- N_vec[7] * phi4.6
+    N_vec_next[9] <- N_vec[8] * phi7.9
+    N_vec_next[10] <- N_vec[9] * phi7.9
+    N_vec_next[11] <- N_vec[10] * phi7.9
+    N_vec_next[12] <- N_vec[11] * phi10.12
+    N_vec_next[13] <- N_vec[12] * phi10.12
+    N_vec_next[14] <- N_vec[13] * phi10.12
+    N_vec_next[15] <- N_vec[14] * phi13.16
+    N_vec_next[16] <- N_vec[15] * phi13.16
+    N_vec_next[17] <- N_vec[16] * phi13.16
+    N_vec_next[18] <- N_vec[17] * phi13.16
+
+    # absorbing state (ages 17-23)
+    for (a in 18:24) {
       N_vec_next[a+1] <- N_vec[a] * phiA
     }
     
-    # Update population
+    # update population
     N_vec <- N_vec_next
   }
   
-  # Store the final stabilized population size (multiplying by 2 to account for males)
+  # store stabilized population size (multiply by 2 to account for males)
   K_estimates[i] <- sum(N_vec) * 2 
 }
 
-# View your final estimates!
+# mean
 mean_K <- mean(K_estimates)
 K_CI <- quantile(K_estimates, probs = c(0.025, 0.975))
 
-print(paste("Estimated K:", round(mean_K), "95% CI:", round(K_CI[1]), "-", round(K_CI[2])))
+# print(paste("Estimated K:", round(mean_K), "95% CI:", round(K_CI[1]), "-", round(K_CI[2])))
 
-##once have K, derive MNPL and OSP
+##calculate MNPL and OSP
 
-#simplified approach assuming 60%
+#simplified approach assuming 60%, or use vital rates from IPM
 # MNPL_estimates <- K_estimates * 0.60
 
-#or use vital rates from IPM
-# Extract your MCMC matrix (assuming 'out' is your nimble output)
+#use vital rates from IPM
+# extract MCMC matrix 
 mcmc_matrix <- as.matrix(out) 
 
-# Number of posterior draws to simulate
+# number of posterior draws to simulate
 n_draws <- 1000 
 draw_indices <- sample(1:nrow(mcmc_matrix), n_draws)
 
-# Vectors to store our demographic estimates
+# storage
 K_estimates <- numeric(n_draws)
 MNPL_estimates <- numeric(n_draws)
 OSP_status <- numeric(n_draws)
 
-# You will need to provide your most recent total population estimate 
-# (e.g., from your final year of count data) to evaluate OSP status.
-N_current_observed <- 250000 
+# final year of count data to evaluate OSP status
+N_current_observed <- pup_cnt_filled[35,'US_PupCnt'] 
 
 for (i in 1:n_draws) {
   row_idx <- draw_indices[i]
   
-  # 1. Extract vital rates for this specific MCMC draw
-  mu_P     <- mcmc_matrix[row_idx, "mu.P"]
-  beta_DD  <- mcmc_matrix[row_idx, "beta.DD"]
-  mu_1     <- mcmc_matrix[row_idx, "mu.1"]
-  mu_A     <- mcmc_matrix[row_idx, "mu.A"]
+  # extract vital rates for each MCMC draw
+  mu_P   <- mcmc_matrix[row_idx, "mu.P"]
+  beta_DD <- mcmc_matrix[row_idx, "beta.DD"]
+  mu_1   <- mcmc_matrix[row_idx, "mu.1"]
+  mu_2.3   <- mcmc_matrix[row_idx, "mu.2.3"]
+  mu_4.6   <- mcmc_matrix[row_idx, "mu.4.6"]
+  mu_7.9   <- mcmc_matrix[row_idx, "mu.7.9"]
+  mu_10.12   <- mcmc_matrix[row_idx, "mu.10.12"]
+  mu_13.16   <- mcmc_matrix[row_idx, "mu.13.16"]
+  mu_A   <- mcmc_matrix[row_idx, "mu.A"]
   fec_low  <- mcmc_matrix[row_idx, "int.fec_low"]
   fec_high <- mcmc_matrix[row_idx, "int.fec_high"]
   
-  # Convert baseline survival to probability scale (assuming SST = 0)
+  # convert baseline survival to probability scale (assuming SST = 0)
   phi1 <- plogis(mu_1)
+  phi2.3 <- plogis(mu_2.3)
+  phi4.6 <- plogis(mu_4.6)
+  phi7.9 <- plogis(mu_7.9)
+  phi10.12 <- plogis(mu_10.12)
+  phi13.16 <- plogis(mu_13.16)
   phiA <- plogis(mu_A)
   
-  # 2. Initialize simulation arrays
-  n_years <- 250 # Ensure enough time for the population to reach K
+  # initialize simulation arrays
+  n_years <- 250 #enough time for the population to reach K
   N_history <- numeric(n_years)
   
-  # Start with a very small population to ensure we capture the full growth curve
-  N_vec <- rep(5, 24) 
+  # start with small population to ensure the full growth curve is captured
+  N_vec <- rep(5, 25) 
   
-  # 3. Project forward and track the population history
+  # project forward and track the population history
   for (y in 1:n_years) {
     
-    # Total population (assuming equal sex ratio, multiplying female count by 2)
+    # total population (assuming equal sex ratio, multiplying female count by 2)
     N_tot <- sum(N_vec) * 2 
     N_history[y] <- N_tot
     
     # Calculate density-dependent pup survival for THIS year
     phiP_current <- plogis(mu_P - beta_DD * (N_tot / 100000))
     
-    # Calculate total pups born
-    pups_born <- (sum(N_vec[4:9]) * fec_low * 0.5) + (sum(N_vec[10:22]) * fec_high * 0.5)
+    # calculate total pups born
+    pups_born <- (sum(N_vec[5:10])*fec_low*0.5) + (sum(N_vec[11:23])*fec_high*0.5)
     
     # Create the next year's population vector
-    N_vec_next <- numeric(24)
+    N_vec_next <- numeric(25)
     N_vec_next[1] <- pups_born
     N_vec_next[2] <- N_vec[1] * phiP_current
     N_vec_next[3] <- N_vec[2] * phi1
-    
-    # [ --- INSERT YOUR OTHER AGE TRANSITIONS HERE (phi2 through phi16) --- ]
-    
-    # Adult absorbing state (ages 17-23)
-    for (a in 17:23) {
+    N_vec_next[4] <- N_vec[3] * phi2.3
+    N_vec_next[5] <- N_vec[4] * phi2.3
+    N_vec_next[6] <- N_vec[5] * phi4.6
+    N_vec_next[7] <- N_vec[6] * phi4.6
+    N_vec_next[8] <- N_vec[7] * phi4.6
+    N_vec_next[9] <- N_vec[8] * phi7.9
+    N_vec_next[10] <- N_vec[9] * phi7.9
+    N_vec_next[11] <- N_vec[10] * phi7.9
+    N_vec_next[12] <- N_vec[11] * phi10.12
+    N_vec_next[13] <- N_vec[12] * phi10.12
+    N_vec_next[14] <- N_vec[13] * phi10.12
+    N_vec_next[15] <- N_vec[14] * phi13.16
+    N_vec_next[16] <- N_vec[15] * phi13.16
+    N_vec_next[17] <- N_vec[16] * phi13.16
+    N_vec_next[18] <- N_vec[17] * phi13.16
+
+    # absorbing state (ages 17-23)
+    for (a in 18:24) {
       N_vec_next[a+1] <- N_vec[a] * phiA
     }
     
-    # Update population for the next loop iteration
+    # update population
     N_vec <- N_vec_next
   }
   
-  # 4. Numerically derive K and MNPL
+  # numerically derive K and MNPL
   # K is the final stabilized population size at the end of the simulation
   K_estimates[i] <- N_history[n_years]
   
-  # Calculate Net Production (the difference in population size year over year)
+  # calculate net production (the difference in population size each year)
   net_production <- diff(N_history)
   
-  # Find the exact year index where net production was highest
+  # find year index where net production was highest
   max_growth_year <- which.max(net_production)
   
   # MNPL is the population size at that specific peak-growth year
@@ -2147,7 +2179,6 @@ for (i in 1:n_draws) {
   OSP_status[i] <- N_current_observed / MNPL_estimates[i]
 }
 
-# --- SUMMARY STATISTICS ---
 cat("Carrying Capacity (K):\n",
     "Mean:", round(mean(K_estimates)), 
     "| 95% CI:", round(quantile(K_estimates, 0.025)), "-", round(quantile(K_estimates, 0.975)), "\n\n")
@@ -2160,7 +2191,7 @@ cat("OSP Status Ratio (N_current / MNPL):\n",
     "Mean:", round(mean(OSP_status), 2), 
     "| 95% CI:", round(quantile(OSP_status, 0.025), 2), "-", round(quantile(OSP_status, 0.975), 2), "\n")
 
-# Calculate the probability that the population is within its OSP (> 1.0)
+# calculate the probability that the population is within its OSP (> 1.0)
 prob_in_OSP <- mean(OSP_status >= 1.0)
 cat("\nProbability population is within OSP:", round(prob_in_OSP * 100, 1), "%\n")
 
