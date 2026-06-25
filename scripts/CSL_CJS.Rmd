@@ -1268,7 +1268,6 @@ CSL_CJS <- nimbleCode({
     b.enso.2.3[1] ~ dnorm(0,sd = s.ensoJ)
     b.enso.4.6[1] ~ dnorm(0,sd = s.ensoA)
     b.enso.A[1] ~ dnorm(0,sd = s.ensoA)
-    s.sstP ~ dexp(1)
     s.enso1 ~ dexp(1)
     s.ensoJ ~ dexp(1)
     s.ensoA ~ dexp(1)
