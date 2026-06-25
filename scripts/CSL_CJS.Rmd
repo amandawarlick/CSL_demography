@@ -107,11 +107,15 @@ ch_dat_f <- read.csv(here::here('data', 'res_dat_f_20260623.csv'),
                    header = T, stringsAsFactors = F) %>% 
   transform(adjsex == 'Fem') %>%
   dplyr::select(-adjsex) %>%
+  group_by(cohort) %>%
+  slice_sample(n = 25, replace = F) %>%
   arrange(brand)
 
 ch_dat_m <- read.csv(here::here('data', 'res_dat_m_20260623.csv'),
                    header = T, stringsAsFactors = F) %>% 
   dplyr::select(-adjsex) %>%
+  group_by(cohort) %>%
+  slice_sample(n = 20, replace = F) %>%
   arrange(brand)
 
 EN_yes <- c(1991, 1997, 2015, 2023)
@@ -205,7 +209,6 @@ pup_cnt_filled <- na_interpolation(pup_cnts, option = 'stine')
 
 ```
 
-
 ```{r fc inits}
 
 #first capture
@@ -293,7 +296,6 @@ z.init.m = as.matrix(cjs.init(ch_m, fc_m))
 
 
 ```
-
 
 ```{r null model}
 
@@ -692,7 +694,6 @@ saveRDS(out, here::here('results', 'out_null_null.RDS'))
 
 ```
 
-
 ```{r sst model}
 
 CSL_CJS <- nimbleCode({
@@ -1049,8 +1050,6 @@ out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
 saveRDS(out, here::here('results', 'out_sst.RDS'))
 
 ```
-
-
 
 ```{r enso memory model}
 
@@ -1418,66 +1417,24 @@ saveRDS(out, here::here('results', 'out_ENSO_memory.RDS'))
 
 ```
 
-
 ```{r stable age}
 
-# 1. Grab your very first pup count (Year 1 of your time series)
-# Replace this with your actual y_pup_counts[1]
-# initial_pups <- as.numeric(pup_cnt_filled[1,'US_PupCnt'])
-# 
-# # 2. Make rough guesses for baseline survival (probability scale)
-# guess_phiP <- 0.7   # Pups (Index 1 to 2)
-# guess_phi1 <- 0.8   # Yearlings (Index 2 to 3)
-# guess_phiJ <- 0.85   # Juveniles (Indices 3 to 6)
-# guess_phiA <- 0.88   # Adults (Indices 7 to 25)
-# 
-# # 3. Create empty vectors of length 25
-# init_pop_f <- numeric(25)
-# init_pop_m <- numeric(25)
-# 
-# # 4. Assign pups (Index 1) assuming a 50:50 sex ratio
-# init_pop_f[1] <- round(initial_pups / 2)
-# init_pop_m[1] <- round(initial_pups / 2)
-# 
-# # 5. Populate the vectors sequentially
-# for (a in 1:24) {
-#   
-#   # Determine which survival rate applies to the current index
-#   if (a == 1) {
-#     surv_rate <- guess_phiP
-#   } else if (a == 2) {
-#     surv_rate <- guess_phi1
-#   } else if (a >= 3 & a <= 5) {
-#     surv_rate <- guess_phiJ
-#   } else {
-#     surv_rate <- guess_phiA
-#   }
-#   
-#   # Calculate the next age class
-#   init_pop_f[a + 1] <- round(init_pop_f[a] * surv_rate)
-#   init_pop_m[a + 1] <- round(init_pop_m[a] * surv_rate)
-# }
-
-# print(init_pop_f)
-
 #stable age logic to initialize N_f and N_m
-# 1. Define safe, conservative survival guesses (should roughly match your mu inits)
+# define survival rates
 phi_P <- 0.50
 phi_1 <- 0.75
 phi_J <- 0.85 # Juveniles (Ages 2-5)
 phi_A <- 0.80 # Adults (Ages 6-24)
 
-# 2. Create empty tracking matrices (25 rows, n_occasions columns)
+# storage
 N_f_track <- matrix(0, nrow = 25, ncol = (n_occasions-1))
 N_m_track <- matrix(0, nrow = 25, ncol = (n_occasions-1))
 
-# 3. Seed Year 1 with the census data and a Stable Age Distribution
-# (Assuming 50:50 sex ratio for pups)
+# year 1; assuming 50:50 sex ratio for pups
 N_f_track[1, 1] <- round(pup_cnt_filled$US_PupCnt[1] / 2)
 N_m_track[1, 1] <- pup_cnt_filled$US_PupCnt[1] - N_f_track[1, 1]
 
 for (a in 1:24) {
-  # Pick the right survival rate for the age class
   surv <- ifelse(a == 1, phi_P, 
           ifelse(a == 2, phi_1, 
           ifelse(a >= 3 & a <= 5, phi_J, phi_A)))
@@ -1514,16 +1471,14 @@ for (t in 1:(n_occasions - 2)) {
   }
 }
 
-# 5. Format for Nimble
-# Nimble will crash if you provide initial values for a deterministic node.
-# Since row 1 (pups) is assigned deterministically in the model, it MUST be NA in the inits.
+# row 1 (pups) is assigned deterministically in the model, NA for inits
 N_f_init <- N_f_track
 N_m_init <- N_m_track
 
 N_f_init[1, ] <- NA
 N_m_init[1, ] <- NA
 
-# Extract Year 1 to serve as the constant for your dpois() priors
+# use year 1 for for dpois() priors
 init_pop_f <- N_f_track[, 1]
 init_pop_m <- N_m_track[, 1]
 
@@ -1532,11 +1487,13 @@ init_pop_m <- N_m_track[, 1]
 
 ```{r osp integration}
 
-CSL_CJS <- nimbleCode({
+CSL_IPM <- nimbleCode({
 
 # Priors and constraints
   
-  beta.DD ~ dexp(1) 
+  # beta.DD ~ dexp(1) 
+  # beta.DD ~ dunif(0,3) #constrain to keep population on track to start
+  beta.DD <- 0
   
   # scaled population density dependence
   for (t in 1:(n_occasions - 1)) {
@@ -1657,14 +1614,14 @@ CSL_CJS <- nimbleCode({
     mu.13.16 <- log(int.phi13.16/(1 - int.phi13.16))
     mu.A <- log(int.phiA/(1 - int.phiA))
     
-    int.phiP ~ dunif(0,1)
-    int.phi1 ~ dunif(0,1)
-    int.phi2.3 ~ dunif(0,1)
-    int.phi4.6 ~ dunif(0,1)
-    int.phi7.9 ~ dunif(0,1)
-    int.phi10.12 ~ dunif(0,1)
-    int.phi13.16 ~ dunif(0,1)
-    int.phiA ~ dunif(0,1)
+    int.phiP ~ dunif(0.05,0.8)
+    int.phi1 ~ dunif(0.1,0.9)
+    int.phi2.3 ~ dunif(0.1,0.93)
+    int.phi4.6 ~ dunif(0.2,0.98)
+    int.phi7.9 ~ dunif(0.2,0.98)
+    int.phi10.12 ~ dunif(0.2,0.98)
+    int.phi13.16 ~ dunif(0.2,0.98)
+    int.phiA ~ dunif(0.2,0.98)
     
     #males
     mu.PM <- log(int.phiPM/(1 - int.phiPM))
@@ -1676,14 +1633,14 @@ CSL_CJS <- nimbleCode({
     mu.13.16M <- log(int.phi10.12M/(1 - int.phi13.16M))
     mu.AM <- log(int.phiAM/(1 - int.phiAM))
     
-    int.phiPM ~ dunif(0,1)
-    int.phi1M ~ dunif(0,1)
-    int.phi2.3M ~ dunif(0,1)
-    int.phi4.6M ~ dunif(0,1)
-    int.phi7.9M ~ dunif(0,1)
-    int.phi10.12M ~ dunif(0,1)
-    int.phi13.16M ~ dunif(0,1)
-    int.phiAM ~ dunif(0,1)
+    int.phiPM ~ dunif(0.05,0.8)
+    int.phi1M ~ dunif(0.1,0.9)
+    int.phi2.3M ~ dunif(0.1,0.95)
+    int.phi4.6M ~ dunif(0.1,0.95)
+    int.phi7.9M ~ dunif(0.1,0.95)
+    int.phi10.12M ~ dunif(0.1,0.95)
+    int.phi13.16M ~ dunif(0.1,0.95)
+    int.phiAM ~ dunif(0.1,0.9)
     
     # b.massP ~ dnorm(0, sd = s.mass)
     # b.mass1 ~ dnorm(0, sd = s.mass)
@@ -1691,16 +1648,26 @@ CSL_CJS <- nimbleCode({
     # b.mass1M ~ dnorm(0, sd = s.mass)
     # s.mass ~ dexp(1)
     
-    b.sst.P ~ dnorm(0,sd = s.sst)
-    b.sst.1 ~ dnorm(0, sd = s.sst)
-    b.sst.2.3 ~ dnorm(0,sd = s.sst)
-    b.sst.4.6 ~ dnorm(0,sd = s.sst)
-    b.sst.2.3M ~ dnorm(0,sd = s.sst)
-    b.sst.4.6M ~ dnorm(0,sd = s.sst)
-    b.sst.7.9 ~ dnorm(0,sd = s.sst.A)
-    b.sst.A ~ dnorm(0,sd = s.sst.A)
-    s.sst ~ dexp(1)
-    s.sst.A ~ dexp(1)
+    # b.sst.P ~ dnorm(0,sd = s.sst)
+    # b.sst.1 ~ dnorm(0, sd = s.sst)
+    # b.sst.2.3 ~ dnorm(0,sd = s.sst)
+    # b.sst.4.6 ~ dnorm(0,sd = s.sst)
+    # b.sst.2.3M ~ dnorm(0,sd = s.sst)
+    # b.sst.4.6M ~ dnorm(0,sd = s.sst)
+    # b.sst.7.9 ~ dnorm(0,sd = s.sst.A)
+    # b.sst.A ~ dnorm(0,sd = s.sst.A)
+    # s.sst ~ dexp(1)
+    # s.sst.A ~ dexp(1)
+    
+    b.sst.P ~ dunif(-3,3)
+    b.sst.1 ~ dunif(-3,3)
+    b.sst.2.3 ~ dunif(-3,3)
+    b.sst.4.6 ~ dunif(-3,3)
+    b.sst.2.3M ~ dunif(-3,3)
+    b.sst.4.6M ~ dunif(-3,3)
+    b.sst.7.9 ~ dunif(-3,3)
+    b.sst.A ~ dunif(-3,3)
+ 
     
     for (t in 1:(n_occasions-1)){
         phiP.prob[t] <- ilogit(mu.P + b.sst.P*sst_pupForage[t] - beta.DD*N_scaled[t])
@@ -1784,8 +1751,10 @@ for (t in (fc_m[i] + 1):n_occasions) {
 ###population model
     
 # fecundity 
-  int.fec_low ~ dunif(0, 1)  
-  int.fec_high ~ dunif(0, 1) 
+  # int.fec_low ~ dunif(0, 1)  
+  # int.fec_high ~ dunif(0, 1) 
+  int.fec_low ~ dunif(0.05, 0.8)  
+  int.fec_high ~ dunif(0.25,0.95)
   
   # initial pop size at t = 1 
   # pups omitted here because they are set by the census below
@@ -1878,7 +1847,7 @@ for (t in (fc_m[i] + 1):n_occasions) {
     
     # calculate the total expected pups from the unobserved adults
     expected_pups_tot[t+1] <- (sum(N_f[5:10, t+1]) * int.fec_low) + 
-                              (sum(N_f[11:23, t+1]) * int.fec_high)
+                              (sum(N_f[11:23, t+1]) * int.fec_high) + 0.1 #0.1 to prevent logProb
                             
     # evaluate the biological expected pups directly against the census data
     y_pup_counts[t+1] ~ dpois(expected_pups_tot[t+1]) 
@@ -1897,22 +1866,22 @@ nim.constants <- list(n_f = dim(y)[1], n_m = dim(ym)[1],
                       mass_f = mass_f, mass_m = mass_m, #site = rook, sex = sex,
                       fc = fc, fc_m = fc_m)
 
-inits <- list(int.phiP = 0.6, int.phi1 = 0.9, int.phi2.3 = 0.9, 
+inits <- list(int.phiP = 0.6, int.phi1 = 0.6, int.phi2.3 = 0.85, 
               int.phi4.6 = 0.9, int.phi7.9 = 0.9, 
               int.phi10.12 = 0.9, int.phi13.16 = 0.8, int.phiA = 0.6,
-              int.phiPM = 0.6, int.phi1M = 0.9, int.phi2.3M = 0.9, int.phi4.6M = 0.9, 
+              int.phiPM = 0.6, int.phi1M = 0.6, int.phi2.3M = 0.9, int.phi4.6M = 0.9, 
               int.phi7.9M = 0.9, 
               int.phi10.12M = 0.7, int.phi13.16M = 0.8, int.phiAM = 0.6,
               int.p1 = 0.4, int.p2.3 = 0.4, int.p4.6 = 0.5, int.p7.12 = 0.7, int.pA = 0.8,
               int.p4.6M = 0.5, int.p7.12M = 0.7, int.pAM = 0.8,
               b.massP = 0, b.mass1 = 0, b.massPM = 0, b.mass1M = 0, 
               b.sst.P = 0, b.sst.1 = 0,
-              beta.DD = 0.05, 
-              int.fec_low = 0.1, 
+              # beta.DD = 0.02, 
+              int.fec_low = 0.4, 
               int.fec_high = 0.7,
               b.sst.2.3 = 0, b.sst.4.6 = 0, b.sst.7.9 = 0, b.sst.A = 0,
               b.sst.2.3M = 0, b.sst.4.6M = 0,
-              N_f = N_f_init, N_m = N_m_init,
+              # N_f = N_f_init, N_m = N_m_init,
               z = z.init, zm = z.init.m)
 
 ### parameters
@@ -1930,7 +1899,7 @@ params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA', 'int.p4.6M'
 
 ### run model
 n.iter = 10000; n.chains = 3; n.burnin = 5000; nthin = 2; nAdapt = 20
-n.iter = 3500; n.chains = 3; n.burnin = 2000; nthin = 3; nAdapt = 20
+n.iter = 1500; n.chains = 3; n.burnin = 800; nthin = 3; nAdapt = 20
 # n.iter = 200; n.chains = 1; n.burnin = 50; nthin = 2; nAdapt = 20
 
 
@@ -1946,7 +1915,7 @@ n.iter = 3500; n.chains = 3; n.burnin = 2000; nthin = 3; nAdapt = 20
   library(here)
   source(here("scripts", "nimbleFunctions.R"))
 
-Rmodel <- nimbleModel(code = CSL_CJS, 
+Rmodel <- nimbleModel(code = CSL_IPM, 
                       constants = nim.constants, data = nim.data, 
                       calculate = F, check = F, inits = inits)
 
@@ -1956,6 +1925,8 @@ conf <- configureMCMC(Rmodel, monitors = params, control = list(adaptInterval = 
 Rmcmc <- buildMCMC(conf)  #produce uncompiled R mcmc function
 Cmodel <- compileNimble(Rmodel)
 Cmcmc <- compileNimble(Rmcmc, project = Rmodel)
+
+sink(here('results', 'IPM_errors.txt'))
 
 out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin, 
                nchains = n.chains,
