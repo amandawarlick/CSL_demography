@@ -39,6 +39,13 @@ Benefits of age-structured approach.... can account for larger/smaller birth pul
 Reasons uncertainty will be different: wider bc propagated, but census is a strong anchor. 
 
 Ultimately, this model enhances ecological realism. 
+
+Literature:
+- Hammill et al. 2021 for northwest atlantic grey seals; similar density dependence framework
+- Ersalman et al. 2024-2025 on baltic ringed seals? env focus on younglings
+- Tinker et al. 2023 for NW atlantic harp seals; K and ice-related pup mortality
+
+Hammill et al. and Tinker et al still use mathematical shape parameter theta
  
 ### Methods
 
@@ -50,6 +57,8 @@ Ultimately, this model enhances ecological realism.
 -- approximately 500 marked 1990-2005, 300-400 from 2006-2015, 250-300 thereafter.
 
 <!-- (table(ch_dat_m$cohort) + table(ch_dat_f$cohort)) -->
+
+- Pup counts and imputation.
 
 - SST data and seasonalility as relevant to pups vs. non-pups.
 
@@ -133,19 +142,76 @@ This Bayesian state-space integrated population model was implemented in NIMBLE 
 
 #### Growth rates, *K*, and MNPL 
 
+
+
+### Discussion
+
 Laake et al. 2018 metrics: 
 
 - ~275,000 (K)
 - MNPL: 183,481... though just based on pups, right...? 
 - abundance in 2014: 258k animals, 40% above MNPL so within OSP range
-
-### Discussion
+- N/K DD: -1.68 (-3.78,-0.03)
 
 ### Figures and tables 
 
 Figure 1. Map?
 
-Figure 2. Posterior median and 95% credible intervals for average age-specific CSL survival and fecundity (pooled for ages 4:9 and 10:22) probabilities. 
+```{r phi plot}
 
-Figure 3. 
+phi_plot
+
+```
+Figure 2. Posterior median and 95% credible intervals for average age-specific CSL survival probabilities over the study period. 
+
+```{r fec plot}
+
+fec_plot
+
+```
+Figure 3. Posterior median and 95% credible intervals for average fecundity (pooled for ages 4:9 and 10:22) probabilities over the study period.
+
+
+```{r p plot}
+
+```
+Figure 4. Posterior median and 95% credible intervals for average age-specific CSL detection probabilities over the study period.
+
+```{r N and pp plot}
+
+```
+Figure 5. Posterior median and 95% credible intervals for annual CSL abundance and predicted number of pups (color) and imputed census counts (color) over the study period.
+
+```{r sst predictions}
+
+sst_plot
+
+```
+Figure 6. Posterior median and 95% credible intervals of (a) age- and sex-specific logit-scale effects of sea surface temperature on CSL survival probabilities, and (b) predicted age- and sex-specific survival probabilities across the range of sea surface temperature anomalies over the study period. 
+
+
+```{r MNPL curve}
+
+```
+Figure 7. Maximum net productivity level curve, showing....?
+
+```{r table 1}
+
+```
+Table 1: Annual abundances for M and F and tot and pup multiplier over time.
+
+```{r table 2}
+
+```
+Table 2: Median and 95% credible intervals for population model parameters, including of B_sst_a, beta.DD, K, MNPL median and 95% CI, MNPL/K, N in start/stop yrs, annual growth/max growth, and N_2024/MNPL (OSP status). 
+
+##Appendix
+
+Describe model diagnostics and fit. 
+
+```{r ppc and posterior prior overlaps}
+
+
+
+```
 
