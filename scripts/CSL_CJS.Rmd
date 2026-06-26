@@ -96,8 +96,6 @@ getP <- nimbleFunction(
 
 ```
 
-
-
 ```{r load MR data, echo = F, eval = T}
 
 filter_yr <- 1989
@@ -107,15 +105,15 @@ ch_dat_f <- read.csv(here::here('data', 'res_dat_f_20260623.csv'),
                    header = T, stringsAsFactors = F) %>% 
   transform(adjsex == 'Fem') %>%
   dplyr::select(-adjsex) %>%
-  group_by(cohort) %>%
-  slice_sample(n = 25, replace = F) %>%
+  # group_by(cohort) %>%
+  # slice_sample(n = 20, replace = F) %>%
   arrange(brand)
 
 ch_dat_m <- read.csv(here::here('data', 'res_dat_m_20260623.csv'),
                    header = T, stringsAsFactors = F) %>% 
   dplyr::select(-adjsex) %>%
-  group_by(cohort) %>%
-  slice_sample(n = 20, replace = F) %>%
+  # group_by(cohort) %>%
+  # slice_sample(n = 20, replace = F) %>%
   arrange(brand)
 
 EN_yes <- c(1991, 1997, 2015, 2023)
@@ -1338,7 +1336,7 @@ nim.constants <- list(n_f = dim(y)[1], n_m = dim(ym)[1],
                       n_occasions = n_occasions,
                       # sst_pupForage = sst_dat[,2],
                       # sst_np = sst_dat[,4],
-                      enso_f = EN_f$EN, enso_m = EN_m$EN,
+                      EN_f = EN_f$EN, EN_m = EN_m$EN,
                       mass_f = mass_f, mass_m = mass_m, #site = rook, sex = sex,
                       fc = fc, fc_m = fc_m)
 
@@ -1367,7 +1365,7 @@ params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA', 'int.p4.6M'
 
 ### run model
 # n.iter = 3500; n.chains = 3; n.burnin = 2000; nthin = 3; nAdapt = 20
-n.iter = 10000; n.chains = 3; n.burnin = 5000; nthin = 2; nAdapt = 20
+n.iter = 25000; n.chains = 3; n.burnin = 15000; nthin = 2; nAdapt = 20
 # n.iter = 200; n.chains = 1; n.burnin = 50; nthin = 2; nAdapt = 20
 
 
@@ -1421,10 +1419,11 @@ saveRDS(out, here::here('results', 'out_ENSO_memory.RDS'))
 
 #stable age logic to initialize N_f and N_m
 # define survival rates
-phi_P <- 0.50
-phi_1 <- 0.75
+phi_P <- 07
+phi_1 <- 0.8
 phi_J <- 0.85 # Juveniles (Ages 2-5)
-phi_A <- 0.80 # Adults (Ages 6-24)
+phi_A <- 0.92 # Adults (Ages 6-13)
+phi_AA <- 0.78
 
 # storage
 N_f_track <- matrix(0, nrow = 25, ncol = (n_occasions-1))
@@ -1437,7 +1436,8 @@ N_m_track[1, 1] <- pup_cnt_filled$US_PupCnt[1] - N_f_track[1, 1]
 for (a in 1:24) {
   surv <- ifelse(a == 1, phi_P, 
           ifelse(a == 2, phi_1, 
-          ifelse(a >= 3 & a <= 5, phi_J, phi_A)))
+          ifelse(a >= 3 & a <= 5, phi_J,
+          ifelse(a >= 6 & a <= 12, phi_A, phi_AA))))
           
   N_f_track[a + 1, 1] <- round(N_f_track[a, 1] * surv)
   N_m_track[a + 1, 1] <- round(N_m_track[a, 1] * surv)
@@ -1492,8 +1492,8 @@ CSL_IPM <- nimbleCode({
 # Priors and constraints
   
   # beta.DD ~ dexp(1) 
-  # beta.DD ~ dunif(0,3) #constrain to keep population on track to start
-  beta.DD <- 0
+  beta.DD ~ dunif(0,3) #constrain to keep population on track to start
+  # beta.DD <- 0
   
   # scaled population density dependence
   for (t in 1:(n_occasions - 1)) {
@@ -1773,85 +1773,161 @@ for (t in (fc_m[i] + 1):n_occasions) {
   #minus 2 bc counts only go up to 2024, so 35 yrs of counts instead of the 36 MR data
   for (t in 1:(n_occasions - 2)) {
     
-    N_f[2, t+1] ~ dbin(phiP.prob[t], N_f[1, t]) #pups survived to become yearlings
-    N_m[2, t+1] ~ dbin(phiPM.prob[t], N_m[1, t])
+    # N_f[2, t+1] ~ dbin(phiP.prob[t], N_f[1, t]) #pups survived to become yearlings
+    # N_m[2, t+1] ~ dbin(phiPM.prob[t], N_m[1, t])
+    # 
+    # N_f[3, t+1] ~ dbin(phi1.prob[t], N_f[2, t]) 
+    # N_m[3, t+1] ~ dbin(phi1M.prob[t], N_m[2, t])
+    # 
+    # N_f[4, t+1] ~ dbin(phi2.3.prob[t], N_f[3, t]) 
+    # N_m[4, t+1] ~ dbin(phi2.3M.prob[t], N_m[3, t])
+    # 
+    # N_f[5, t+1] ~ dbin(phi4.6.prob[t], N_f[4, t]) 
+    # N_m[5, t+1] ~ dbin(phi4.6M.prob[t], N_m[4, t])
+    # 
+    # N_f[6, t+1] ~ dbin(phi4.6.prob[t], N_f[5, t]) 
+    # N_m[6, t+1] ~ dbin(phi4.6M.prob[t], N_m[5, t])
+    # 
+    # N_f[7, t+1] ~ dbin(phi4.6.prob[t], N_f[6, t]) 
+    # N_m[7, t+1] ~ dbin(phi4.6M.prob[t], N_m[6, t])
+    # 
+    # N_f[8, t+1] ~ dbin(phi7.9.prob[t], N_f[7, t]) 
+    # N_m[8, t+1] ~ dbin(phi7.9M.prob[t], N_m[7, t])
+    # 
+    # N_f[9, t+1] ~ dbin(phi7.9.prob[t], N_f[8, t]) 
+    # N_m[9, t+1] ~ dbin(phi7.9M.prob[t], N_m[8, t])
+    # 
+    # N_f[10, t+1] ~ dbin(phi7.9.prob[t], N_f[9, t]) 
+    # N_m[10, t+1] ~ dbin(phi7.9M.prob[t], N_m[9, t])
+    # 
+    # N_f[11, t+1] ~ dbin(phi10.12.prob[t], N_f[10, t]) 
+    # N_m[11, t+1] ~ dbin(phi10.12M.prob[t], N_m[10, t])
+    # 
+    # N_f[12, t+1] ~ dbin(phi10.12.prob[t], N_f[11, t]) 
+    # N_m[12, t+1] ~ dbin(phi10.12M.prob[t], N_m[11, t])
+    # 
+    # N_f[13, t+1] ~ dbin(phi10.12.prob[t], N_f[12, t]) 
+    # N_m[13, t+1] ~ dbin(phi10.12M.prob[t], N_m[12, t])
+    # 
+    # N_f[14, t+1] ~ dbin(phi13.16.prob[t], N_f[13, t]) 
+    # N_m[14, t+1] ~ dbin(phi13.16M.prob[t], N_m[13, t])
+    # 
+    # N_f[15, t+1] ~ dbin(phi13.16.prob[t], N_f[14, t]) 
+    # N_m[15, t+1] ~ dbin(phi13.16M.prob[t], N_m[14, t])
+    # 
+    # N_f[16, t+1] ~ dbin(phi13.16.prob[t], N_f[15, t]) 
+    # N_m[16, t+1] ~ dbin(phi13.16M.prob[t], N_m[15, t])
+    # 
+    # N_f[17, t+1] ~ dbin(phi13.16.prob[t], N_f[16, t]) 
+    # N_m[17, t+1] ~ dbin(phi13.16M.prob[t], N_m[16, t])
+    # 
+    # N_f[18, t+1] ~ dbin(phiA.prob[t], N_f[17, t]) 
+    # N_m[18, t+1] ~ dbin(phiAM.prob[t], N_m[17, t])
+    # 
+    # N_f[19, t+1] ~ dbin(phiA.prob[t], N_f[18, t]) 
+    # N_m[19, t+1] ~ dbin(phiAM.prob[t], N_m[18, t])
+    # 
+    # N_f[20, t+1] ~ dbin(phiA.prob[t], N_f[19, t]) 
+    # N_m[20, t+1] ~ dbin(phiAM.prob[t], N_m[19, t])
+    # 
+    # N_f[21, t+1] ~ dbin(phiA.prob[t], N_f[20, t]) 
+    # N_m[21, t+1] ~ dbin(phiAM.prob[t], N_m[20, t])
+    # 
+    # N_f[22, t+1] ~ dbin(phiA.prob[t], N_f[21, t]) 
+    # N_m[22, t+1] ~ dbin(phiAM.prob[t], N_m[21, t])
+    # 
+    # N_f[23, t+1] ~ dbin(phiA.prob[t], N_f[22, t]) 
+    # N_m[23, t+1] ~ dbin(phiAM.prob[t], N_m[22, t])
+    # 
+    # N_f[24, t+1] ~ dbin(phiA.prob[t], N_f[23, t]) 
+    # N_m[24, t+1] ~ dbin(phiAM.prob[t], N_m[23, t])
+    # 
+    # N_f[25, t+1] ~ dbin(phiA.prob[t], N_f[24, t]) #24 is max allowable age
+    # N_m[25, t+1] ~ dbin(phiAM.prob[t], N_m[24, t])
     
-    N_f[3, t+1] ~ dbin(phi1.prob[t], N_f[2, t]) 
-    N_m[3, t+1] ~ dbin(phi1M.prob[t], N_m[2, t])
+    N_f[2, t+1] ~ dpois(phiP.prob[t]*N_f[1, t]) #pups survived to become yearlings
+    N_m[2, t+1] ~ dpois(phiPM.prob[t]*N_m[1, t])
     
-    N_f[4, t+1] ~ dbin(phi2.3.prob[t], N_f[3, t]) 
-    N_m[4, t+1] ~ dbin(phi2.3M.prob[t], N_m[3, t])
+    N_f[3, t+1] ~ dpois(phi1.prob[t]*N_f[2, t]) 
+    N_m[3, t+1] ~ dpois(phi1M.prob[t]*N_m[2, t])
     
-    N_f[5, t+1] ~ dbin(phi4.6.prob[t], N_f[4, t]) 
-    N_m[5, t+1] ~ dbin(phi4.6M.prob[t], N_m[4, t])
+    N_f[4, t+1] ~ dpois(phi2.3.prob[t]*N_f[3, t]) 
+    N_m[4, t+1] ~ dpois(phi2.3M.prob[t]*N_m[3, t])
     
-    N_f[6, t+1] ~ dbin(phi4.6.prob[t], N_f[5, t]) 
-    N_m[6, t+1] ~ dbin(phi4.6M.prob[t], N_m[5, t])
+    N_f[5, t+1] ~ dpois(phi4.6.prob[t]*N_f[4, t]) 
+    N_m[5, t+1] ~ dpois(phi4.6M.prob[t]*N_m[4, t])
     
-    N_f[7, t+1] ~ dbin(phi4.6.prob[t], N_f[6, t]) 
-    N_m[7, t+1] ~ dbin(phi4.6M.prob[t], N_m[6, t])
+    N_f[6, t+1] ~ dpois(phi4.6.prob[t]*N_f[5, t]) 
+    N_m[6, t+1] ~ dpois(phi4.6M.prob[t]*N_m[5, t])
     
-    N_f[8, t+1] ~ dbin(phi7.9.prob[t], N_f[7, t]) 
-    N_m[8, t+1] ~ dbin(phi7.9M.prob[t], N_m[7, t])
+    N_f[7, t+1] ~ dpois(phi4.6.prob[t]*N_f[6, t]) 
+    N_m[7, t+1] ~ dpois(phi4.6M.prob[t]*N_m[6, t])
     
-    N_f[9, t+1] ~ dbin(phi7.9.prob[t], N_f[8, t]) 
-    N_m[9, t+1] ~ dbin(phi7.9M.prob[t], N_m[8, t])
+    N_f[8, t+1] ~ dpois(phi7.9.prob[t]*N_f[7, t]) 
+    N_m[8, t+1] ~ dpois(phi7.9M.prob[t]*N_m[7, t])
     
-    N_f[10, t+1] ~ dbin(phi7.9.prob[t], N_f[9, t]) 
-    N_m[10, t+1] ~ dbin(phi7.9M.prob[t], N_m[9, t])
+    N_f[9, t+1] ~ dpois(phi7.9.prob[t]*N_f[8, t]) 
+    N_m[9, t+1] ~ dpois(phi7.9M.prob[t]*N_m[8, t])
     
-    N_f[11, t+1] ~ dbin(phi10.12.prob[t], N_f[10, t]) 
-    N_m[11, t+1] ~ dbin(phi10.12M.prob[t], N_m[10, t])
+    N_f[10, t+1] ~ dpois(phi7.9.prob[t]*N_f[9, t]) 
+    N_m[10, t+1] ~ dpois(phi7.9M.prob[t]*N_m[9, t])
     
-    N_f[12, t+1] ~ dbin(phi10.12.prob[t], N_f[11, t]) 
-    N_m[12, t+1] ~ dbin(phi10.12M.prob[t], N_m[11, t])
+    N_f[11, t+1] ~ dpois(phi10.12.prob[t]*N_f[10, t]) 
+    N_m[11, t+1] ~ dpois(phi10.12M.prob[t]*N_m[10, t])
     
-    N_f[13, t+1] ~ dbin(phi10.12.prob[t], N_f[12, t]) 
-    N_m[13, t+1] ~ dbin(phi10.12M.prob[t], N_m[12, t])
+    N_f[12, t+1] ~ dpois(phi10.12.prob[t]*N_f[11, t]) 
+    N_m[12, t+1] ~ dpois(phi10.12M.prob[t]*N_m[11, t])
     
-    N_f[14, t+1] ~ dbin(phi13.16.prob[t], N_f[13, t]) 
-    N_m[14, t+1] ~ dbin(phi13.16M.prob[t], N_m[13, t])
+    N_f[13, t+1] ~ dpois(phi10.12.prob[t]*N_f[12, t]) 
+    N_m[13, t+1] ~ dpois(phi10.12M.prob[t]*N_m[12, t])
     
-    N_f[15, t+1] ~ dbin(phi13.16.prob[t], N_f[14, t]) 
-    N_m[15, t+1] ~ dbin(phi13.16M.prob[t], N_m[14, t])
+    N_f[14, t+1] ~ dpois(phi13.16.prob[t]*N_f[13, t]) 
+    N_m[14, t+1] ~ dpois(phi13.16M.prob[t]*N_m[13, t])
     
-    N_f[16, t+1] ~ dbin(phi13.16.prob[t], N_f[15, t]) 
-    N_m[16, t+1] ~ dbin(phi13.16M.prob[t], N_m[15, t])
+    N_f[15, t+1] ~ dpois(phi13.16.prob[t]*N_f[14, t]) 
+    N_m[15, t+1] ~ dpois(phi13.16M.prob[t]*N_m[14, t])
     
-    N_f[17, t+1] ~ dbin(phi13.16.prob[t], N_f[16, t]) 
-    N_m[17, t+1] ~ dbin(phi13.16M.prob[t], N_m[16, t])
+    N_f[16, t+1] ~ dpois(phi13.16.prob[t]*N_f[15, t]) 
+    N_m[16, t+1] ~ dpois(phi13.16M.prob[t]*N_m[15, t])
     
-    N_f[18, t+1] ~ dbin(phiA.prob[t], N_f[17, t]) 
-    N_m[18, t+1] ~ dbin(phiAM.prob[t], N_m[17, t])
+    N_f[17, t+1] ~ dpois(phi13.16.prob[t]*N_f[16, t]) 
+    N_m[17, t+1] ~ dpois(phi13.16M.prob[t]*N_m[16, t])
     
-    N_f[19, t+1] ~ dbin(phiA.prob[t], N_f[18, t]) 
-    N_m[19, t+1] ~ dbin(phiAM.prob[t], N_m[18, t])
+    N_f[18, t+1] ~ dpois(phiA.prob[t]*N_f[17, t]) 
+    N_m[18, t+1] ~ dpois(phiAM.prob[t]*N_m[17, t])
     
-    N_f[20, t+1] ~ dbin(phiA.prob[t], N_f[19, t]) 
-    N_m[20, t+1] ~ dbin(phiAM.prob[t], N_m[19, t])
+    N_f[19, t+1] ~ dpois(phiA.prob[t]*N_f[18, t]) 
+    N_m[19, t+1] ~ dpois(phiAM.prob[t]*N_m[18, t])
     
-    N_f[21, t+1] ~ dbin(phiA.prob[t], N_f[20, t]) 
-    N_m[21, t+1] ~ dbin(phiAM.prob[t], N_m[20, t])
+    N_f[20, t+1] ~ dpois(phiA.prob[t]*N_f[19, t]) 
+    N_m[20, t+1] ~ dpois(phiAM.prob[t]*N_m[19, t])
     
-    N_f[22, t+1] ~ dbin(phiA.prob[t], N_f[21, t]) 
-    N_m[22, t+1] ~ dbin(phiAM.prob[t], N_m[21, t])
+    N_f[21, t+1] ~ dpois(phiA.prob[t]*N_f[20, t]) 
+    N_m[21, t+1] ~ dpois(phiAM.prob[t]*N_m[20, t])
     
-    N_f[23, t+1] ~ dbin(phiA.prob[t], N_f[22, t]) 
-    N_m[23, t+1] ~ dbin(phiAM.prob[t], N_m[22, t])
+    N_f[22, t+1] ~ dpois(phiA.prob[t]*N_f[21, t]) 
+    N_m[22, t+1] ~ dpois(phiAM.prob[t]*N_m[21, t])
     
-    N_f[24, t+1] ~ dbin(phiA.prob[t], N_f[23, t]) 
-    N_m[24, t+1] ~ dbin(phiAM.prob[t], N_m[23, t])
+    N_f[23, t+1] ~ dpois(phiA.prob[t]*N_f[22, t]) 
+    N_m[23, t+1] ~ dpois(phiAM.prob[t]*N_m[22, t])
     
-    N_f[25, t+1] ~ dbin(phiA.prob[t], N_f[24, t]) #24 is max allowable age
-    N_m[25, t+1] ~ dbin(phiAM.prob[t], N_m[24, t])
+    N_f[24, t+1] ~ dpois(phiA.prob[t]*N_f[23, t]) 
+    N_m[24, t+1] ~ dpois(phiAM.prob[t]*N_m[23, t])
+    
+    N_f[25, t+1] ~ dpois(phiA.prob[t]*N_f[24, t]) #24 is max allowable age
+    N_m[25, t+1] ~ dpois(phiAM.prob[t]*N_m[24, t])
     
     # calculate the total expected pups from the unobserved adults
     expected_pups_tot[t+1] <- (sum(N_f[5:10, t+1]) * int.fec_low) + 
                               (sum(N_f[11:23, t+1]) * int.fec_high) + 0.1 #0.1 to prevent logProb
                             
     # evaluate the biological expected pups directly against the census data
-    y_pup_counts[t+1] ~ dpois(expected_pups_tot[t+1]) 
+    # y_pup_counts[t+1] ~ dpois(expected_pups_tot[t+1]) 
+    y_pup_counts[t+1] ~ dnorm(expected_pups_tot[t+1], tau.cnt) #more flexible for age structure
   }
+  
+  sigma.cnt ~ dunif(0,5000)
+  tau.cnt <- 1/(sigma.cnt*sigma.cnt)
   
 }) # mod   
 
@@ -1876,9 +1952,10 @@ inits <- list(int.phiP = 0.6, int.phi1 = 0.6, int.phi2.3 = 0.85,
               int.p4.6M = 0.5, int.p7.12M = 0.7, int.pAM = 0.8,
               b.massP = 0, b.mass1 = 0, b.massPM = 0, b.mass1M = 0, 
               b.sst.P = 0, b.sst.1 = 0,
-              # beta.DD = 0.02, 
+              beta.DD = 0.02,
               int.fec_low = 0.4, 
               int.fec_high = 0.7,
+              sigma.cnt = 2000,
               b.sst.2.3 = 0, b.sst.4.6 = 0, b.sst.7.9 = 0, b.sst.A = 0,
               b.sst.2.3M = 0, b.sst.4.6M = 0,
               # N_f = N_f_init, N_m = N_m_init,
@@ -1887,7 +1964,7 @@ inits <- list(int.phiP = 0.6, int.phi1 = 0.6, int.phi2.3 = 0.85,
 ### parameters
 params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA', 'int.p4.6M', 
             'int.p7.12M', 'int.pAM',
-            'N_f', 'N_m', 'beta.DD', 'N_total',
+            'N_f', 'N_m', 'beta.DD', 'N_total', 'expected_pups_tot',
             # 'b.massP', 'b.mass1', 'b.massPM', 'b.mass1M',
             'b.sst.P', 'b.sst.1', 'b.sst.2.3', 'b.sst.4.6', 
             'b.sst.2.3M', 'b.sst.4.6M', 'b.sst.7.9', 'b.sst.A',
@@ -1898,8 +1975,8 @@ params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA', 'int.p4.6M'
             'int.phi10.12M', 'int.phi13.16M', 'int.phiAM')
 
 ### run model
-n.iter = 10000; n.chains = 3; n.burnin = 5000; nthin = 2; nAdapt = 20
-n.iter = 1500; n.chains = 3; n.burnin = 800; nthin = 3; nAdapt = 20
+n.iter = 15000; n.chains = 3; n.burnin = 7000; nthin = 2; nAdapt = 20
+# n.iter = 1500; n.chains = 3; n.burnin = 800; nthin = 3; nAdapt = 20
 # n.iter = 200; n.chains = 1; n.burnin = 50; nthin = 2; nAdapt = 20
 
 
@@ -1926,7 +2003,7 @@ Rmcmc <- buildMCMC(conf)  #produce uncompiled R mcmc function
 Cmodel <- compileNimble(Rmodel)
 Cmcmc <- compileNimble(Rmcmc, project = Rmodel)
 
-sink(here('results', 'IPM_errors.txt'))
+sink(here('results', 'IPM_errors_DD.txt'))
 
 out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin, 
                nchains = n.chains,
@@ -1937,7 +2014,7 @@ out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin,
 
 
   # saveRDS(out, here('results', paste("out_IPM_sst_", i, ".RDS", sep = "")))
-saveRDS(out, here('results', paste("out_IPM_sst_.RDS", sep = "")))
+saveRDS(out, here('results', paste("out_IPM_sst_DD.RDS", sep = "")))
 
 # } # closes parallel loop
 
