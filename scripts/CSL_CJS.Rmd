@@ -2169,6 +2169,54 @@ cat("\nProbability population is within OSP:", round(prob_in_OSP * 100, 1), "%\n
 
 ```
 
+```{r plots}
+
+library(ggplot2)
+library(dplyr)
+
+# 1. Combine the MCMC chains into a single matrix
+# (Assuming 'out' is your mcmc.list object from runMCMC)
+posterior_matrix <- do.call(rbind, out)
+
+#### also plot scatterplot of int.phiP and beta.DD
+
+# 2. Extract the expected pups columns chronologically
+n_occasions <- nim.constants$n_occasions
+pup_cols <- paste0("expected_pups_tot[", 2:n_occasions, "]") # Starts at 2 because t+1 in the loop
+pup_posterior <- posterior_matrix[, pup_cols]
+
+# 3. Calculate the median and 95% Credible Intervals for each year
+# We also append the actual census data here
+pup_summary <- data.frame(
+  TimeStep = 2:n_occasions, 
+  Expected_Median = apply(pup_posterior, 2, median),
+  Expected_LCI = apply(pup_posterior, 2, quantile, probs = 0.025),
+  Expected_UCI = apply(pup_posterior, 2, quantile, probs = 0.975),
+  Observed = nim.constants$y_pup_counts[2:n_occasions]
+)
+
+# 4. Plot the Posterior Predictive Check
+ggplot(pup_summary, aes(x = TimeStep)) +
+  # 95% Credible Interval Ribbon
+  geom_ribbon(aes(ymin = Expected_LCI, ymax = Expected_UCI), 
+              fill = "steelblue", alpha = 0.3) +
+  # Median Expected Trend Line
+  geom_line(aes(y = Expected_Median), color = "steelblue", size = 1) +
+  # Actual Hard Census Data
+  geom_point(aes(y = Observed), color = "black", size = 2) +
+  theme_minimal() +
+  labs(
+    title = "Posterior Predictive Check: California Sea Lion Pup Production",
+    subtitle = "Black dots = Census Data | Blue line & ribbon = Model Expected Pups (95% CI)",
+    x = "Time Step",
+    y = "Total Pups"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    axis.title = element_text(face = "bold")
+  )
+
+```
 
 #### archive 
 ```{r temporal variance model}
