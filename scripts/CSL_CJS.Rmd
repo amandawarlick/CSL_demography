@@ -106,14 +106,14 @@ ch_dat_f <- read.csv(here::here('data', 'res_dat_f_20260623.csv'),
   transform(adjsex == 'Fem') %>%
   dplyr::select(-adjsex) %>%
   # group_by(cohort) %>%
-  # slice_sample(n = 20, replace = F) %>%
+  # slice_sample(n = 15, replace = F) %>%
   arrange(brand)
 
 ch_dat_m <- read.csv(here::here('data', 'res_dat_m_20260623.csv'),
                    header = T, stringsAsFactors = F) %>% 
   dplyr::select(-adjsex) %>%
   # group_by(cohort) %>%
-  # slice_sample(n = 20, replace = F) %>%
+  # slice_sample(n = 15, replace = F) %>%
   arrange(brand)
 
 EN_yes <- c(1991, 1997, 2015, 2023)
@@ -1334,10 +1334,10 @@ nim.data <- list(y = y, ym = ym)
 
 nim.constants <- list(n_f = dim(y)[1], n_m = dim(ym)[1], 
                       n_occasions = n_occasions,
-                      # sst_pupForage = sst_dat[,2],
+                      sst_pupForage = sst_dat[,2],
                       # sst_np = sst_dat[,4],
                       EN_f = EN_f$EN, EN_m = EN_m$EN,
-                      mass_f = mass_f, mass_m = mass_m, #site = rook, sex = sex,
+                      # mass_f = mass_f, mass_m = mass_m, #site = rook, sex = sex,
                       fc = fc, fc_m = fc_m)
 
 inits <- list(int.phiP = 0.9, int.phi1 = 0.9, int.phi2.3 = 0.9, int.phi4.6 = 0.9, int.phi7.9 = 0.9, 
@@ -1392,6 +1392,8 @@ Rmcmc <- buildMCMC(conf)  #produce uncompiled R mcmc function
 Cmodel <- compileNimble(Rmodel)
 Cmcmc <- compileNimble(Rmcmc, project = Rmodel)
 
+sink(here('results', 'errors_ENSO_mem.txt'))
+
 out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin, 
                nchains = n.chains,
                # nchains = 1,
@@ -1411,7 +1413,7 @@ out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin,
 # library(coda)
 # out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
 
-saveRDS(out, here::here('results', 'out_ENSO_memory.RDS'))
+# saveRDS(out, here::here('results', 'out_ENSO_memory.RDS'))
 
 ```
 
