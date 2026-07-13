@@ -81,7 +81,11 @@ phi_plot <- ggplot(int_dat %>% filter(grepl('phi', variable)),
                 position = position_dodge(0.5),
                 width = 0.35) +
   geom_point(size = 0.8, position = position_dodge(0.5)) +
+<<<<<<< HEAD
+  xlab('') + ylab(expression(paste('Survival probability ',  ' (', phi, ')'))) +
+=======
   xlab('Age class') + ylab(expression(paste('Survival probability ',  '(', phi, ')'))) +
+>>>>>>> 575fdcd24223add6c89b97558499712b08978b5b
   ggtitle('') +
   # facet_wrap(~sex, scales = 'free_x', drop = T) +
   plot_theme(legend.position = 'top', 

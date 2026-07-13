@@ -106,14 +106,14 @@ ch_dat_f <- read.csv(here::here('data', 'res_dat_f_20260623.csv'),
   transform(adjsex == 'Fem') %>%
   dplyr::select(-adjsex) %>%
   # group_by(cohort) %>%
-  # slice_sample(n = 20, replace = F) %>%
+  # slice_sample(n = 15, replace = F) %>%
   arrange(brand)
 
 ch_dat_m <- read.csv(here::here('data', 'res_dat_m_20260623.csv'),
                    header = T, stringsAsFactors = F) %>% 
   dplyr::select(-adjsex) %>%
   # group_by(cohort) %>%
-  # slice_sample(n = 20, replace = F) %>%
+  # slice_sample(n = 15, replace = F) %>%
   arrange(brand)
 
 EN_yes <- c(1991, 1997, 2015, 2023)
@@ -684,9 +684,6 @@ out_3 <- readRDS(here::here('results', paste("out.parallel_null_null_", "3.RDS",
 # 
 library(coda)
 out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
-# 
-# out <- list(`out_1`, `out_2`) %>% as.mcmc.list()
-# out <- out_3
 
 saveRDS(out, here::here('results', 'out_null_null.RDS'))
 
@@ -974,16 +971,18 @@ nim.constants <- list(n_f = dim(y)[1], n_m = dim(ym)[1],
                       n_occasions = n_occasions,
                       sst_pupForage = sst_dat[,2],
                       sst_np = sst_dat[,4],
-                      mass_f = mass_f, mass_m = mass_m, #site = rook, sex = sex,
+                      # mass_f = mass_f, mass_m = mass_m, #site = rook, sex = sex,
                       fc = fc, fc_m = fc_m)
 
-inits <- list(int.phiP = 0.9, int.phi1 = 0.9, int.phi2.3 = 0.9, int.phi4.6 = 0.9, int.phi7.9 = 0.9, 
+inits <- list(int.phiP = 0.6, int.phi1 = 0.6, int.phi2.3 = 0.9, 
+              int.phi4.6 = 0.9, int.phi7.9 = 0.9, 
               int.phi10.12 = 0.9, int.phi13.16 = 0.8, int.phiA = 0.6,
-              int.phiPM = 0.9, int.phi1M = 0.9, int.phi2.3M = 0.9, int.phi4.6M = 0.9, int.phi7.9M = 0.9, 
+              int.phiPM = 0.9, int.phi1M = 0.9, int.phi2.3M = 0.9, int.phi4.6M = 0.9, 
+              int.phi7.9M = 0.9, 
               int.phi10.12M = 0.9, int.phi13.16M = 0.8, int.phiAM = 0.6,
               int.p1 = 0.4, int.p2.3 = 0.4, int.p4.6 = 0.5, int.p7.12 = 0.7, int.pA = 0.8,
               int.p4.6M = 0.5, int.p7.12M = 0.7, int.pAM = 0.8,
-              b.massP = 0, b.mass1 = 0, b.massPM = 0, b.mass1M = 0, 
+              # b.massP = 0, b.mass1 = 0, b.massPM = 0, b.mass1M = 0, 
               b.sst.P = 0, b.sst.1 = 0,
               z = z.init, zm = z.init.m)
 
@@ -1003,14 +1002,14 @@ n.iter = 10000; n.chains = 3; n.burnin = 5000; nthin = 2; nAdapt = 20
 # n.iter = 200; n.chains = 1; n.burnin = 50; nthin = 2; nAdapt = 20
 
 
-start <- Sys.time()
-
-cores=detectCores() 
-used.cores = min(n.chains, cores) 
-cl <- makeCluster(n.chains, setup_strategy = "sequential") 
-registerDoParallel(cl) 
-
-foreach(i = 1:n.chains) %dopar% {
+# start <- Sys.time()
+# 
+# cores=detectCores() 
+# used.cores = min(n.chains, cores) 
+# cl <- makeCluster(n.chains, setup_strategy = "sequential") 
+# registerDoParallel(cl) 
+# 
+# foreach(i = 1:n.chains) %dopar% {
   library(nimble)
   library(here)
   source(here("scripts", "nimbleFunctions.R"))
@@ -1026,24 +1025,14 @@ Rmcmc <- buildMCMC(conf)  #produce uncompiled R mcmc function
 Cmodel <- compileNimble(Rmodel)
 Cmcmc <- compileNimble(Rmcmc, project = Rmodel)
 
+sink(here('results', 'errors_CJS_sst.txt'))
+
 out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin, 
-               # nchains = n.chains, 
-               nchains = 1,
+               nchains = n.chains,
+               # nchains = 1,
                inits = inits,
                  setSeed = FALSE, progressBar = TRUE,
                samplesAsCodaMCMC = TRUE)
-
-
-  saveRDS(out, here('results', paste("out.parallel_sst_", i, ".RDS", sep = "")))
-
-} # closes parallel loop
-
-out_1 <- readRDS(here::here('results', paste("out.parallel_sst_", "1.RDS", sep = "")))
-out_2 <- readRDS(here::here('results', paste("out.parallel_sst_", "2.RDS", sep = "")))
-out_3 <- readRDS(here::here('results', paste("out.parallel_sst_", "3.RDS", sep = "")))
-
-library(coda)
-out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
 
 saveRDS(out, here::here('results', 'out_sst.RDS'))
 
@@ -1334,10 +1323,10 @@ nim.data <- list(y = y, ym = ym)
 
 nim.constants <- list(n_f = dim(y)[1], n_m = dim(ym)[1], 
                       n_occasions = n_occasions,
-                      # sst_pupForage = sst_dat[,2],
+                      sst_pupForage = sst_dat[,2],
                       # sst_np = sst_dat[,4],
                       EN_f = EN_f$EN, EN_m = EN_m$EN,
-                      mass_f = mass_f, mass_m = mass_m, #site = rook, sex = sex,
+                      # mass_f = mass_f, mass_m = mass_m, #site = rook, sex = sex,
                       fc = fc, fc_m = fc_m)
 
 inits <- list(int.phiP = 0.9, int.phi1 = 0.9, int.phi2.3 = 0.9, int.phi4.6 = 0.9, int.phi7.9 = 0.9, 
@@ -1392,6 +1381,8 @@ Rmcmc <- buildMCMC(conf)  #produce uncompiled R mcmc function
 Cmodel <- compileNimble(Rmodel)
 Cmcmc <- compileNimble(Rmcmc, project = Rmodel)
 
+sink(here('results', 'errors_ENSO_mem.txt'))
+
 out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin, 
                nchains = n.chains,
                # nchains = 1,
@@ -1411,7 +1402,7 @@ out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin,
 # library(coda)
 # out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
 
-saveRDS(out, here::here('results', 'out_ENSO_memory.RDS'))
+# saveRDS(out, here::here('results', 'out_ENSO_memory.RDS'))
 
 ```
 
