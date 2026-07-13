@@ -15,44 +15,53 @@ library(Hmisc) #v4.5-0; %nin%
 
 ```
 
-
 ```{r create CH}
 
-filter_yr <- 1993
+filter_yr <- 1989
 
-data_raw <- read.csv(here::here('data', "2025_CCEP_Zc_CH.csv"), 
-                  header = T, stringsAsFactors = F) %>%
-  filter(cohort > filter_yr)
+# data_raw <- read.csv(here::here('data', "2025_CCEP_Zc_CH.csv"), 
+#                   header = T, stringsAsFactors = F) %>%
+#   filter(cohort > filter_yr)
+
+#google drive June 2026 from S. Melin
+data_raw <- read.csv(here::here('data', 'CSL_San Miguel Island_Capture History CH_20260622.csv'),
+                     header = T, stringsAsFactors = F) %>%
+ filter(cohort > filter_yr)
 
 ch_dat_f <- data_raw %>%
-  dplyr::select(brand:Y2024) %>%
-  filter(sex != 'M')
+  dplyr::select(brand:X25) %>%
+  filter(adjsex != 'M')
 
 ch_dat_m <- data_raw %>%
-  dplyr::select(brand:Y2024) %>%
-  filter(sex == 'M')
+  dplyr::select(brand:X25) %>%
+  filter(adjsex == 'M')
 
-areas_f <- data_raw %>%
-  filter(sex != 'M') %>%
-  dplyr::select(brand, cohort, area11991:area22024)
+#this info is only in the original MR data
+# areas_f <- data_raw %>%
+#   filter(adjsex != 'M') %>%
+#   dplyr::select(brand, cohort, area11991:area22024)
+# 
+# areas_m <- data_raw %>%
+#   filter(sex == 'M') %>%
+#   dplyr::select(brand, cohort, area11991:area22024)
 
-areas_m <- data_raw %>%
-  filter(sex == 'M') %>%
-  dplyr::select(brand, cohort, area11991:area22024)
-
-repro_f <- data_raw %>%
-  filter(sex != 'M') %>%
-  dplyr::select(brand, cohort, repro1993:repro2024)
-
-repro_m <- data_raw %>%
-  filter(sex == 'M') %>%
-  dplyr::select(brand, cohort, repro1993:repro2024)
+# repro_f <- data_raw %>%
+#   filter(sex != 'M') %>%
+#   dplyr::select(brand, cohort, repro1993:repro2024)
+# 
+# repro_m <- data_raw %>%
+#   filter(sex == 'M') %>%
+#   dplyr::select(brand, cohort, repro1993:repro2024)
 
 ##melt to get into ages/states instead of just 1's and 0's
 res_long <- ch_dat_f %>%
-  dplyr::select(-c(AgeAtFirstResight, LastYearSeen, TotaltimesResighted)) %>%
-  reshape2::melt(id.vars = c('brand', 'cohort', 'sex', 'wt')) %>%
-  transform(variable = as.numeric(gsub('Y', '', variable))) %>%
+  dplyr::select(-c(sex)) %>%
+  reshape2::melt(id.vars = c('brand', 'cohort', 'adjsex', 'weight')) %>%
+  transform(variable = gsub('X', '', variable)) %>%
+  transform(variable = ifelse(variable %in% c('87', '88', '89', '90', '91', '92', 
+                                              '93', '94', '95', '96', '97', '98', '99'), 
+                              paste0('19', variable), paste0('20', variable))) %>%
+  transform(variable = as.numeric(variable)) %>%
   transform(years_old = variable-cohort) %>%
   filter(years_old >= 0) %>%
   #add 1 so pup is z == 1
@@ -73,15 +82,19 @@ fill_grid <- expand.grid(brand = unique(res_long$brand),
 
 res_dat_f <- res_long %>% #filter(brand == '9102') %>% 
   merge(fill_grid, by = c('brand', 'variable'), all = T) %>% 
-  reshape2::dcast(brand + cohort + sex + wt ~ variable, value.var = 'ch_cat', fill = 19) %>%
+  reshape2::dcast(brand + cohort + adjsex + weight ~ variable, value.var = 'ch_cat', fill = 19) %>%
   arrange(cohort, brand) %>%
   #filters out awkward blanks in wt, cohort, sex when expanded grid for 2020
   filter(!is.na(cohort))
 
 res_long_m <- ch_dat_m %>%
-  dplyr::select(-c(AgeAtFirstResight, LastYearSeen, TotaltimesResighted)) %>%
-  reshape2::melt(id.vars = c('brand', 'cohort', 'sex', 'wt')) %>%
-  transform(variable = as.numeric(gsub('Y', '', variable))) %>%
+  dplyr::select(-c(sex)) %>%
+  reshape2::melt(id.vars = c('brand', 'cohort', 'adjsex', 'weight')) %>%
+  transform(variable = gsub('X', '', variable)) %>%
+  transform(variable = ifelse(variable %in% c('87', '88', '89', '90', '91', '92', 
+                                              '93', '94', '95', '96', '97', '98', '99'), 
+                              paste0('19', variable), paste0('20', variable))) %>%
+  transform(variable = as.numeric(variable)) %>%
   transform(years_old = variable-cohort) %>%
   filter(years_old >= 0) %>%
   #add 1 so pup is z == 1
@@ -99,7 +112,7 @@ fill_grid <- expand.grid(brand = unique(res_long_m$brand),
 
 res_dat_m <- res_long_m %>% 
   merge(fill_grid, by = c('brand', 'variable'), all = T) %>%
-  reshape2::dcast(brand + cohort + sex + wt ~ variable, value.var = 'ch_cat', fill = 19) %>%
+  reshape2::dcast(brand + cohort + adjsex + weight ~ variable, value.var = 'ch_cat', fill = 19) %>%
   arrange(cohort, brand) %>%
   #filters out awkward blanks in wt, cohort, sex when expanded grid for 2020
   filter(!is.na(cohort))
@@ -107,21 +120,79 @@ res_dat_m <- res_long_m %>%
 
 ```
 
+```{r known dead}
+
+
+
+```
+
+
 ```{r write csvs}
 
 ## ALL INDIVIDUALS
 
 write.csv(res_dat_f,
-          file = here::here('data', 'res_dat_f_1994.csv'), row.names = F)
-# write.csv(num_resight,
-#           file = paste(here::here('data', 'ProcData'), '/num_resight.csv', sep = ''),
-#           row.names = F)
+          file = here::here('data', 'res_dat_f_20260623.csv'), row.names = F)
+
 write.csv(res_dat_m,
-          file = here::here('data', 'res_dat_m_1994.csv'), row.names = F)
+          file = here::here('data', 'res_dat_m_20260623.csv'), row.names = F)
 
 
 
 ```
+
+```{r strandings for lepto/DA cases}
+
+library(lubridate)
+library(stringr)
+library(readr)
+library(ggplot2)
+
+strand_dat <- read.csv(here('data', 'CSL Strandings 2014-2025.csv'))
+
+dat <- strand_dat %>%
+  transform(Date.of.Examination = ifelse(Date.of.Examination == '', 
+                                         Died.Date, Date.of.Examination)) %>%
+  transform(date = mdy(Date.of.Examination)) %>%
+  transform(year = year(date)) %>%
+  select(year, Cause.of.Death, Other.Findings...Describe, 
+         Condition.Comments, Died.Comments, Additional.Remarks,
+         Rehab.Additional.Remarks) 
+
+colnames(dat) <- c('year', 'com1', 'com2', 'com3', 'com4', 'com5', 'com6')
+
+dat <- dat %>%
+  mutate(lep_yes = if_any(c(com1, com2, com3, com4, com5, 
+                            com6), ~ str_detect(.x, 'lep'))) %>%
+  mutate(DA_yes = if_any(c(com1, com2, com3, com4, com5, 
+                            com6), ~ str_detect(.x, 'domoic'))) 
+
+dat_yr <- dat %>%
+  filter(!is.na(year)) %>%
+  filter(year > 2013) %>%
+  group_by(year) %>%
+  dplyr::summarize(lep = mean(lep_yes),
+                   DA = mean(DA_yes))
+
+da_early <- read_tsv(here('data', 'DA.txt'))
+
+lep_early <- read_tsv(here('data', 'lepto.txt'))
+
+all_yrs <- dat_yr %>%
+  melt(id.vars = 'year') %>%
+  transform(variable = factor(variable, levels = c('lep', 'DA'),
+                              labels = c('Lepto', 'DA')))
+
+ggplot(all_yrs, aes(x = year, y = value, color = variable)) +
+  geom_point() +
+  geom_line() +
+  xlab('') + ylab('Proportion of stranding cases') +
+  theme_bw() +
+  theme(legend.position = 'top') +
+  scale_color_manual(values = c('dodgerblue3', 'goldenrod'), name = '')
+
+```
+
 
 ```{r brands per year}
 
