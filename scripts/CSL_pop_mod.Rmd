@@ -8,6 +8,8 @@ date: "2026-06-24"
 
 knitr::opts_chunk$set(echo = TRUE)
 
+source(here('scripts', 'CSL_results.Rmd'))
+
 
 ```
 
