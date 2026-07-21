@@ -903,6 +903,26 @@ CSL_CJS <- nimbleCode({
     b.sst.A ~ dnorm(0,sd = s.sst.A)
     s.sst ~ dexp(1)
     s.sst.A ~ dexp(1)
+    
+     for (t in 1:(n_occasions-1)){
+        phiP.prob[t] <- ilogit(mu.P + b.sst.P*sst_pupForage[t])
+        phi1.prob[t] <- ilogit(mu.1  + b.sst.1*sst_np[t])
+        phi2.3.prob[t] <- ilogit(mu.2.3  + b.sst.2.3*sst_np[t])
+        phi4.6.prob[t] <- ilogit(mu.4.6  + b.sst.4.6*sst_np[t])
+        phi7.9.prob[t] <- ilogit(mu.7.9  + b.sst.7.9*sst_np[t])
+        phi10.12.prob[t] <- ilogit(mu.10.12 + b.sst.A*sst_np[t])
+        phi13.16.prob[t] <- ilogit(mu.13.16 + b.sst.A*sst_np[t])
+        phiA.prob[t] <- ilogit(mu.A + b.sst.A*sst_np[t])
+        
+        phiPM.prob[t] <- ilogit(mu.PM + b.sst.P*sst_pupForage[t])
+        phi1M.prob[t] <- ilogit(mu.1M  + b.sst.1*sst_np[t])
+        phi2.3M.prob[t] <- ilogit(mu.2.3M  + b.sst.2.3M*sst_np[t])
+        phi4.6M.prob[t] <- ilogit(mu.4.6M  + b.sst.4.6M*sst_np[t])
+        phi7.9M.prob[t] <- ilogit(mu.7.9M)
+        phi10.12M.prob[t] <- ilogit(mu.10.12M)
+        phi13.16M.prob[t] <- ilogit(mu.13.16M)
+        phiAM.prob[t] <- ilogit(mu.AM)
+    }
   
     #likelihood
 for (i in 1:n_f) { #females
@@ -990,6 +1010,10 @@ inits <- list(int.phiP = 0.6, int.phi1 = 0.6, int.phi2.3 = 0.9,
 params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA', 'int.p4.6M', 
             'int.p7.12M', 'int.pAM',
             # 'b.massP', 'b.mass1', 'b.massPM', 'b.mass1M',
+            'phiP.prob', 'phi1.prob', 'phi2.3.prob', 'phi4.6.prob', 'phi7.9.prob', 'phi10.12.prob',
+            'phi13.16.prob', 'phiA.prob',
+            'phiPM.prob', 'phi1M.prob', 'phi2.3M.prob', 'phi4.6M.prob', 'phi7.9M.prob',
+            'phi10.12M.prob', 'phi13.16M.prob', 'phiAM.prob',
             'b.sst.P', 'b.sst.1', 'b.sst.2.3', 'b.sst.4.6', 'b.sst.7.9', 'b.sst.A',
             'int.phiP', 'int.phi1', 'int.phi2.3', 'int.phi4.6', 'int.phi7.9',
             'int.phi10.12', 'int.phi13.16', 'int.phiA',
@@ -1034,7 +1058,7 @@ out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin,
                  setSeed = FALSE, progressBar = TRUE,
                samplesAsCodaMCMC = TRUE)
 
-saveRDS(out, here::here('results', 'out_sst.RDS'))
+saveRDS(out, here::here('results', 'out_sst_probs.RDS'))
 
 ```
 
@@ -2105,6 +2129,195 @@ saveRDS(out, here('results', paste("out_IPM_sst_DD.RDS", sep = "")))
 # # print(paste("Estimated K:", round(mean_K), "95% CI:", round(K_CI[1]), "-", round(K_CI[2])))
 
 ```
+
+```{r osp post-hoc}
+
+##instead of a fully integrated approach, post-hoc calculations similar to Laake et al.
+
+library(dplyr)
+library(ggplot2)
+library(coda)
+
+out <- readRDS(here('results', 'out_sst_probs.RDS'))
+outmat <- as.matrix(out)
+
+pup_counts <- pup_cnt_filled$US_PupCnt
+
+# Reconstruct abundance deterministically from pup counts and survival
+# pup_counts Vector of observed annual pup census counts
+# phi_f Matrix of female survival (rows = age classes 1:24, cols = years)
+# phi_m Matrix of male survival (rows = age classes 1:24, cols = years)
+# init_f Initial female age vector at t=1 (length = max_age)
+# init_m Initial male age vector at t=1 (length = max_age)
+init_f <- N_f_track[,1]
+init_m <- N_m_track[,1]
+
+reconstruct_pop <- function(pup_counts, phi_f, phi_m, init_f, init_m) {
+  n_occasions <- length(pup_counts)
+  max_age <- nrow(phi_f)
+  
+  N_f <- matrix(0, nrow = max_age, ncol = n_occasions)
+  N_m <- matrix(0, nrow = max_age, ncol = n_occasions)
+  
+  # Seed Year 1 with starting age distribution
+  N_f[,1] <- N_f_track[,1]
+  N_m[,1] <- N_m_track[,1]
+  
+  for (t in 1:(n_occasions - 1)) {
+    # pups (Index 1) enter directly from empirical census counts
+    # Assumes a 50:50 sex ratio at birth
+    N_f[1,t+1] <- pup_counts[t+1]/2
+    N_m[1,t+1] <- pup_counts[t+1]/2
+    
+    # age up older cohorts deterministically using CJS survival rates
+    for (a in 1:(max_age - 1)) {
+      N_f[a+1,t+1] <- N_f[a,t]*phi_f[a,t]
+      N_m[a+1,t+1] <- N_m[a,t]*phi_m[a,t]
+    }
+  }
+  
+  # Calculate total abundance per year 
+  Ntot <- colSums(N_f) + colSums(N_m)
+  
+  return(list(Ntot = Ntot, N_f = N_f, N_m = N_m))
+}
+
+
+# Fit Theta-Logistic Model to reconstructed abundance via Sum of Squared Errors
+# N_series is a vector of reconstructed total population size over time
+fit_theta_logistic <- function(N_series) {
+  n_occasions <- length(N_series)
+  
+  # Objective function: Sum of Squared Errors (SSE)
+  sse_fn <- function(params) {
+    r     <- params[1]
+    K     <- params[2]
+    theta <- params[3]
+    
+    N_pred <- numeric(n_occasions)
+    N_pred[1] <- N_series[1]
+    
+    for (t in 1:(n_occasions - 1)) {
+      # Discrete theta-logistic step
+      growth <- r * N_pred[t] * (1 - (N_pred[t] / K)^theta)
+      N_pred[t+1] <- N_pred[t] + growth
+      
+      # Penalty for numerical overflow or negative population dips
+      if (is.na(N_pred[t+1]) || N_pred[t+1] <= 0) return(1e10)
+    }
+    
+    return(sum((N_series - N_pred)^2))
+  }
+  
+  # Set reasonable biological starting bounds for optimization
+  init_K     <- max(N_series) * 1.1
+  init_r     <- 0.07 # Standard pinniped intrinsic growth rate
+  init_theta <- 2.0  # Standard delayed density dependence
+  
+  opt <- optim(
+    par = c(r = init_r, K = init_K, theta = init_theta),
+    fn = sse_fn,
+    method = "L-BFGS-B",
+    lower = c(r = 0.01, K = max(N_series) * 0.8, theta = 0.5),
+    upper = c(r = 0.20, K = max(N_series) * 3.0, theta = 10.0)
+  )
+  
+  # Extract estimates and analytically calculate MNPL
+  r_est     <- opt$par["r"]
+  K_est     <- opt$par["K"]
+  theta_est <- opt$par["theta"]
+  mnpl_est  <- K_est * ((1 / (theta_est + 1))^(1 / theta_est))
+  
+  return(data.frame(
+    r = r_est, 
+    K = K_est, 
+    theta = theta_est, 
+    MNPL = mnpl_est, 
+    MNPL_ratio = mnpl_est / K_est,
+    Convergence = opt$convergence
+  ))
+}
+
+
+# loop across CJS posterior draws)
+
+nsim <- 500
+results_list <- vector("list", nsim)
+
+phiPcols <- paste0('phiP.prob[', 1:n_occasions, ']')
+phi1cols <- paste0('phi1.prob[', 1:n_occasions, ']')
+phi2.3cols <- paste0('phi2.3.prob[', 1:n_occasions, ']')
+phi4.6cols <- paste0('phi4.6.prob[', 1:n_occasions, ']')
+phi7.9cols <- paste0('phi7.9.prob[', 1:n_occasions, ']')
+phi10.12cols <- paste0('phi10.12.prob[', 1:n_occasions, ']')
+phi13.16cols <- paste0('phi13.16.prob[', 1:n_occasions, ']')
+phiAcols <- paste0('phiA.prob[', 1:n_occasions, ']')
+phiPMcols <- paste0('phiPM.prob[', 1:n_occasions, ']')
+phi1Mcols <- paste0('phi1M.prob[', 1:n_occasions, ']')
+phi2.3Mcols <- paste0('phi2.3M.prob[', 1:n_occasions, ']')
+phi4.6Mcols <- paste0('phi4.6M.prob[', 1:n_occasions, ']')
+phi7.9Mcols <- paste0('phi7.9M.prob[', 1:n_occasions, ']')
+phi10.12Mcols <- paste0('phi10.12M.prob[', 1:n_occasions, ']')
+phi13.16Mcols <- paste0('phi13.16M.prob[', 1:n_occasions, ']')
+phiAMcols <- paste0('phiAM.prob[', 1:n_occasions, ']')
+
+cat("Running post-hoc reconstruction across", nsim, "CJS draws...\n")
+for (k in 1:nsim) {
+
+  phiP <- outmat[k,phiPcols]
+  phi1 <- outmat[k,phi1cols]
+  phi2.3 <- outmat[k,phi2.3cols]
+  phi4.6 <- outmat[k,phi4.6cols]
+  phi7.9 <- outmat[k,phi7.9cols]
+  phi10.12 <- outmat[k,phi10.12cols]
+  phi13.16 <- outmat[k,phi13.16cols]
+  phiA <- outmat[k,phiAcols]
+  phiPM <- outmat[k,phiPMcols]
+  phi1M <- outmat[k,phi1Mcols]
+  phi2.3M <- outmat[k,phi2.3Mcols]
+  phi4.6M <- outmat[k,phi4.6Mcols]
+  phi7.9M <- outmat[k,phi7.9Mcols]
+  phi10.12M <- outmat[k,phi10.12Mcols]
+  phi13.16M <- outmat[k,phi13.16Mcols]
+  phiAM <- outmat[k,phiAMcols]
+  
+  phi_f <- rbind(phiP, phi1, phi2.3, phi2.3, phi4.6, phi4.6, phi4.6, 
+                 phi7.9, phi7.9, phi7.9, phi10.12, phi10.12, phi10.12, 
+                 phi13.16, phi13.16, phi13.16, phi13.16, 
+                 do.call(rbind, replicate(8, phiA, simplify = F)))
+  phi_m <- rbind(phiPM, phi1M, phi2.3M, phi2.3M, phi4.6M, phi4.6M, phi4.6M, 
+                 phi7.9M, phi7.9M, phi7.9M, phi10.12M, phi10.12M, phi10.12M, 
+                 phi13.16M, phi13.16M, phi13.16M, phi13.16M, 
+                 do.call(rbind, replicate(8, phiAM, simplify = F)))
+  
+  # Run deterministic projection
+  recon <- reconstruct_pop(pup_counts, phi_f, phi_m, init_f, init_m)
+  
+  # Fit theta-logistic model
+  fit <- fit_theta_logistic(recon$total_N)
+  fit$draw <- i
+  results_list[[i]] <- fit
+}
+
+# Combine results into a final summary dataframe
+post <- bind_rows(results_list)
+
+# View summary statistics (Your immediate baseline!)
+summary_table <- post %>%
+  summarise(
+    K_median    = median(K),
+    K_LCI       = quantile(K, 0.025),
+    K_UCI       = quantile(K, 0.975),
+    MNPL_median = median(MNPL),
+    MNPL_LCI    = quantile(MNPL, 0.025),
+    MNPL_UCI    = quantile(MNPL, 0.975),
+    Theta_median = median(theta)
+  )
+
+print(summary_table)
+
+```
+
 
 
 #### archive 
