@@ -1434,7 +1434,7 @@ out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin,
 
 #stable age logic to initialize N_f and N_m
 # define survival rates
-phi_P <- 07
+phi_P <- 0.7
 phi_1 <- 0.8
 phi_J <- 0.85 # Juveniles (Ages 2-5)
 phi_A <- 0.92 # Adults (Ages 6-13)
@@ -1458,7 +1458,7 @@ for (a in 1:24) {
   N_m_track[a + 1, 1] <- round(N_m_track[a, 1] * surv)
 }
 
-# 4. Dynamically project the rest of the matrix forward through time!
+# 4. Dynamically project the rest of the matrix forward through time
 for (t in 1:(n_occasions - 2)) {
   
   # Insert the REAL pup count for the next year
@@ -1480,9 +1480,14 @@ for (t in 1:(n_occasions - 2)) {
   }
   
   # Adults transition (Indices 6-24 -> 7-25)
-  for (a in 6:24) {
+  for (a in 6:12) {
     N_f_track[a+1, t+1] <- round(N_f_track[a, t] * phi_A)
     N_m_track[a+1, t+1] <- round(N_m_track[a, t] * phi_A)
+  }
+  
+    for (a in 13:24) {
+    N_f_track[a+1, t+1] <- round(N_f_track[a, t] * phi_AA)
+    N_m_track[a+1, t+1] <- round(N_m_track[a, t] * phi_AA)
   }
 }
 
@@ -1984,6 +1989,10 @@ params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA', 'int.p4.6M'
             'b.sst.P', 'b.sst.1', 'b.sst.2.3', 'b.sst.4.6', 
             'b.sst.2.3M', 'b.sst.4.6M', 'b.sst.7.9', 'b.sst.A',
             'int.fec_low', 'int.fec_high',
+            'phiP.prob', 'phi1.prob', 'phi2.3.prob', 'phi4.6.prob', 'phi7.9.prob', 'phi10.12.prob',
+            'phi13.16.prob', 'phiA.prob',
+            'phiPM.prob', 'phi1M.prob', 'phi2.3M.prob', 'phi4.6M.prob', 'phi7.9M.prob',
+            'phi10.12M.prob', 'phi13.16M.prob', 'phiAM.prob',
             'int.phiP', 'int.phi1', 'int.phi2.3', 'int.phi4.6', 'int.phi7.9',
             'int.phi10.12', 'int.phi13.16', 'int.phiA',
             'int.phiPM', 'int.phi1M', 'int.phi2.3M', 'int.phi4.6M', 'int.phi7.9M',
@@ -1995,14 +2004,14 @@ n.iter = 15000; n.chains = 3; n.burnin = 7000; nthin = 2; nAdapt = 20
 # n.iter = 200; n.chains = 1; n.burnin = 50; nthin = 2; nAdapt = 20
 
 
-# start <- Sys.time()
-# 
-# cores=detectCores() 
-# used.cores = min(n.chains, cores) 
-# cl <- makeCluster(n.chains, setup_strategy = "sequential") 
-# registerDoParallel(cl) 
+start <- Sys.time()
 
-# foreach(i = 1:n.chains) %dopar% {
+cores=detectCores()
+used.cores = min(n.chains, cores)
+cl <- makeCluster(n.chains, setup_strategy = "sequential")
+registerDoParallel(cl)
+
+foreach(i = 1:n.chains) %dopar% {
   library(nimble)
   library(here)
   source(here("scripts", "nimbleFunctions.R"))
@@ -2021,17 +2030,27 @@ Cmcmc <- compileNimble(Rmcmc, project = Rmodel)
 sink(here('results', 'IPM_errors_DD.txt'))
 
 out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin, 
-               nchains = n.chains,
-               # nchains = 1,
+               # nchains = n.chains,
+               nchains = 1,
                inits = inits,
                  setSeed = FALSE, progressBar = TRUE,
                samplesAsCodaMCMC = TRUE)
 
 
-  # saveRDS(out, here('results', paste("out_IPM_sst_", i, ".RDS", sep = "")))
-saveRDS(out, here('results', paste("out_IPM_sst_DD.RDS", sep = "")))
+  saveRDS(out, here('results', paste("out_IPM_sst_DD_", i, ".RDS", sep = "")))
+# saveRDS(out, here('results', paste("out_IPM_sst_DD.RDS", sep = "")))
 
-# } # closes parallel loop
+} # closes parallel loop
+
+# out_1 <- readRDS(here::here('results', "out_IPM_sst_DD_1.RDS", sep = ""))
+# out_2 <- readRDS(here::here('results', "out_IPM_sst_DD_2.RDS", sep = ""))
+# out_3 <- readRDS(here::here('results', "out_IPM_sst_DD_3.RDS", sep = ""))
+
+# combine them and make an mcmc object
+# library(coda)
+# out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
+
+# saveRDS(out, file = here('results', 'out_IPM_sst_DD_chains.rds'))
 
 ##k and osp
 # Extract your MCMC matrix
@@ -2132,7 +2151,23 @@ saveRDS(out, here('results', paste("out_IPM_sst_DD.RDS", sep = "")))
 
 ```{r osp post-hoc}
 
-##instead of a fully integrated approach, post-hoc calculations similar to Laake et al.
+# ##instead of a fully integrated approach, post-hoc calculations similar to Laake et al.
+# start_pups_f <- pup_counts[1] / 2
+# 
+# # 2. Create a generic, average baseline survival vector for initialization
+# # (e.g., 60% for pups, 85% for juveniles/adults)
+# # Note: This doesn't have to be perfect; the model will quickly "burn off" 
+# # any slight initialization errors over the first few time steps.
+# init_phi <- c(0.60, rep(0.85, 23))
+# 
+# # 3. Decay the pups forward to build a stable abundance for Ages 1 to 24
+# cum_surv <- c(1, cumprod(init_phi)[1:23])
+# realistic_init_vec <- start_pups_f * cum_surv
+# 
+# # 4. Assign this realistic vector to your starting parameters
+# init_f <- realistic_init_vec
+# init_m <- realistic_init_vec
+
 
 library(dplyr)
 library(ggplot2)
@@ -2225,7 +2260,8 @@ fit_theta_logistic <- function(N_series) {
   # Extract estimates and analytically calculate MNPL
   r_est     <- opt$par["r"]
   K_est     <- opt$par["K"]
-  theta_est <- opt$par["theta"]
+  # theta_est <- opt$par["theta"]
+  theta_est <- 2.4 #MMPA standard; not always possible to estimate r and K and theta
   mnpl_est  <- K_est * ((1 / (theta_est + 1))^(1 / theta_est))
   
   return(data.frame(
@@ -2243,6 +2279,7 @@ fit_theta_logistic <- function(N_series) {
 
 nsim <- 500
 results_list <- vector("list", nsim)
+n_occasions <- 35
 
 phiPcols <- paste0('phiP.prob[', 1:n_occasions, ']')
 phi1cols <- paste0('phi1.prob[', 1:n_occasions, ']')
@@ -2252,6 +2289,7 @@ phi7.9cols <- paste0('phi7.9.prob[', 1:n_occasions, ']')
 phi10.12cols <- paste0('phi10.12.prob[', 1:n_occasions, ']')
 phi13.16cols <- paste0('phi13.16.prob[', 1:n_occasions, ']')
 phiAcols <- paste0('phiA.prob[', 1:n_occasions, ']')
+
 phiPMcols <- paste0('phiPM.prob[', 1:n_occasions, ']')
 phi1Mcols <- paste0('phi1M.prob[', 1:n_occasions, ']')
 phi2.3Mcols <- paste0('phi2.3M.prob[', 1:n_occasions, ']')
@@ -2272,6 +2310,7 @@ for (k in 1:nsim) {
   phi10.12 <- outmat[k,phi10.12cols]
   phi13.16 <- outmat[k,phi13.16cols]
   phiA <- outmat[k,phiAcols]
+  
   phiPM <- outmat[k,phiPMcols]
   phi1M <- outmat[k,phi1Mcols]
   phi2.3M <- outmat[k,phi2.3Mcols]
@@ -2283,26 +2322,27 @@ for (k in 1:nsim) {
   
   phi_f <- rbind(phiP, phi1, phi2.3, phi2.3, phi4.6, phi4.6, phi4.6, 
                  phi7.9, phi7.9, phi7.9, phi10.12, phi10.12, phi10.12, 
-                 phi13.16, phi13.16, phi13.16, phi13.16, 
-                 do.call(rbind, replicate(8, phiA, simplify = F)))
-  phi_m <- rbind(phiPM, phi1M, phi2.3M, phi2.3M, phi4.6M, phi4.6M, phi4.6M, 
+                 phi13.16, phi13.16, phi13.16, phi13.16,
+                 phiA, phiA, phiA, phiA, phiA, phiA, phiA, phiA)
+  phi_m <- rbind(phiPM, phi1M, #phi2.3M, phi2.3M, phi4.6M, phi4.6M, phi4.6M,
+                 phi2.3, phi2.3, phi4.6, phi4.6, phi4.6,
                  phi7.9M, phi7.9M, phi7.9M, phi10.12M, phi10.12M, phi10.12M, 
                  phi13.16M, phi13.16M, phi13.16M, phi13.16M, 
-                 do.call(rbind, replicate(8, phiAM, simplify = F)))
-  
+                 phiAM, phiAM, phiAM, phiAM, phiAM, phiAM, phiAM, phiAM)
+
   # Run deterministic projection
   recon <- reconstruct_pop(pup_counts, phi_f, phi_m, init_f, init_m)
   
   # Fit theta-logistic model
-  fit <- fit_theta_logistic(recon$total_N)
-  fit$draw <- i
-  results_list[[i]] <- fit
+  fit <- fit_theta_logistic(recon$Ntot)
+  fit$draw <- k
+  results_list[[k]] <- fit
 }
 
 # Combine results into a final summary dataframe
 post <- bind_rows(results_list)
 
-# View summary statistics (Your immediate baseline!)
+# View summary statistics 
 summary_table <- post %>%
   summarise(
     K_median    = median(K),
@@ -2311,10 +2351,27 @@ summary_table <- post %>%
     MNPL_median = median(MNPL),
     MNPL_LCI    = quantile(MNPL, 0.025),
     MNPL_UCI    = quantile(MNPL, 0.975),
-    Theta_median = median(theta)
+    Theta_median = median(theta),
+    Theta_LCI = quantile(theta, 0.025),
+    theta_UCI = quantile(theta, 0.975)
   )
 
 print(summary_table)
+
+
+plot(recon$Ntot, type = "l", col = "blue", lwd = 2, 
+     main = "Diagnostic: Reconstructed Population Trajectory",
+     ylab = "Total Abundance", xlab = "Time Step")
+
+
+# 2. Calculate the "Implied Fecundity" (Reality Check)
+# How many pups were born per adult female (assuming ages 4-24 are adults)?
+adult_females <- colSums(recon$N_f[4:24, ])
+implied_fecundity <- pup_counts / adult_females
+
+plot(implied_fecundity, type = "b", col = "red", pch = 16,
+     main = "Diagnostic: Implied Birth Rate",
+     ylab = "Pups per Adult Female", xlab = "Time Step")
 
 ```
 
