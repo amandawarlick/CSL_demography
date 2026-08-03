@@ -1028,12 +1028,12 @@ n.iter = 10000; n.chains = 3; n.burnin = 5000; nthin = 2; nAdapt = 20
 
 # start <- Sys.time()
 # 
-# cores=detectCores() 
-# used.cores = min(n.chains, cores) 
-# cl <- makeCluster(n.chains, setup_strategy = "sequential") 
-# registerDoParallel(cl) 
-# 
-# foreach(i = 1:n.chains) %dopar% {
+cores=detectCores()
+used.cores = min(n.chains, cores)
+cl <- makeCluster(n.chains, setup_strategy = "sequential")
+registerDoParallel(cl)
+
+foreach(i = 1:n.chains) %dopar% {
   library(nimble)
   library(here)
   source(here("scripts", "nimbleFunctions.R"))
@@ -1049,14 +1049,24 @@ Rmcmc <- buildMCMC(conf)  #produce uncompiled R mcmc function
 Cmodel <- compileNimble(Rmodel)
 Cmcmc <- compileNimble(Rmcmc, project = Rmodel)
 
-sink(here('results', 'errors_CJS_sst.txt'))
+# sink(here('results', 'errors_CJS_sst.txt'))
 
 out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin, 
-               nchains = n.chains,
-               # nchains = 1,
+               # nchains = n.chains,
+               nchains = 1,
                inits = inits,
                  setSeed = FALSE, progressBar = TRUE,
                samplesAsCodaMCMC = TRUE)
+
+saveRDS(out, here::here('results', paste0('out_sst_probs_', i,'.RDS', sep = '')))
+}
+
+out_1 <- readRDS(here::here('results', paste("out_sst_probs_", "1.RDS", sep = "")))
+out_2 <- readRDS(here::here('results', paste("out_sst_probs_", "2.RDS", sep = "")))
+out_3 <- readRDS(here::here('results', paste("out_sst_probs_", "3.RDS", sep = "")))
+
+library(coda)
+out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
 
 saveRDS(out, here::here('results', 'out_sst_probs.RDS'))
 
