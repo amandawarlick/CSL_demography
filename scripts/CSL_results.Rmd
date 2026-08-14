@@ -81,11 +81,7 @@ phi_plot <- ggplot(int_dat %>% filter(grepl('phi', variable)),
                 position = position_dodge(0.5),
                 width = 0.35) +
   geom_point(size = 0.8, position = position_dodge(0.5)) +
-<<<<<<< HEAD
-  xlab('') + ylab(expression(paste('Survival probability ',  ' (', phi, ')'))) +
-=======
   xlab('Age class') + ylab(expression(paste('Survival probability ',  '(', phi, ')'))) +
->>>>>>> 575fdcd24223add6c89b97558499712b08978b5b
   ggtitle('') +
   # facet_wrap(~sex, scales = 'free_x', drop = T) +
   plot_theme(legend.position = 'top', 
@@ -151,9 +147,11 @@ b.sst_sum <- post_sum %>% filter(grepl('b.sst', variable)) %>%
   # transform(var_name = ifelse(grepl('b.mass.f', variable), '1', 
   #                                    ifelse(grepl('b.mass.m', variable), '1M',
                   transform(var_name = gsub('b.sst.', '', variable)) %>%
+  transform(age = factor(var_name, levels = c('P', '1', '2.3', '4.6', '7.9', 'A'),
+                         labels = c('P', '1', '2-3', '4-6', '7-9', '10+')))
 
-sst_eff_plot <- ggplot(b.sst_sum, aes(x = var_name, y = med)) +
-  geom_errorbar(aes(x = var_name, ymin=lower, ymax=upper),
+sst_plot <- ggplot(b.sst_sum, aes(x = age, y = med)) +
+  geom_errorbar(aes(x = age, ymin=lower, ymax=upper),
                 position = position_dodge(0.5),
                 width = 0.25, show.legend = F) +
   geom_point(size = 0.8, position = position_dodge(0.5)) +
@@ -255,14 +253,16 @@ preds_all <- rbind(summarize_preds_pup(preds_p) %>%
                      transform(age = '1', sex = 'Fem'),
                    summarize_preds_np(preds_1m) %>%
                      transform(age = '1', sex = 'Male'))) %>%
-  # bind_rows(rbind(summarize_preds_np(preds_2.3) %>%
-  #                    transform(age = '2:3', sex = 'Fem'),
-  #                  summarize_preds_np(preds_2.3m) %>%
-  #                    transform(age = '2:3', sex = 'Male'))) %>%
-  # bind_rows(rbind(summarize_preds_np(preds_4.6) %>%
-  #                    transform(age = '4:6', sex = 'Fem'),
-  #                  summarize_preds_np(preds_4.6m) %>%
-  #                    transform(age = '4:6', sex = 'Male'))) %>%
+  bind_rows(rbind(summarize_preds_np(preds_2.3) %>%
+                     transform(age = '2:3', sex = 'Fem')#,
+                   # summarize_preds_np(preds_2.3m) %>%
+                   #   transform(age = '2:3', sex = 'Male')
+                  )) %>%
+  bind_rows(rbind(summarize_preds_np(preds_4.6) %>%
+                     transform(age = '4:6', sex = 'Fem')#,
+                   # summarize_preds_np(preds_4.6m) %>%
+                   #   transform(age = '4:6', sex = 'Male')
+                   )) %>%
   bind_rows(summarize_preds_np(preds_7.9) %>%
                      transform(age = '7:9', sex = 'Fem')) %>%
   bind_rows(summarize_preds_np(preds_10.12) %>%
@@ -274,18 +274,33 @@ preds_all <- rbind(summarize_preds_pup(preds_p) %>%
   transform(age = factor(age, levels = c('P', '1', '2:3', '4:6', '7:9',
                                          '10:12', '13:16', '17+')))
 
-sst_preds_plot <- ggplot(preds_all, aes(x = sst_val, y = mean_phi, col = sex)) +
+sst_preds_plot <- ggplot(preds_all %>% filter(sex == 'Fem'), 
+                         aes(x = sst_val, y = mean_phi, col = age)) +
   geom_ribbon(aes(ymin = low_phi, ymax = high_phi), alpha = 0.2, color = NA) +
   geom_line(linewidth = 1) +
-  facet_grid(.~age) +
+  facet_wrap(.~age) +
   labs(x = "SST anomalies",
        y = "Predicted survival probability") +
   theme_bw() +
-  theme(legend.position = 'top',
+  theme(legend.position = 'none',
                 axis.title.x = element_text(margin = margin(t = 7))) +
   scale_y_continuous(limits = c(0, 1)) + 
-  scale_color_manual(values = rainbow2[c(2,6)], name = 'Sex') + 
-  scale_fill_manual(values = rainbow2[c(2,6)]) #+ 
+  scale_color_manual(values = rainbow2[c(2,6)], name = '') + 
+  scale_fill_manual(values = rainbow2[c(2,6)])
+
+#sex
+# sst_preds_plot <- ggplot(preds_all, aes(x = sst_val, y = mean_phi, col = sex)) +
+#   geom_ribbon(aes(ymin = low_phi, ymax = high_phi), alpha = 0.2, color = NA) +
+#   geom_line(linewidth = 1) +
+#   facet_grid(.~age) +
+#   labs(x = "SST anomalies",
+#        y = "Predicted survival probability") +
+#   theme_bw() +
+#   theme(legend.position = 'top',
+#                 axis.title.x = element_text(margin = margin(t = 7))) +
+#   scale_y_continuous(limits = c(0, 1)) + 
+#   scale_color_manual(values = rainbow2[c(2,6)], name = 'Sex') + 
+#   scale_fill_manual(values = rainbow2[c(2,6)]) #+ 
   # scale_x_continuous(limits = c(-1.5, 2.5), breaks = c(seq(-1.5,2.5, length = 5)),
   #                    labels = round(c(seq(0.3,0.65, length = 5)),2))
 
