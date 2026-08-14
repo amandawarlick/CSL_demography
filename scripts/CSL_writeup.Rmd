@@ -1,30 +1,31 @@
 ---
-title: "CSL empirical estimates - summer 2026"
+title: "CSL population model"
 output: html_document
+date: "2026-06-24"
 ---
 
-```{r setup, include=FALSE, fig.align = 'center'}
+```{r setup, include=FALSE}
 
-knitr::opts_chunk$set(echo = FALSE, eval = T, message = F, warning = F, fig.align = 'center')
+knitr::opts_chunk$set(echo = F, warning = F, eval = T, message = F, cache = T, cache.lazy = T, fig.width = 6, fig.height = 5, fig.align = 'center')
 
 library(here) #v1.0.1
 library(dplyr) #v1.0.5
 # library(nimble) #v0.12.1
+# library(coda)
 library(ggplot2)
-library(coda)
-library(ggh4x)
+library(tidyverse)
 library(readr)
-library(knitr)
-library(Hmisc)
-library(stringr)
 
 source(here::here('scripts', 'PlotTheme.R'))
+
 
 ```
 
 
+
 ```{r vital rates}
 
+library(coda)
 out <- readRDS(here::here('results', 'out_sst.RDS'))
 
 all_pars <- colnames(out[[1]])
@@ -81,11 +82,7 @@ phi_plot <- ggplot(int_dat %>% filter(grepl('phi', variable)),
                 position = position_dodge(0.5),
                 width = 0.35) +
   geom_point(size = 0.8, position = position_dodge(0.5)) +
-<<<<<<< HEAD
-  xlab('') + ylab(expression(paste('Survival probability ',  ' (', phi, ')'))) +
-=======
   xlab('Age class') + ylab(expression(paste('Survival probability ',  '(', phi, ')'))) +
->>>>>>> 575fdcd24223add6c89b97558499712b08978b5b
   ggtitle('') +
   # facet_wrap(~sex, scales = 'free_x', drop = T) +
   plot_theme(legend.position = 'top', 
@@ -667,4 +664,210 @@ ggplot(phi.vals %>% filter(rate == 'Survival' & exclude_phi != 'Y' &
 
 ```
 
+
+
+
+### Introduction 
+
+- CSL as indicator species in a dynamic CCE 
+- Importance of monitoring sentinel species to understand population dynamics, provide updated management and conservation metrics, and understand responses of a species sensitive to environmental variability in an ecosystem notorious for cyclic phases.
+- Climate impacts the food web and health
+- Opportunities afforded by a well-studied (and observable) species in a dynamic environment
+
+- CSL historical and contemporary context
+-- ups and downs and connections with ENSO
+-- prominent species along the coast, 
+-- foraging ecology/fisheries interactions
+-- human impacts and disease/stranding/public concern
+
+- Current importance
+-- estimates growing outdated
+-- improvements upon previous estimation, and more SST evidence
+
+- Aims: upgrade Laake et al.
+- Laake et al implement a two-step analytical approach: survival estimates fed into population projection model and then separately derive K and MNPL
+-- Benefits: computationally efficient
+-- Disadvantages: (1) does not fully integrate uncertainty in MR estimates within the population projection model and therefore does not resolve discrepancies between the two datasets based on relative precision of the data streams; (2) DD not estimated with respect to a particular vital rate (doesn't specify mechanism of dependence). 
+-- Fully integrated IPM: addressing disadvantages: (1) weights uncertainty in each data stream to wrestle out discrepancies; uncertainty from all components propagated into final posteriors of K and MNPL, and (2) estimates DD with respect to mechanism... assume it is rookery crowding or resource limitation for lactating females... can specify how transient dynamics (such as small cohort of pups from ENSO event) propagates through the age structure over the next decade. **Distinguishes between ENSO noise and density signal - what would K be in an average environment -- may be a higher/truer carrying capacity instead of logistic growth model where a lot of high SST years could look like approaching K. In IPM, MNPL and K are emergent properties derived from age-structured vital rates. Laake et al. used theta parameter to force productivity curve into specific mathematical shape, which could skew MNPL relative to K, generally 0.6 for marine mammals instead of 0.5K that would be represented by perfect symmetry. IPM will organically generate right-skewed productivity curve based on vital rates. 
+
+Benefits of age-structured approach.... can account for larger/smaller birth pulses and when they enter into the reproductive pool. 
+
+Reasons uncertainty will be different: wider bc propagated, but census is a strong anchor. 
+
+Ultimately, this model enhances ecological realism. 
+
+Literature:
+- Hammill et al. 2021 for northwest atlantic grey seals; similar density dependence framework
+- Ersalman et al. 2024-2025 on baltic ringed seals? env focus on younglings
+- Tinker et al. 2023 for NW atlantic harp seals; K and ice-related pup mortality
+
+Hammill et al. and Tinker et al still use mathematical shape parameter theta
+ 
+### Methods
+
+#### Study system   
+
+#### Data collection and curation  
+
+- Marked cohort sizes and years (every year? similar approximate samples sizes?)
+-- approximately 500 marked 1990-2005, 300-400 from 2006-2015, 250-300 thereafter.
+
+<!-- (table(ch_dat_m$cohort) + table(ch_dat_f$cohort)) -->
+
+- Pup counts and imputation.
+
+- SST data and seasonalility as relevant to pups vs. non-pups.
+
+
+#### Statistical analyses
+
+We developed a fully integrated Bayesian population model to jointly estimate vital rates and population dynamics for California sea lions using data collected from the California Coast from 1990-2025. The IPM framework simultaneously evaluates a Cormack-Jolly-Seber (CJS; citation) mark-recapture model and a state-space demographic projection matrix, linked by shared age- and sex-specific survival parameters. To resolve latent fecundity and anchor population trajectories, we incorporated annual pup counts treated as a census without observation error.
+
+*Vital rates subcomponent model*
+
+We modeled the individual capture histories using a CJS framework to estimate age- and sex-specific apparent survival ($\phi$) and detection probabilities ($p$). The state process was modeled using a categorical distribution tracking individuals across distinct biological age classes, up to a maximum modeled lifespan of 24 years.
+
+Survival probabilities were estimated for pups, ages 1, 2-3, 4-6, 7-9, 10-12, 13-16, and 17+ for both males and females. Survival probabilities were estimated on the logit scale and modeled as a function of baseline age- and sex-specific intercepts ($\mu$) and environmental stochasticity ($\beta_{\text{SST}}$). Additional temporal variation not attributable to the effects of SST were not included and pup birth weight, while known to be influential in survival outcomes, was not included as a covariate here due to its correlation with annual SST (i.e., pup weights negatively correlated with SST; citation or create additional supplemental figure) . Because density dependence in pinnipeds acts most strongly on early life stages (i.e., pups), so the density effect ($\beta_{\text{DD}}$) was isolated to pup survival ($\phi_P$). Total annual population size, $N_t$, was the summation of all male and female age classes and scaled by a constant ($100,000$) to facilitate Markov chain Monte Carlo (MCMC) convergence. For an individual $i$ at time $t$ and sex $s$, pup survival was parameterized as:
+
+$$\text{logit}(\phi_{p, i, t}) = \mu_p + \beta_{\text{SST}_p} \cdot \text{SST}_{t} - \beta_{\text{DD}} \cdot \left( \frac{N_{t}}{100,000} \right)$$
+
+Juvenile and adult survival and fecundity were assumed to be density-independent and driven solely by baseline rates and environmental stochasticity. Thus, survival for older age classes (yearlings through adults) was parameterized with age-specific intercepts and distinct sea surface temperature values ($\text{SST}_{t}$) relevant to foraging ecology:
+
+$$\text{logit}(\phi_{a, i, t}) = \mu_a + \beta_{\text{SST}, a} \cdot \text{SST}_{t}$$
+Detection probailities ($p$) were assumed to be constant between sexes and estimated for each age class with temporal variance pooled across ages estimated using a shrinkage prior, but detection was assumed to be constant across sexes, natal regions, and resight location. 
+
+In the mark-resight subcomponent model, we assumed that marks were not lost, misread, or missed when an animal is encountered, and that all individuals within a specific age and sex class share the same underlying probabilities of survival and detection in a given year.
+
+*Population projection subcomponent model*
+
+To evaluate population-level dynamics, we constructed a sex-specific deterministic and stochastic projection model using survival rates estimated as above. We assumed a post-breeding census timeline, meaning the annual pup counts represent reproduction by females that successfully survived from year $t$ into year $t+1$.
+
+Because pup counts were treated as a census, the number of pups at age 0 ($N_{1, t}$) was assigned deterministically from field observations, assuming a 50:50 sex ratio. To avoid MCMC initialization failures, the latent age classes for the first year of the time series were initialized using a stable age distribution derived from baseline survival probability approximations.
+
+Population structure and age-specific abundance for each age class $a$ were modeled via Poisson distributions (to facilitate MCMC sampling instead of more constrained binomial draws) using the predicted annual age-specific survival probabilities (${\phi}_{a, t}$) accounting for changes in SST over the study period multiplied by the age-specific abundance in the previous year:
+
+$$N_{a+1, t+1} \sim \text{Poisson}({\phi}_{a, t}\cdot N_{a, t})$$
+
+Individuals reaching the terminal age class (age 24) were assumed to undergo complete reproductive and survival senescence and were removed from the matrix in subsequent time steps.
+
+*Integrated population model*
+
+To link the unobserved adult female population to the perfectly observed pup census, we modeled reproduction using a post-breeding census assumption. Pups born in year $t+1$ were calculated as a function of the females that successfully survived into year $t+1$.
+
+Fecundity was estimated as a latent parameter divided into two biological tiers: a lower fecundity rate for younger reproductive females ($F_{\text{4:9}}$, Ages 4–9) and a higher fecundity rate for prime-age adults ($F_{\text{10:22}}$, Ages 10–22). Assuming an equal sex ratio at birth, the expected total number of pups produced was calculated as:
+
+$$E[Pups_{t+1}] = \left( \sum_{a=5}^{10} N_{f, a, t+1} \cdot F_{\text{4:9}} \right) + \left( \sum_{a=11}^{23} N_{f, a, t+1} \cdot F_{\text{10:22}} \right)$$
+
+The final integration of the demography and the count data was achieved by evaluating the expected pup production as estimated in the population growth equations in terms of the census data ($y_{t+1}$) using a Poisson likelihood constraint:
+
+$$y_{t+1} \sim \text{Poisson}(E[Pups_{t+1}])$$
+
+Any divergence between expected reproduction and the census data directly penalizes the likelihood of the adult female survival and fecundity estimates, ensuring mathematical tension and precise demographic alignment across the integrated framework.
+
+Assuming the mark-recapture data ($\mathbf{y}_{MR}$) and the pup census counts ($\mathbf{y}_{count}$) are conditionally independent, the joint likelihood of the model ($L_{IPM}$) is the product of their separate likelihoods:
+
+$$L_{IPM}(\theta|\mathbf{y}_{MR},\mathbf{y}_{count})=L_{MR}(\theta|\mathbf{y}_{MR})\times L_{count}(\theta|\mathbf{y}_{count})$$
+where $\theta$ represents the joint vector of all estimated parameters (survival, detection, fecundity, and environmental/density coefficients). By evaluating this joint likelihood, the model allows the high-precision pup census data to inform and constrain the latent vital rates that cannot be fully resolved by the mark-recapture data alone.
+
+*Derivation of carrying capacity ($K$)*
+Because density dependence was parameterized mechanistically as a penalty on pup survival rather than through an overarching population growth curve, carrying capacity ($K$) was not estimated as an explicit parameter in the joint likelihood. Instead, $K$ was treated as an emergent property of the estimated vital rates.For each posterior draw, $K$ was derived numerically via a post-hoc simulation. The estimated age-specific survival and fecundity rates were used to project a theoretical population forward in time under average environmental conditions ($\text{SST}_{t}=0$). As the simulated population grew, the density-dependent penalty ($\beta_{DD}$) incrementally suppressed pup survival. $K$ was defined as the equilibrium population size at which the number of deaths perfectly balanced the number of births (population growth rate $\lambda=1$):
+
+$$K=\lim_{t\to\infty}\sum_{a=1}^{25}N_{a,t}\quad\text{where}\quad N_{t+1}=N_{t}$$
+
+*Estimation of MNPL and OSP Status*  
+
+To evaluate the population status relative to the Marine Mammal Protection Act (MMPA) management metrics, we calculated the Maximum Net Productivity Level (MNPL) and Optimal Sustainable Population (OSP) status from the posterior draws of the $K$ simulations. 
+
+Rather than assuming a rigid generalized logistic (theta-logistic) shape parameter, MNPL was derived numerically by tracking the absolute population growth ($\Delta N$) at each time step of the *post-hoc* simulation. MNPL was identified as the exact population size where net production (the number of individuals added to the population annually) reached its global maximum:
+
+$$MNPL=N_{t}\quad\text{where}\quad\max(N_{t+1}-N_{t})\text{ occurs}$$
+
+Finally, the OSP status was evaluated as the ratio of the most recent observed total population size ($N_{current}$) to the derived MNPL. A population is considered to be within its OSP if this ratio is greater than or equal to 1:
+
+$$OSP_{status}=\frac{N_{current}}{MNPL}$$
+
+This numeric derivation ensures that the management metrics are driven entirely by the species' empirical, age-structured vital rates and specific density-dependent survival thresholds estimated by the IPM.
+
+#### Implementation and diagnostics 
+
+This Bayesian state-space integrated population model was implemented in NIMBLE (NIMBLE Development Team 2019) using three Markov chain Monte Carlo (MCMC) chains with 30,000 iterations, 10,000 burn-in, and a thinning rate of 3 within the R programming environment (R Core Team 2020). Convergence was assessed by examining MCMC chains and a Brooks-Gelman-Rubin statistic (Gelman & Rubin 1992; Brooks & Roberts 1998) < 1.1. We summarized the results of the full model according to the proportion of MCMC chain samples for the environmental effects that was above versus below zero. 
+
+### Results  
+
+#### Vital rates  
+
+#### Growth rates, *K*, and MNPL 
+
+
+
+### Discussion
+
+Laake et al. 2018 metrics: 
+
+- ~275,000 (K)
+- MNPL: 183,481... though just based on pups, right...? 
+- abundance in 2014: 258k animals, 40% above MNPL so within OSP range
+- N/K DD: -1.68 (-3.78,-0.03)
+
+### Figures and tables 
+
+Figure 1. Map?
+
+```{r phi plot}
+
+phi_plot
+
+```
+Figure 2. Posterior median and 95% credible intervals for average age-specific CSL survival probabilities over the study period. 
+
+```{r fec plot}
+
+fec_plot
+
+```
+Figure 3. Posterior median and 95% credible intervals for average fecundity (pooled for ages 4:9 and 10:22) probabilities over the study period.
+
+
+```{r p plot}
+
+```
+Figure 4. Posterior median and 95% credible intervals for average age-specific CSL detection probabilities over the study period.
+
+```{r N and pp plot}
+
+```
+Figure 5. Posterior median and 95% credible intervals for annual CSL abundance and predicted number of pups (color) and imputed census counts (color) over the study period.
+
+```{r sst predictions}
+
+sst_plot
+
+```
+Figure 6. Posterior median and 95% credible intervals of (a) age- and sex-specific logit-scale effects of sea surface temperature on CSL survival probabilities, and (b) predicted age- and sex-specific survival probabilities across the range of sea surface temperature anomalies over the study period. 
+
+
+```{r MNPL curve}
+
+```
+Figure 7. Maximum net productivity level curve, showing....?
+
+```{r table 1}
+
+```
+Table 1: Annual abundances for M and F and tot and pup multiplier over time.
+
+```{r table 2}
+
+```
+Table 2: Median and 95% credible intervals for population model parameters, including of B_sst_a, beta.DD, K, MNPL median and 95% CI, MNPL/K, N in start/stop yrs, annual growth/max growth, and N_2024/MNPL (OSP status). 
+
+##Appendix
+
+Describe model diagnostics and fit. 
+
+```{r ppc and posterior prior overlaps}
+
+
+
+```
 
