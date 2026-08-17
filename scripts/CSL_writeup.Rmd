@@ -1,12 +1,12 @@
 ---
-title: "CSL population model"
+title: ""
 output: html_document
-date: "2026-06-24"
+date: ""
 ---
 
 ```{r setup, include=FALSE}
 
-knitr::opts_chunk$set(echo = F, warning = F, eval = T, message = F, cache = T, cache.lazy = T, fig.width = 6, fig.height = 5, fig.align = 'center')
+knitr::opts_chunk$set(echo = F, warning = F, eval = F, message = F, cache = T, cache.lazy = T, fig.width = 6, fig.height = 5, fig.align = 'center')
 
 library(here) #v1.0.1
 library(dplyr) #v1.0.5
@@ -20,12 +20,10 @@ source(here::here('scripts', 'PlotTheme.R'))
 
 ```
 
-
-
 ```{r vital rates}
 
 library(coda)
-out <- readRDS(here::here('results', 'out_sst.RDS'))
+out <- readRDS(here::here('results', 'out_sst_probs.RDS'))
 
 all_pars <- colnames(out[[1]])
 outmat <- as.matrix(out)
@@ -41,12 +39,12 @@ post_sum$variable <- row.names(post_sum)
 mu.pars <- all_pars[which(grepl('mu.', all_pars))]
 
 # b.mass_sum <- post_sum %>% filter(grepl('b.mass', variable)) %>%
-#   # transform(var_name = ifelse(grepl('b.mass.f', variable), '1', 
+#   # transform(var_name = ifelse(grepl('b.mass.f', variable), '1',
 #   #                                    ifelse(grepl('b.mass.m', variable), '1M',
-#                   transform(var_name = ifelse(grepl('b.mass1', variable), '1', 
+#                   transform(var_name = ifelse(grepl('b.mass1', variable), '1',
 #                        ifelse(grepl('b.massP', variable), 'P', NA))) %>%
 #   transform(sex = ifelse(grepl('M', variable), 'M', 'F')) %>%
-#   transform(var_name = factor(var_name, levels = c('P', '1'))) 
+#   transform(var_name = factor(var_name, levels = c('P', '1')))
 #   
 # ggplot(b.mass_sum,
 #        aes(x = var_name, y = med, col = sex, group = sex)) +
@@ -155,7 +153,8 @@ sst_dat <- sst_raw %>% filter(time > 1989) #%>% filter(time > 2010)
 b.sst_sum <- post_sum %>% filter(grepl('b.sst', variable)) %>%
   # transform(var_name = ifelse(grepl('b.mass.f', variable), '1', 
   #                                    ifelse(grepl('b.mass.m', variable), '1M',
-                  transform(var_name = gsub('b.sst.', '', variable))
+                  transform(var_name = gsub('b.sst.', '', variable)) %>%
+  transform(var_name = factor(var_name, levels = c('P', '1', '2.3', '4.6', '7.9', 'A')))
 
 sst_eff_plot <- ggplot(b.sst_sum, aes(x = var_name, y = med)) +
   geom_errorbar(aes(x = var_name, ymin=lower, ymax=upper),
@@ -279,24 +278,81 @@ preds_all <- rbind(summarize_preds_pup(preds_p) %>%
   transform(age = factor(age, levels = c('P', '1', '2:3', '4:6', '7:9',
                                          '10:12', '13:16', '17+')))
 
-sst_preds_plot <- ggplot(preds_all, aes(x = sst_val, y = mean_phi, col = sex)) +
-  geom_ribbon(aes(ymin = low_phi, ymax = high_phi), alpha = 0.2, color = NA) +
+#includes both sexes
+# sst_preds_plot <- ggplot(preds_all, aes(x = sst_val, y = mean_phi, col = sex)) +
+#   geom_ribbon(aes(ymin = low_phi, ymax = high_phi), alpha = 0.2, color = NA) +
+#   geom_line(linewidth = 1) +
+#   facet_grid(.~age) +
+#   labs(x = "SST anomalies",
+#        y = "Predicted survival probability") +
+#   theme_bw() +
+#   theme(legend.position = 'top',
+#                 axis.title.x = element_text(margin = margin(t = 7))) +
+#   scale_y_continuous(limits = c(0, 1)) + 
+#   scale_color_manual(values = rainbow2[c(2,6)], name = 'Sex') + 
+#   scale_fill_manual(values = rainbow2[c(2,6)]) #+ 
+#   # scale_x_continuous(limits = c(-1.5, 2.5), breaks = c(seq(-1.5,2.5, length = 5)),
+#   #                    labels = round(c(seq(0.3,0.65, length = 5)),2))
+
+sst_preds_plot <- ggplot(preds_all %>% filter(sex != 'M'), aes(x = sst_val, y = mean_phi, col = age)) +
+  geom_ribbon(data = preds_all, aes(ymin = low_phi, ymax = high_phi, fill = age), 
+              alpha = 0.2, color = NA, show.legend = F) +
   geom_line(linewidth = 1) +
-  facet_grid(.~age) +
+  # facet_grid(.~age) +
   labs(x = "SST anomalies",
        y = "Predicted survival probability") +
   theme_bw() +
   theme(legend.position = 'top',
                 axis.title.x = element_text(margin = margin(t = 7))) +
   scale_y_continuous(limits = c(0, 1)) + 
-  scale_color_manual(values = rainbow2[c(2,6)], name = 'Sex') + 
-  scale_fill_manual(values = rainbow2[c(2,6)]) #+ 
+  scale_color_manual(values = rainbow2[c(2,4,6,7,8,9)], name = 'Age') + 
+  scale_fill_manual(values = rainbow2[c(2,4,6,7,8,9)]) #+ 
   # scale_x_continuous(limits = c(-1.5, 2.5), breaks = c(seq(-1.5,2.5, length = 5)),
   #                    labels = round(c(seq(0.3,0.65, length = 5)),2))
 
+#ENSO "memory" effects
+out_ENSO <- readRDS(file = here('results', 'out_ENSO_memory.RDS'))
+
+# all_pars <- colnames(out_ENSO[[1]])
+outmat_ENSO <- as.matrix(out_ENSO)
+
+post_sum_ENSO <- data.frame(
+  med = apply(outmat_ENSO, 2, function(x) quantile(x, probs = 0.5, na.rm = T, names = F)),
+  lower = apply(outmat_ENSO, 2, function(x) quantile(x, probs = 0.025, na.rm = T, names = F)),
+  upper = apply(outmat_ENSO, 2, function(x) quantile(x, probs = 0.975, na.rm = T, names = F)))
+post_sum_ENSO$variable <- row.names(post_sum_ENSO)
+
+
+b.enso <- post_sum_ENSO %>% 
+  filter(grepl('b.enso', variable)) %>%
+  transform(var_name = gsub('b.enso.', '', variable)) %>%
+  filter(med != 0) %>%
+  transform(var_name = factor(var_name, levels = c('1[1]', '2.3[1]', '4.6[1]', 'A[1]'), 
+                              labels = c('1', '2.3', '4.6', '7+')))
+
+enso_eff_plot <- ggplot(b.enso, aes(x = var_name, y = med)) +
+  geom_errorbar(aes(x = var_name, ymin=lower, ymax=upper),
+                position = position_dodge(0.5),
+                width = 0.25, show.legend = F) +
+  geom_point(size = 0.8, position = position_dodge(0.5)) +
+  geom_hline(aes(yintercept = 0), linetype = 'dashed') +
+  xlab('Age class') + ylab(expression(paste('Logit-scale effect of ENSO birth year'))) +
+  ggtitle('') +
+  pres_theme(legend.position = 'top', #panel.border = element_rect(fill = NA),
+             plot.title = element_text(hjust = 0.5))
+
 ```
 
-```{r stable age}
+
+```{r metrics from MR fit}
+
+library(imputeTS)
+
+pup_cnts <- read_tsv(here('data', 'CSL_San Miguel Island_PupCounts_20260622.txt')) %>%
+  filter(Year > 1989)
+
+pup_cnt_filled <- na_interpolation(pup_cnts[,1:5]) %>%
+  mutate(US_PupCnt = rowSums(across(-Year)))
 
 #stable age logic to initialize N_f and N_m
 # define survival rates
@@ -369,18 +425,6 @@ N_m_init[1, ] <- NA
 init_pop_f <- N_f_track[, 1]
 init_pop_m <- N_m_track[, 1]
 
-```
-
-
-
-```{r metric calcs}
-
-library(imputeTS)
-
-pup_cnts <- read_tsv(here('data', 'CSL_San Miguel Island_PupCounts_20260622.txt')) %>%
-  filter(Year > 1989)
-
-pup_cnt_filled <- na_interpolation(pup_cnts, option = 'stine')
 
 ##calculate MNPL and OSP
 
@@ -429,9 +473,8 @@ reconstruct_pop <- function(pup_counts, phi_f, phi_m, init_f, init_m) {
   # Calculate total abundance per year 
   Ntot <- colSums(N_f) + colSums(N_m)
   
-  return(list(Ntot = Ntot, N_f = N_f, N_m = N_m))
+  return(list(Ntot = Ntot, N_f = N_f, N_m = N_m, pups = pup_counts))
 }
-
 
 # Fit Theta-Logistic Model to reconstructed abundance via Sum of Squared Errors
 # N_series is a vector of reconstructed total population size over time
@@ -489,8 +532,10 @@ fit_theta_logistic <- function(N_series) {
   ))
 }
 
-
 # loop across CJS posterior draws)
+
+out <- readRDS(here::here('results', 'out_sst_probs.RDS'))
+outmat <- as.matrix(out)
 
 nsim <- 500
 results_list <- vector("list", nsim)
@@ -571,94 +616,234 @@ summary_table <- post %>%
     theta_UCI = quantile(theta, 0.975)
   )
 
-print(summary_table)
+# print(summary_table)
 
 
-plot(recon$Ntot, type = "l", col = "blue", lwd = 2, 
-     main = "Diagnostic: Reconstructed Population Trajectory",
-     ylab = "Total Abundance", xlab = "Time Step")
-
-
-# 2. Calculate the "Implied Fecundity" (Reality Check)
+# calculate the implied fecundity
 # How many pups were born per adult female (assuming ages 4-24 are adults)?
 adult_females <- colSums(recon$N_f[4:24, ])
 implied_fecundity <- pup_counts / adult_females
 
-plot(implied_fecundity, type = "b", col = "red", pch = 16,
-     main = "Diagnostic: Implied Birth Rate",
-     ylab = "Pups per Adult Female", xlab = "Time Step")
+# Ntot_recon_plot <- plot(x = 1990:2024, y = recon$Ntot, type = "l", col = "darkblue", lwd = 2, 
+#      main = "Reconstructed population trajectory",
+#      ylab = "Total abundance", xlab = "")
+# 
+# fec_calc_plot <- plot(x = 1990:2024, y = implied_fecundity, type = "b", col = "darkred", pch = 16,
+#      # main = "Implied birth rate",
+#      ylab = "Fecundity (pups per adult female)", xlab = "")
 
 
 ```
 
+```{r metrics from IPM fit and post pred checks}
 
-```{r abundance and pp}
+out_IPM <- readRDS(file = here('results', 'out_IPM_sst_DD_slice2.RDS'))
+outmat <- do.call(rbind, out_IPM)
 
-# 1. Combine the MCMC chains into a single matrix
-# (Assuming 'out' is your mcmc.list object from runMCMC)
-posterior_matrix <- do.call(rbind, out)
+outmat <- as.matrix(out_IPM)
 
-# 2. Extract the expected pups columns chronologically
-n_occasions <- nim.constants$n_occasions
+post_sumIPM <- data.frame(
+  med = apply(outmat, 2, function(x) quantile(x, probs = 0.5, na.rm = T, names = F)),
+  lower = apply(outmat, 2, function(x) quantile(x, probs = 0.025, na.rm = T, names = F)),
+  upper = apply(outmat, 2, function(x) quantile(x, probs = 0.975, na.rm = T, names = F)))
+post_sumIPM$variable <- row.names(post_sumIPM)
+
+#survival
+int_datIPM <- post_sumIPM %>% filter(grepl('int.phi', variable)) %>%
+  # bind_rows(post_sum %>% filter(grepl('int.psi', variable))) %>%
+  transform(variable = gsub('int.', '', variable)) %>%
+  transform(sex = ifelse(grepl('M', variable), 'M', 'F')) %>%
+  transform(age = gsub('phi', '', variable)) %>%
+  transform(age = gsub('M', '', age)) %>%
+   transform(age = factor(age, levels = c('P', 'PM', '1', 
+                                                   '1M', '2.3', '2.3M',
+                            '4.6', '4.6M', '7.9', '7.9M', '10.12', '10.12M',
+                            '13.16', '13.16M', 'A', 'AM'))) %>%
+  transform(mod = 'IPM') %>%
+  bind_rows(int_dat %>% transform(mod = 'MR'))
+  
+plot_dat <- int_datIPM %>% filter(sex != 'M')
+
+phi_plot_compare <- ggplot(plot_dat, aes(age, med, color = mod)) +
+  geom_errorbar(aes(x = age, ymin=lower, ymax=upper),
+                position = position_dodge(0.5),
+                width = 0.35) +
+  geom_point(size = 0.8, position = position_dodge(0.5)) +
+  xlab('Age class') + ylab(expression(paste('Survival probability ',  '(', phi, ')'))) +
+  ggtitle('') +
+  # facet_wrap(~sex, scales = 'free_x', drop = T) +
+  plot_theme(legend.position = 'top', 
+             panel.border = element_rect(fill = NA),
+             plot.title = element_text(hjust = 0.5)) +
+  scale_color_manual(values = c('black', 'darkgrey'), name = 'Model')
+
+#fecundity
+fec_dat <- data.frame(outmat) %>% dplyr::select(contains('int.fec'))
+colnames(fec_dat) <- c('Age 10+', 'Age 4-9')
+
+fec_plot <- ggplot(fec_dat %>% reshape2::melt() %>%
+                     transform(variable = factor(variable, levels = c('Age 4-9', 'Age 10+'))), 
+                   aes(x = variable, y = value)) +
+  geom_violin() +
+  ylab('Fecundity') xlab('') +
+  theme_bw()
+
+DD_sum <- post_sumIPM %>% filter(grepl('beta.DD', variable))
+
+DD_plot <- ggplot(DD_sum, aes(y = med, x = variable)) +
+  geom_point(aes(x = variable, y = med)) +
+  geom_errorbar(aes(x = variable, ymin = lower, ymax = upper), width = 0.1) +
+  ylab('Density dependence') + xlab('') +
+  theme_bw()
+
+##PPC
+# expected pups columns chronologically
 pup_cols <- paste0("expected_pups_tot[", 2:n_occasions, "]") # Starts at 2 because t+1 in the loop
-pup_posterior <- posterior_matrix[, pup_cols]
+pup_post <- outmat[, pup_cols]
 
-# 3. Calculate the median and 95% Credible Intervals for each year
-# We also append the actual census data here
+# calculate the median and 95% CI for each year and append census data 
 pup_summary <- data.frame(
   TimeStep = 2:n_occasions, 
-  Expected_Median = apply(pup_posterior, 2, median),
-  Expected_LCI = apply(pup_posterior, 2, quantile, probs = 0.025),
-  Expected_UCI = apply(pup_posterior, 2, quantile, probs = 0.975),
-  Observed = nim.constants$y_pup_counts[2:n_occasions]
+  year = 1991:2024,
+  Expected_Median = apply(pup_post, 2, median),
+  Expected_LCI = apply(pup_post, 2, quantile, probs = 0.025),
+  Expected_UCI = apply(pup_post, 2, quantile, probs = 0.975),
+  Observed = pup_cnt_filled$US_PupCnt[2:n_occasions]
 )
 
-# 4. Plot the Posterior Predictive Check
-ggplot(pup_summary, aes(x = TimeStep)) +
-  # 95% Credible Interval Ribbon
+pups_ppc_plot <- ggplot(pup_summary, aes(x = year)) +
   geom_ribbon(aes(ymin = Expected_LCI, ymax = Expected_UCI), 
               fill = "steelblue", alpha = 0.3) +
-  # Median Expected Trend Line
   geom_line(aes(y = Expected_Median), color = "steelblue", size = 1) +
-  # Actual Hard Census Data
   geom_point(aes(y = Observed), color = "black", size = 2) +
-  theme_minimal() +
+  geom_line(aes(y = Observed), linetype = 'dashed', col = 'darkgrey') +
+  theme_bw() +
   labs(
-    title = "Posterior Predictive Check: California Sea Lion Pup Production",
-    subtitle = "Black dots = Census Data | Blue line & ribbon = Model Expected Pups (95% CI)",
-    x = "Time Step",
-    y = "Total Pups"
-  ) +
-  theme(
-    plot.title = element_text(face = "bold", size = 14),
-    axis.title = element_text(face = "bold")
-  )
+    title = "Posterior predictive check",
+    # subtitle = "Black dots = Census Data | Blue line & ribbon = Model Expected Pups (95% CI)",
+    x = "",
+    y = "Total pups") +
+  plot_theme()
 
 
-#### also plot scatterplot of int.phiP and beta.DD
+#### also plot scatterplot of int.phiP and beta.DD?
 
 
-```
 
-```{r derive net productivity curve}
 
-# 1. Extract your posterior medians
-# (Replace 'posterior_matrix' with your actual combined MCMC output matrix)
+
+
+##calculate K and MNPL
+# Number of posterior draws to simulate (e.g., sample 1000 to save time)
+n_draws <- 500#0
+draw_indices <- sample(1:nrow(outmat), n_draws)
+
+# Vector to store K estimates
+K_estimates <- numeric(n_draws)
+
+# Run the simulation for each sampled posterior draw
+for (i in 1:n_draws) {
+  row_idx <- draw_indices[i]
+
+  # extract vital rates for each MCMC draw
+  int_phiP   <- outmat[row_idx, "int.phiP"]
+  beta_DD <- outmat[row_idx, "beta.DD"]
+  int_phi1   <- outmat[row_idx, "int.phi1"]
+  int_phi2.3   <- outmat[row_idx, "int.phi2.3"]
+  int_phi4.6   <- outmat[row_idx, "int.phi4.6"]
+  int_phi7.9   <- outmat[row_idx, "int.phi7.9"]
+  int_phi10.12   <- outmat[row_idx, "int.phi10.12"]
+  int_phi13.16   <- outmat[row_idx, "int.phi13.16"]
+  int_phiA   <- outmat[row_idx, "int.phiA"]
+  fec_low  <- outmat[row_idx, "int.fec_low"]
+  fec_high <- outmat[row_idx, "int.fec_high"]
+
+  # convert baseline survival to probability scale (assuming SST = 0)
+  mu_P <- qlogis(int_phiP)
+  mu_1 <- qlogis(int_phi1)
+  mu_2.3 <- qlogis(int_phi2.3)
+  mu_4.6 <- qlogis(int_phi4.6)
+  mu_7.9 <- qlogis(int_phi7.9)
+  mu_10.12 <- qlogis(int_phi10.12)
+  mu_13.16 <- qlogis(int_phi13.16)
+  mu_A <- qlogis(int_phiA)
+
+  # initialize a starting population vector
+  # (e.g., 50 females per age class to the simulation)
+  N_vec <- rep(50, 25)
+
+  # project forward to reach equilibrium (K)
+  for (y in 1:500) { # 200 years long enough?
+
+    N_tot <- sum(N_vec) # just modeling females here for simplicity,
+                        # or multiply by 2 if assuming equal male population.
+
+    # calculate density-dependent pup survival for THIS year
+    # scale N as in the model
+    phiP_current <- plogis(mu_P-beta_DD*((N_tot*2)/100000))
+
+    # calculate total pups born
+    pups_born <- (sum(N_vec[5:10])*fec_low*0.5) + (sum(N_vec[11:23])*fec_high*0.5)
+
+    # Create the next year's population vector
+    N_vec_next <- numeric(25)
+    N_vec_next[1] <- pups_born
+    N_vec_next[2] <- N_vec[1] * phiP_current
+    N_vec_next[3] <- N_vec[2] * int_phi1
+    N_vec_next[4] <- N_vec[3] * int_phi2.3
+    N_vec_next[5] <- N_vec[4] * int_phi2.3
+    N_vec_next[6] <- N_vec[5] * int_phi4.6
+    N_vec_next[7] <- N_vec[6] * int_phi4.6
+    N_vec_next[8] <- N_vec[7] * int_phi4.6
+    N_vec_next[9] <- N_vec[8] * int_phi7.9
+    N_vec_next[10] <- N_vec[9] * int_phi7.9
+    N_vec_next[11] <- N_vec[10] * int_phi7.9
+    N_vec_next[12] <- N_vec[11] * int_phi10.12
+    N_vec_next[13] <- N_vec[12] * int_phi10.12
+    N_vec_next[14] <- N_vec[13] * int_phi10.12
+    N_vec_next[15] <- N_vec[14] * int_phi13.16
+    N_vec_next[16] <- N_vec[15] * int_phi13.16
+    N_vec_next[17] <- N_vec[16] * int_phi13.16
+    N_vec_next[18] <- N_vec[17] * int_phi13.16
+
+    # absorbing state (ages 17-23)
+    for (a in 18:24) {
+      N_vec_next[a+1] <- N_vec[a] * int_phiA
+    }
+
+    # update population
+    N_vec <- N_vec_next
+  }
+
+  # store stabilized population size (multiply by 2 to account for males)
+  K_estimates[i] <- sum(N_vec) * 2
+}
+
+# mean
+mean_K <- mean(K_estimates)
+K_CI <- quantile(K_estimates, probs = c(0.025, 0.975))
+
+# print(paste("Estimated K:", round(mean_K), "95% CI:", round(K_CI[1]), "-", round(K_CI[2])))
+
+#net productivity curve
+####derive net productivity curve
+
+# extract your posterior medians
 # Baseline survival (converted to logit scale for the density penalty math)
-mu_P_f <- qlogis(median(posterior_matrix[, "int.phiP"]))
-mu_P_m <- qlogis(median(posterior_matrix[, "int.phiPM"]))
+mu_P_f <- qlogis(median(outmat[, "int.phiP"]))
+mu_P_m <- qlogis(median(outmat[, "int.phiPM"]))
 
 # Define a helper vector for female and male adult survival across indices 2 to 24
 # You will need to map your specific age-class medians (int.phi1, int.phi2.3, etc.) 
 # to the 23 transitions (Index 1 to 2, up to Index 24 to 25).
 # For this example, I am using a simplified constant adult survival for brevity:
-phi_adult_f <- rep(median(posterior_matrix[, "int.phiA"]), 24) 
-phi_adult_m <- rep(median(posterior_matrix[, "int.phiAM"]), 24) 
+phi_adult_f <- rep(median(outmat[, "int.phiA"]), 24) 
+phi_adult_m <- rep(median(outmat[, "int.phiAM"]), 24) 
 
 # Fecundity and Density Dependence
-fec_low <- median(posterior_matrix[, "int.fec_low"])
-fec_high <- median(posterior_matrix[, "int.fec_high"])
-beta_DD <- median(posterior_matrix[, "beta.DD"])
+fec_low <- median(outmat[, "int.fec_low"])
+fec_high <- median(outmat[, "int.fec_high"])
+beta_DD <- median(outmat[, "beta.DD"])
 
 # 2. Setup the projection
 n_years <- 300
@@ -833,61 +1018,73 @@ ggplot(phi.vals %>% filter(rate == 'Survival' & exclude_phi != 'Y' &
 
 ```
 
+#### CSL population dynamics and environmental effects  
 
+*Project status*  
 
-### Introduction 
+- MR model estimates look great  
+-- Haven't incorporated dead stranded IDs or lepto/DA  
+- Prototype IPM model estimates look like they're working (model takes a *long* long time to run)  
+- Estimates of management metrics between IPM and MR models align - this is also great and not to be taken for granted   
+- Methods drafted, results visualized  
+- Medium to-do.... think a bit about the density dependence mechanism in the IPM given the estimated effects of ENSO on not just pups... yearlings and juveniles have a harder time finding food too? 
 
-- CSL as indicator species in a dynamic CCE 
-- Importance of monitoring sentinel species to understand population dynamics, provide updated management and conservation metrics, and understand responses of a species sensitive to environmental variability in an ecosystem notorious for cyclic phases.
-- Climate impacts the food web and health
-- Opportunities afforded by a well-studied (and observable) species in a dynamic environment
+*Draft fodder for future manuscript effort...* 
 
-- CSL historical and contemporary context
--- ups and downs and connections with ENSO
--- prominent species along the coast, 
--- foraging ecology/fisheries interactions
--- human impacts and disease/stranding/public concern
+#### Introduction 
 
-- Current importance
--- estimates growing outdated
--- improvements upon previous estimation, and more SST evidence
+CSL as indicator species in a dynamic CCE 
+- Importance of monitoring sentinel species to understand population dynamics, provide updated management and conservation metrics, and understand responses of a species sensitive to environmental variability in an ecosystem notorious for cyclic phases  
+- Climate impacts the food web and health  
+- Opportunities afforded by a well-studied (and observable) species in a dynamic environment  
 
-- Aims: upgrade Laake et al.
-- Laake et al implement a two-step analytical approach: survival estimates fed into population projection model and then separately derive K and MNPL
--- Benefits: computationally efficient
--- Disadvantages: (1) does not fully integrate uncertainty in MR estimates within the population projection model and therefore does not resolve discrepancies between the two datasets based on relative precision of the data streams; (2) DD not estimated with respect to a particular vital rate (doesn't specify mechanism of dependence). 
--- Fully integrated IPM: addressing disadvantages: (1) weights uncertainty in each data stream to wrestle out discrepancies; uncertainty from all components propagated into final posteriors of K and MNPL, and (2) estimates DD with respect to mechanism... assume it is rookery crowding or resource limitation for lactating females... can specify how transient dynamics (such as small cohort of pups from ENSO event) propagates through the age structure over the next decade. **Distinguishes between ENSO noise and density signal - what would K be in an average environment -- may be a higher/truer carrying capacity instead of logistic growth model where a lot of high SST years could look like approaching K. In IPM, MNPL and K are emergent properties derived from age-structured vital rates. Laake et al. used theta parameter to force productivity curve into specific mathematical shape, which could skew MNPL relative to K, generally 0.6 for marine mammals instead of 0.5K that would be represented by perfect symmetry. IPM will organically generate right-skewed productivity curve based on vital rates. 
+Estimating density dependence for long-lived top predator  
+- Challenges  
+- Different approaches  
 
-Benefits of age-structured approach.... can account for larger/smaller birth pulses and when they enter into the reproductive pool. 
+CSL historical and contemporary context  
+- ups and downs and connections with ENSO  
+- prominent species along the coast  
+- foraging ecology/fisheries interactions  
+- human impacts and disease/stranding/public concern  
 
-Reasons uncertainty will be different: wider bc propagated, but census is a strong anchor. 
+Current importance  
+-- estimates growing outdated  
+-- improvements upon previous estimation, and more SST evidence  
 
-Ultimately, this model enhances ecological realism. 
+Aims: upgrade Laake et al. and provide management metrics    
+- Laake et al implemented a two-step approach: survival estimates fed into population projection model and then separately derive K and MNPL  
+-- Benefits: computationally efficient  
+-- Disadvantages: (1) does not fully integrate uncertainty in MR estimates within the population projection model and therefore does not resolve discrepancies between the two datasets based on relative precision of the data streams; (2) DD not estimated with respect to a particular vital rate (doesn't specify mechanism of dependence) and assumes downturns in abundance are due to density instead of environmental effect  
+- Fully integrated IPM addresses these issues: (1) weights uncertainty in each data stream to settle discrepancies; uncertainty from all components propagated into final posteriors of *K* and MNPL, and (2) estimates DD with respect to an ecological mechanism and facilitates specifying how transient dynamics (such as small cohort of pups from ENSO event) propagates through the age structure over the next decade   
+- Full IPM distinguishes between ENSO noise and density signal - what would *K* be in an average environment -- may be a higher/truer carrying capacity instead of logistic growth model where a lot of high SST years could look like approaching *K*   
+- In the IPM, MNPL and *K* are emergent properties derived from age-structured vital rates. Laake et al. used the $\theta$ parameter to force the productivity curve into a specific mathematical shape, which could skew MNPL relative to *K* (generally 0.6 for marine mammals instead of 0.5K that would be represented by perfect symmetry) whereas the IPM will organically generate right-skewed productivity curve based on vital rates  
+- Ultimately, this model enhances ecological realism  
 
-Literature:
-- Hammill et al. 2021 for northwest atlantic grey seals; similar density dependence framework
-- Ersalman et al. 2024-2025 on baltic ringed seals? env focus on younglings
-- Tinker et al. 2023 for NW atlantic harp seals; K and ice-related pup mortality
+<!-- Literature: -->
+<!-- - Hammill et al. 2021 for northwest atlantic grey seals; similar density dependence framework -->
+<!-- - Ersalman et al. 2024-2025 on baltic ringed seals? env focus on younglings -->
+<!-- - Tinker et al. 2023 for NW atlantic harp seals; K and ice-related pup mortality -->
 
-Hammill et al. and Tinker et al still use mathematical shape parameter theta
+<!-- Hammill et al. and Tinker et al still use mathematical shape parameter theta -->
  
-### Methods
+#### Methods
 
-#### Study system   
+##### Study system   
 
-#### Data collection and curation  
+##### Data collection and curation  
 
 - Marked cohort sizes and years (every year? similar approximate samples sizes?)
--- approximately 500 marked 1990-2005, 300-400 from 2006-2015, 250-300 thereafter.
+-- approximately 500 marked annually (!!wow!!) 1990-2005, 300-400 from 2006-2015, 250-300 thereafter.
 
 <!-- (table(ch_dat_m$cohort) + table(ch_dat_f$cohort)) -->
 
-- Pup counts and imputation.
+- Pup counts and imputation to fill any gaps.
 
-- SST data and seasonalility as relevant to pups vs. non-pups.
+- SST data and seasonality as relevant to pups vs. non-pups.
 
 
-#### Statistical analyses
+##### Statistical analyses
 
 We developed a fully integrated Bayesian population model to jointly estimate vital rates and population dynamics for California sea lions using data collected from the California Coast from 1990-2025. The IPM framework simultaneously evaluates a Cormack-Jolly-Seber (CJS; citation) mark-recapture model and a state-space demographic projection matrix, linked by shared age- and sex-specific survival parameters. To resolve latent fecundity and anchor population trajectories, we incorporated annual pup counts treated as a census without observation error.
 
@@ -956,19 +1153,87 @@ $$OSP_{status}=\frac{N_{current}}{MNPL}$$
 
 This numeric derivation ensures that the management metrics are driven entirely by the species' empirical, age-structured vital rates and specific density-dependent survival thresholds estimated by the IPM.
 
-#### Implementation and diagnostics 
+##### Implementation and diagnostics 
 
 This Bayesian state-space integrated population model was implemented in NIMBLE (NIMBLE Development Team 2019) using three Markov chain Monte Carlo (MCMC) chains with 30,000 iterations, 10,000 burn-in, and a thinning rate of 3 within the R programming environment (R Core Team 2020). Convergence was assessed by examining MCMC chains and a Brooks-Gelman-Rubin statistic (Gelman & Rubin 1992; Brooks & Roberts 1998) < 1.1. We summarized the results of the full model according to the proportion of MCMC chain samples for the environmental effects that was above versus below zero. 
 
-### Results  
+#### Results  
 
-#### Vital rates  
+Results described from the IPM are still only a subset (50-100 marked individuals per year) of the full dataset. 
 
-#### Growth rates, *K*, and MNPL 
+##### Vital rates  
+
+```{r phi plot}
+
+phi_plot
+phi_plot_compare
+
+```
+
+The first plot shows sex- and age class-specific survival probabilities and associated 95% credible intervals. The second plot shows very strong agreement between these MR estimates and those from the IPM for female survival probabilities. 
+
+
+```{r p plot}
+
+p_plot
+
+```
+
+Sex- and age-specific annual detection probabilities, though yearlings seem low? Should it be sex-specific for yearlings and juveniles too? Males lower makes sense too?  
+
+##### Covariate effects  
+
+```{r cov plots}
+
+sst_eff_plot
+sst_preds_plot
+enso_eff_plot
+
+```
+
+Figure (A): logit-scale (positive versus negative) effect of SST for each age shows that pups and yearlings are largely affected similarly and that there are negative effects estimated for all age classes except 4-6yo's. Plain language interpretation: survival is lower for all age classes (except 4-6) in years when SST is high and the effect is strongest for pups and yearlings. *Note to self - recheck whether these are sex-specific effects?*
+
+Figure (B): probability-scale effects of the SST covariate effect for each age: survival goes from approximately 75% in years with lower SST to approximately 30% for pups and yearlings when SST is high. 
+
+Figure (C): I'm calling this the "ENSO memory" effect: whether individuals are affected in subsequent years if born in an ENSO year. This shows that (for example) survival is high at ages 2-6 for individuals born in ENSO years and lower for adults that were born in ENSO years. We should talk through this a bit more, but my guess is that this is more showing us a cyclic effect rather than some sort of lasting ENSO effect that pups carry with them as they age. Once pups that were born in an ENSO event have reached ages 2-6, those years are probably cold, and once those same pups that were born in an ENSO event have reached 7+ survival is maybe lower again because they're back into an ENSO event. 
+
+##### Management metrics: *K*, and MNPL 
+
+The two-step approach (e.g., Laake et al update) produces the following estimates of *K* and MNLP: approximately 292k individuals for a carrying capacity, and a MNPL of 175,364. 
+
+```{r post hoc metrics}
+
+print(round(summary_table))
+
+plot(x = 1990:2024, y = recon$Ntot, type = "l", col = "darkblue", lwd = 2, 
+     main = "Reconstructed population trajectory",
+     ylab = "Total abundance", xlab = "")
+
+plot(x = 1990:2024, y = implied_fecundity, type = "b", col = "darkred", pch = 16,
+     # main = "Implied birth rate",
+     ylab = "Fecundity (pups per adult female)", xlab = "")
+
+```
+
+Plots show reconstructed population trajectory (were pup counts increasing that rapidly 2000-2010?) and implied fecundity rate (is this about right for CSL? seems a bit low for the pinnipeds I'm used to, or at least more volatile). 
+
+The integrated population model produces the following estimates: 
+
+```{r IPM metrics}
 
 
 
-### Discussion
+fec_plot
+
+DD_plot
+
+```
+
+
+##### Abundance and posterior predictive checks  
+
+
+#### Discussion
 
 Laake et al. 2018 metrics: 
 
@@ -977,7 +1242,7 @@ Laake et al. 2018 metrics:
 - abundance in 2014: 258k animals, 40% above MNPL so within OSP range
 - N/K DD: -1.68 (-3.78,-0.03)
 
-### Figures and tables 
+#### Figures and tables 
 
 Figure 1. Map?
 
@@ -1029,7 +1294,7 @@ Table 1: Annual abundances for M and F and tot and pup multiplier over time.
 ```
 Table 2: Median and 95% credible intervals for population model parameters, including of B_sst_a, beta.DD, K, MNPL median and 95% CI, MNPL/K, N in start/stop yrs, annual growth/max growth, and N_2024/MNPL (OSP status). 
 
-##Appendix
+#### Appendix
 
 Describe model diagnostics and fit. 
 
