@@ -106,14 +106,14 @@ ch_dat_f <- read.csv(here::here('data', 'res_dat_f_20260623.csv'),
   transform(adjsex == 'Fem') %>%
   dplyr::select(-adjsex) %>%
   group_by(cohort) %>%
-  # slice_sample(n = 15, replace = F) %>%
+  slice_sample(n = 125, replace = F) %>%
   arrange(brand)
 
 ch_dat_m <- read.csv(here::here('data', 'res_dat_m_20260623.csv'),
                    header = T, stringsAsFactors = F) %>% 
   dplyr::select(-adjsex) %>%
   group_by(cohort) %>%
-  # slice_sample(n = 15, replace = F) %>%
+  slice_sample(n = 75, replace = F) %>%
   arrange(brand)
 
 EN_yes <- c(1991, 1997, 2015, 2023)
@@ -2010,8 +2010,8 @@ params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA', 'int.p4.6M'
 
 ### run model
 n.iter = 15000; n.chains = 3; n.burnin = 7000; nthin = 2; nAdapt = 20
-# n.iter = 1500; n.chains = 3; n.burnin = 800; nthin = 3; nAdapt = 20
-n.iter = 2000; n.chains = 2; n.burnin = 500; nthin = 2; nAdapt = 20
+n.iter = 12000; n.chains = 3; n.burnin = 7000; nthin = 2; nAdapt = 20
+# n.iter = 5000; n.chains = 2; n.burnin = 2000; nthin = 2; nAdapt = 20
 
 
 start <- Sys.time()
@@ -2037,7 +2037,7 @@ Rmcmc <- buildMCMC(conf)  #produce uncompiled R mcmc function
 Cmodel <- compileNimble(Rmodel)
 Cmcmc <- compileNimble(Rmcmc, project = Rmodel)
 
-sink(here('results', 'IPM_errors_DD_slice.txt'))
+sink(here('results', 'IPM_errors_DD_slice100.txt'))
 
 out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin, 
                # nchains = n.chains,
@@ -2047,21 +2047,21 @@ out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin,
                samplesAsCodaMCMC = TRUE)
 
 
-  saveRDS(out, here('results', paste("out_IPM_sst_DD_slice_", i, ".RDS", sep = "")))
+  saveRDS(out, here('results', paste("out_IPM_sst_DD_slice100_", i, ".RDS", sep = "")))
 # saveRDS(out, here('results', paste("out_IPM_sst_DD.RDS", sep = "")))
 
 } # closes parallel loop
 
-out_1 <- readRDS(here::here('results', "out_IPM_sst_DD_slice_1.RDS", sep = ""))
-out_2 <- readRDS(here::here('results', "out_IPM_sst_DD_slice_2.RDS", sep = ""))
-# out_3 <- readRDS(here::here('results', "out_IPM_sst_DD_3.RDS", sep = ""))
+out_1 <- readRDS(here::here('results', "out_IPM_sst_DD_slice100_1.RDS", sep = ""))
+out_2 <- readRDS(here::here('results', "out_IPM_sst_DD_slice100_2.RDS", sep = ""))
+out_3 <- readRDS(here::here('results', "out_IPM_sst_DD100_3.RDS", sep = ""))
 
 # combine them and make an mcmc object
 library(coda)
 # out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
-out <- list(`out_1`, `out_2`) %>% as.mcmc.list()
+out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
 
-saveRDS(out, file = here('results', 'out_IPM_sst_DD_slice.rds'))
+saveRDS(out, file = here('results', 'out_IPM_sst_DD_slice100.rds'))
 
 ##k and osp
 # Extract your MCMC matrix
