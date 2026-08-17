@@ -17,6 +17,7 @@ library(readr)
 library(knitr)
 library(Hmisc)
 library(stringr)
+library(tidyverse)
 
 source(here::here('scripts', 'PlotTheme.R'))
 
@@ -25,9 +26,11 @@ source(here::here('scripts', 'PlotTheme.R'))
 
 ```{r vital rates}
 
-out <- readRDS(here::here('results', 'out_sst.RDS'))
+library(coda)
 
-all_pars <- colnames(out[[1]])
+out <- readRDS(here::here('results', 'out_sst_probs.rds'))
+
+all_pars <- colnames(out)
 outmat <- as.matrix(out)
 
 post_sum <- data.frame(

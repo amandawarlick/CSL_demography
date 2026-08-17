@@ -142,11 +142,20 @@ p_plot <- ggplot(int_dat,
 
 ```{r covariate effects and predictions}
 
+sst_raw <- read.csv(here('data', '2025_CCEP_sst.csv'), stringsAsFactors = F, header = T)
+
+#from S. Melin in project summary notes docx
+#use pupOcttoJune: pup survival from marking to 1st birthday
+#use pupAprtoSept: pup survival via gestational foraging success/pup weight effects
+#use nonpupJulytoJune: survival of non-pup age classes - sea lion "year"
+
+sst_dat <- sst_raw %>% filter(time > 1989) #%>% filter(time > 2010)
+
 #sst
 b.sst_sum <- post_sum %>% filter(grepl('b.sst', variable)) %>%
   # transform(var_name = ifelse(grepl('b.mass.f', variable), '1', 
   #                                    ifelse(grepl('b.mass.m', variable), '1M',
-                  transform(var_name = gsub('b.sst.', '', variable)) %>%
+                  transform(var_name = gsub('b.sst.', '', variable))
 
 sst_eff_plot <- ggplot(b.sst_sum, aes(x = var_name, y = med)) +
   geom_errorbar(aes(x = var_name, ymin=lower, ymax=upper),
@@ -287,8 +296,91 @@ sst_preds_plot <- ggplot(preds_all, aes(x = sst_val, y = mean_phi, col = sex)) +
 
 ```
 
+```{r stable age}
+
+#stable age logic to initialize N_f and N_m
+# define survival rates
+n_occasions <- 36
+phi_P <- 0.7
+phi_1 <- 0.8
+phi_J <- 0.85 # Juveniles (Ages 2-5)
+phi_A <- 0.92 # Adults (Ages 6-13)
+phi_AA <- 0.78
+
+# storage
+N_f_track <- matrix(0, nrow = 25, ncol = (n_occasions-1))
+N_m_track <- matrix(0, nrow = 25, ncol = (n_occasions-1))
+
+# year 1; assuming 50:50 sex ratio for pups
+N_f_track[1, 1] <- round(pup_cnt_filled$US_PupCnt[1] / 2)
+N_m_track[1, 1] <- pup_cnt_filled$US_PupCnt[1] - N_f_track[1, 1]
+
+for (a in 1:24) {
+  surv <- ifelse(a == 1, phi_P, 
+          ifelse(a == 2, phi_1, 
+          ifelse(a >= 3 & a <= 5, phi_J,
+          ifelse(a >= 6 & a <= 12, phi_A, phi_AA))))
+          
+  N_f_track[a + 1, 1] <- round(N_f_track[a, 1] * surv)
+  N_m_track[a + 1, 1] <- round(N_m_track[a, 1] * surv)
+}
+
+# 4. Dynamically project the rest of the matrix forward through time
+for (t in 1:(n_occasions - 2)) {
+  
+  # Insert the REAL pup count for the next year
+  N_f_track[1, t+1] <- round(pup_cnt_filled$US_PupCnt[t+1] / 2)
+  N_m_track[1, t+1] <- pup_cnt_filled$US_PupCnt[t+1] - N_f_track[1, t+1]
+  
+  # Pups transition to yearlings (Index 1 -> 2)
+  N_f_track[2, t+1] <- round(N_f_track[1, t] * phi_P)
+  N_m_track[2, t+1] <- round(N_m_track[1, t] * phi_P)
+  
+  # Yearlings transition to Age 2 (Index 2 -> 3)
+  N_f_track[3, t+1] <- round(N_f_track[2, t] * phi_1)
+  N_m_track[3, t+1] <- round(N_m_track[2, t] * phi_1)
+  
+  # Juveniles transition (Indices 3-5 -> 4-6)
+  for (a in 3:5) {
+    N_f_track[a+1, t+1] <- round(N_f_track[a, t] * phi_J)
+    N_m_track[a+1, t+1] <- round(N_m_track[a, t] * phi_J)
+  }
+  
+  # Adults transition (Indices 6-24 -> 7-25)
+  for (a in 6:12) {
+    N_f_track[a+1, t+1] <- round(N_f_track[a, t] * phi_A)
+    N_m_track[a+1, t+1] <- round(N_m_track[a, t] * phi_A)
+  }
+  
+    for (a in 13:24) {
+    N_f_track[a+1, t+1] <- round(N_f_track[a, t] * phi_AA)
+    N_m_track[a+1, t+1] <- round(N_m_track[a, t] * phi_AA)
+  }
+}
+
+# row 1 (pups) is assigned deterministically in the model, NA for inits
+N_f_init <- N_f_track
+N_m_init <- N_m_track
+
+N_f_init[1, ] <- NA
+N_m_init[1, ] <- NA
+
+# use year 1 for for dpois() priors
+init_pop_f <- N_f_track[, 1]
+init_pop_m <- N_m_track[, 1]
+
+```
+
+
 
 ```{r metric calcs}
+
+library(imputeTS)
+
+pup_cnts <- read_tsv(here('data', 'CSL_San Miguel Island_PupCounts_20260622.txt')) %>%
+  filter(Year > 1989)
+
+pup_cnt_filled <- na_interpolation(pup_cnts, option = 'stine')
 
 ##calculate MNPL and OSP
 
@@ -297,127 +389,205 @@ sst_preds_plot <- ggplot(preds_all, aes(x = sst_val, y = mean_phi, col = sex)) +
 
 #use vital rates from IPM
 # extract MCMC matrix 
-mcmc_matrix <- as.matrix(out) 
+outmat <- as.matrix(out)
 
-# number of posterior draws to simulate
-n_draws <- 1000 
-draw_indices <- sample(1:nrow(mcmc_matrix), n_draws)
+pup_counts <- pup_cnt_filled$US_PupCnt
 
-# storage
-K_estimates <- numeric(n_draws)
-MNPL_estimates <- numeric(n_draws)
-OSP_status <- numeric(n_draws)
+# Reconstruct abundance deterministically from pup counts and survival
+# pup_counts Vector of observed annual pup census counts
+# phi_f Matrix of female survival (rows = age classes 1:24, cols = years)
+# phi_m Matrix of male survival (rows = age classes 1:24, cols = years)
+# init_f Initial female age vector at t=1 (length = max_age)
+# init_m Initial male age vector at t=1 (length = max_age)
+init_f <- N_f_track[,1]
+init_m <- N_m_track[,1]
 
-# final year of count data to evaluate OSP status
-N_current_observed <- pup_cnt_filled[35,'US_PupCnt'] 
-
-for (i in 1:n_draws) {
-  row_idx <- draw_indices[i]
+reconstruct_pop <- function(pup_counts, phi_f, phi_m, init_f, init_m) {
+  n_occasions <- length(pup_counts)
+  max_age <- nrow(phi_f)
   
-  # extract vital rates for each MCMC draw
-  mu_P   <- mcmc_matrix[row_idx, "mu.P"]
-  beta_DD <- mcmc_matrix[row_idx, "beta.DD"]
-  mu_1   <- mcmc_matrix[row_idx, "mu.1"]
-  mu_2.3   <- mcmc_matrix[row_idx, "mu.2.3"]
-  mu_4.6   <- mcmc_matrix[row_idx, "mu.4.6"]
-  mu_7.9   <- mcmc_matrix[row_idx, "mu.7.9"]
-  mu_10.12   <- mcmc_matrix[row_idx, "mu.10.12"]
-  mu_13.16   <- mcmc_matrix[row_idx, "mu.13.16"]
-  mu_A   <- mcmc_matrix[row_idx, "mu.A"]
-  fec_low  <- mcmc_matrix[row_idx, "int.fec_low"]
-  fec_high <- mcmc_matrix[row_idx, "int.fec_high"]
+  N_f <- matrix(0, nrow = max_age, ncol = n_occasions)
+  N_m <- matrix(0, nrow = max_age, ncol = n_occasions)
   
-  # convert baseline survival to probability scale (assuming SST = 0)
-  phi1 <- plogis(mu_1)
-  phi2.3 <- plogis(mu_2.3)
-  phi4.6 <- plogis(mu_4.6)
-  phi7.9 <- plogis(mu_7.9)
-  phi10.12 <- plogis(mu_10.12)
-  phi13.16 <- plogis(mu_13.16)
-  phiA <- plogis(mu_A)
+  # Seed Year 1 with starting age distribution
+  N_f[,1] <- N_f_track[,1]
+  N_m[,1] <- N_m_track[,1]
   
-  # initialize simulation arrays
-  n_years <- 250 #enough time for the population to reach K
-  N_history <- numeric(n_years)
-  
-  # start with small population to ensure the full growth curve is captured
-  N_vec <- rep(5, 25) 
-  
-  # project forward and track the population history
-  for (y in 1:n_years) {
+  for (t in 1:(n_occasions - 1)) {
+    # pups (Index 1) enter directly from empirical census counts
+    # Assumes a 50:50 sex ratio at birth
+    N_f[1,t+1] <- pup_counts[t+1]/2
+    N_m[1,t+1] <- pup_counts[t+1]/2
     
-    # total population (assuming equal sex ratio, multiplying female count by 2)
-    N_tot <- sum(N_vec) * 2 
-    N_history[y] <- N_tot
-    
-    # Calculate density-dependent pup survival for THIS year
-    phiP_current <- plogis(mu_P - beta_DD * (N_tot / 100000))
-    
-    # calculate total pups born
-    pups_born <- (sum(N_vec[5:10])*fec_low*0.5) + (sum(N_vec[11:23])*fec_high*0.5)
-    
-    # Create the next year's population vector
-    N_vec_next <- numeric(25)
-    N_vec_next[1] <- pups_born
-    N_vec_next[2] <- N_vec[1] * phiP_current
-    N_vec_next[3] <- N_vec[2] * phi1
-    N_vec_next[4] <- N_vec[3] * phi2.3
-    N_vec_next[5] <- N_vec[4] * phi2.3
-    N_vec_next[6] <- N_vec[5] * phi4.6
-    N_vec_next[7] <- N_vec[6] * phi4.6
-    N_vec_next[8] <- N_vec[7] * phi4.6
-    N_vec_next[9] <- N_vec[8] * phi7.9
-    N_vec_next[10] <- N_vec[9] * phi7.9
-    N_vec_next[11] <- N_vec[10] * phi7.9
-    N_vec_next[12] <- N_vec[11] * phi10.12
-    N_vec_next[13] <- N_vec[12] * phi10.12
-    N_vec_next[14] <- N_vec[13] * phi10.12
-    N_vec_next[15] <- N_vec[14] * phi13.16
-    N_vec_next[16] <- N_vec[15] * phi13.16
-    N_vec_next[17] <- N_vec[16] * phi13.16
-    N_vec_next[18] <- N_vec[17] * phi13.16
-
-    # absorbing state (ages 17-23)
-    for (a in 18:24) {
-      N_vec_next[a+1] <- N_vec[a] * phiA
+    # age up older cohorts deterministically using CJS survival rates
+    for (a in 1:(max_age - 1)) {
+      N_f[a+1,t+1] <- N_f[a,t]*phi_f[a,t]
+      N_m[a+1,t+1] <- N_m[a,t]*phi_m[a,t]
     }
-    
-    # update population
-    N_vec <- N_vec_next
   }
   
-  # numerically derive K and MNPL
-  # K is the final stabilized population size at the end of the simulation
-  K_estimates[i] <- N_history[n_years]
+  # Calculate total abundance per year 
+  Ntot <- colSums(N_f) + colSums(N_m)
   
-  # calculate net production (the difference in population size each year)
-  net_production <- diff(N_history)
-  
-  # find year index where net production was highest
-  max_growth_year <- which.max(net_production)
-  
-  # MNPL is the population size at that specific peak-growth year
-  MNPL_estimates[i] <- N_history[max_growth_year]
-  
-  # Calculate OSP ratio for this MCMC draw
-  OSP_status[i] <- N_current_observed / MNPL_estimates[i]
+  return(list(Ntot = Ntot, N_f = N_f, N_m = N_m))
 }
 
-cat("Carrying Capacity (K):\n",
-    "Mean:", round(mean(K_estimates)), 
-    "| 95% CI:", round(quantile(K_estimates, 0.025)), "-", round(quantile(K_estimates, 0.975)), "\n\n")
 
-cat("Maximum Net Productivity Level (MNPL):\n",
-    "Mean:", round(mean(MNPL_estimates)), 
-    "| 95% CI:", round(quantile(MNPL_estimates, 0.025)), "-", round(quantile(MNPL_estimates, 0.975)), "\n\n")
+# Fit Theta-Logistic Model to reconstructed abundance via Sum of Squared Errors
+# N_series is a vector of reconstructed total population size over time
+fit_theta_logistic <- function(N_series) {
+  n_occasions <- length(N_series)
+  
+  # Objective function: Sum of Squared Errors (SSE)
+  sse_fn <- function(params) {
+    r     <- params[1]
+    K     <- params[2]
+    theta <- params[3]
+    
+    N_pred <- numeric(n_occasions)
+    N_pred[1] <- N_series[1]
+    
+    for (t in 1:(n_occasions - 1)) {
+      # Discrete theta-logistic step
+      growth <- r * N_pred[t] * (1 - (N_pred[t] / K)^theta)
+      N_pred[t+1] <- N_pred[t] + growth
+      
+      # Penalty for numerical overflow or negative population dips
+      if (is.na(N_pred[t+1]) || N_pred[t+1] <= 0) return(1e10)
+    }
+    
+    return(sum((N_series - N_pred)^2))
+  }
+  
+  # Set reasonable biological starting bounds for optimization
+  init_K     <- max(N_series) * 1.1
+  init_r     <- 0.07 # Standard pinniped intrinsic growth rate
+  init_theta <- 2.0  # Standard delayed density dependence
+  
+  opt <- optim(
+    par = c(r = init_r, K = init_K, theta = init_theta),
+    fn = sse_fn,
+    method = "L-BFGS-B",
+    lower = c(r = 0.01, K = max(N_series) * 0.8, theta = 0.5),
+    upper = c(r = 0.20, K = max(N_series) * 3.0, theta = 10.0)
+  )
+  
+  # Extract estimates and analytically calculate MNPL
+  r_est     <- opt$par["r"]
+  K_est     <- opt$par["K"]
+  # theta_est <- opt$par["theta"]
+  theta_est <- 2.4 #MMPA standard; not always possible to estimate r and K and theta
+  mnpl_est  <- K_est * ((1 / (theta_est + 1))^(1 / theta_est))
+  
+  return(data.frame(
+    r = r_est, 
+    K = K_est, 
+    theta = theta_est, 
+    MNPL = mnpl_est, 
+    MNPL_ratio = mnpl_est / K_est,
+    Convergence = opt$convergence
+  ))
+}
 
-cat("OSP Status Ratio (N_current / MNPL):\n",
-    "Mean:", round(mean(OSP_status), 2), 
-    "| 95% CI:", round(quantile(OSP_status, 0.025), 2), "-", round(quantile(OSP_status, 0.975), 2), "\n")
 
-# calculate the probability that the population is within its OSP (> 1.0)
-prob_in_OSP <- mean(OSP_status >= 1.0)
-cat("\nProbability population is within OSP:", round(prob_in_OSP * 100, 1), "%\n")
+# loop across CJS posterior draws)
+
+nsim <- 500
+results_list <- vector("list", nsim)
+n_occasions <- 35
+
+phiPcols <- paste0('phiP.prob[', 1:n_occasions, ']')
+phi1cols <- paste0('phi1.prob[', 1:n_occasions, ']')
+phi2.3cols <- paste0('phi2.3.prob[', 1:n_occasions, ']')
+phi4.6cols <- paste0('phi4.6.prob[', 1:n_occasions, ']')
+phi7.9cols <- paste0('phi7.9.prob[', 1:n_occasions, ']')
+phi10.12cols <- paste0('phi10.12.prob[', 1:n_occasions, ']')
+phi13.16cols <- paste0('phi13.16.prob[', 1:n_occasions, ']')
+phiAcols <- paste0('phiA.prob[', 1:n_occasions, ']')
+
+phiPMcols <- paste0('phiPM.prob[', 1:n_occasions, ']')
+phi1Mcols <- paste0('phi1M.prob[', 1:n_occasions, ']')
+phi2.3Mcols <- paste0('phi2.3M.prob[', 1:n_occasions, ']')
+phi4.6Mcols <- paste0('phi4.6M.prob[', 1:n_occasions, ']')
+phi7.9Mcols <- paste0('phi7.9M.prob[', 1:n_occasions, ']')
+phi10.12Mcols <- paste0('phi10.12M.prob[', 1:n_occasions, ']')
+phi13.16Mcols <- paste0('phi13.16M.prob[', 1:n_occasions, ']')
+phiAMcols <- paste0('phiAM.prob[', 1:n_occasions, ']')
+
+cat("Running post-hoc reconstruction across", nsim, "CJS draws...\n")
+for (k in 1:nsim) {
+
+  phiP <- outmat[k,phiPcols]
+  phi1 <- outmat[k,phi1cols]
+  phi2.3 <- outmat[k,phi2.3cols]
+  phi4.6 <- outmat[k,phi4.6cols]
+  phi7.9 <- outmat[k,phi7.9cols]
+  phi10.12 <- outmat[k,phi10.12cols]
+  phi13.16 <- outmat[k,phi13.16cols]
+  phiA <- outmat[k,phiAcols]
+  
+  phiPM <- outmat[k,phiPMcols]
+  phi1M <- outmat[k,phi1Mcols]
+  phi2.3M <- outmat[k,phi2.3Mcols]
+  phi4.6M <- outmat[k,phi4.6Mcols]
+  phi7.9M <- outmat[k,phi7.9Mcols]
+  phi10.12M <- outmat[k,phi10.12Mcols]
+  phi13.16M <- outmat[k,phi13.16Mcols]
+  phiAM <- outmat[k,phiAMcols]
+  
+  phi_f <- rbind(phiP, phi1, phi2.3, phi2.3, phi4.6, phi4.6, phi4.6, 
+                 phi7.9, phi7.9, phi7.9, phi10.12, phi10.12, phi10.12, 
+                 phi13.16, phi13.16, phi13.16, phi13.16,
+                 phiA, phiA, phiA, phiA, phiA, phiA, phiA, phiA)
+  phi_m <- rbind(phiPM, phi1M, #phi2.3M, phi2.3M, phi4.6M, phi4.6M, phi4.6M,
+                 phi2.3, phi2.3, phi4.6, phi4.6, phi4.6,
+                 phi7.9M, phi7.9M, phi7.9M, phi10.12M, phi10.12M, phi10.12M, 
+                 phi13.16M, phi13.16M, phi13.16M, phi13.16M, 
+                 phiAM, phiAM, phiAM, phiAM, phiAM, phiAM, phiAM, phiAM)
+
+  # Run deterministic projection
+  recon <- reconstruct_pop(pup_counts, phi_f, phi_m, init_f, init_m)
+  
+  # Fit theta-logistic model
+  fit <- fit_theta_logistic(recon$Ntot)
+  fit$draw <- k
+  results_list[[k]] <- fit
+}
+
+# Combine results into a final summary dataframe
+post <- bind_rows(results_list)
+
+# View summary statistics 
+summary_table <- post %>%
+  summarise(
+    K_median    = median(K),
+    K_LCI       = quantile(K, 0.025),
+    K_UCI       = quantile(K, 0.975),
+    MNPL_median = median(MNPL),
+    MNPL_LCI    = quantile(MNPL, 0.025),
+    MNPL_UCI    = quantile(MNPL, 0.975),
+    Theta_median = median(theta),
+    Theta_LCI = quantile(theta, 0.025),
+    theta_UCI = quantile(theta, 0.975)
+  )
+
+print(summary_table)
+
+
+plot(recon$Ntot, type = "l", col = "blue", lwd = 2, 
+     main = "Diagnostic: Reconstructed Population Trajectory",
+     ylab = "Total Abundance", xlab = "Time Step")
+
+
+# 2. Calculate the "Implied Fecundity" (Reality Check)
+# How many pups were born per adult female (assuming ages 4-24 are adults)?
+adult_females <- colSums(recon$N_f[4:24, ])
+implied_fecundity <- pup_counts / adult_females
+
+plot(implied_fecundity, type = "b", col = "red", pch = 16,
+     main = "Diagnostic: Implied Birth Rate",
+     ylab = "Pups per Adult Female", xlab = "Time Step")
+
 
 ```
 
