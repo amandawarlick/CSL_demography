@@ -147,6 +147,7 @@ library(lubridate)
 library(stringr)
 library(readr)
 library(ggplot2)
+library(reshape2)
 
 strand_dat <- read.csv(here('data', 'CSL Strandings 2014-2025.csv'))
 
@@ -190,6 +191,7 @@ ggplot(all_yrs, aes(x = year, y = value, color = variable)) +
   theme_bw() +
   theme(legend.position = 'top') +
   scale_color_manual(values = c('dodgerblue3', 'goldenrod'), name = '')
+
 
 ```
 

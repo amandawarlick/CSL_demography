@@ -307,7 +307,7 @@ sst_preds_plot <- ggplot(preds_all %>% filter(sex == 'Fem'),
 ```
 
 
-```{r}
+```{r metric calcs}
 
 ##calculate MNPL and OSP
 
