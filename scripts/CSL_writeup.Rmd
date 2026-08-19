@@ -6,7 +6,7 @@ date: ""
 
 ```{r setup, include=FALSE}
 
-knitr::opts_chunk$set(echo = F, warning = F, eval = F, message = F, cache = T, cache.lazy = T, fig.width = 6, fig.height = 5, fig.align = 'center')
+knitr::opts_chunk$set(echo = F, warning = F, eval = F, message = F, cache = F, cache.lazy = T, fig.width = 6, fig.height = 5, fig.align = 'center')
 
 library(here) #v1.0.1
 library(dplyr) #v1.0.5
@@ -108,7 +108,7 @@ fec_plot <- ggplot(fec_dat, aes(x = age, y = value)) +
              plot.title = element_text(hjust = 0.5))
 
 #detection
-int_dat <- post_sum %>% filter(grepl('int.p', variable)) %>%
+int_dat_p <- post_sum %>% filter(grepl('int.p', variable)) %>%
   # bind_rows(post_sum %>% filter(grepl('int.psi', variable))) %>%
   transform(variable = gsub('int.', '', variable)) %>%
   filter(!grepl('phi', variable)) %>%
@@ -118,7 +118,7 @@ int_dat <- post_sum %>% filter(grepl('int.p', variable)) %>%
     transform(age = factor(age, levels = c('1', '2.3', '4.6',  
                                                    '7.12', 'A'))) 
 
-p_plot <- ggplot(int_dat,
+p_plot <- ggplot(int_dat_p,
        aes(age, med, color = sex)) +
   geom_errorbar(aes(x = age, ymin=lower, ymax=upper),
                 position = position_dodge(0.5),
@@ -132,9 +132,6 @@ p_plot <- ggplot(int_dat,
              plot.title = element_text(hjust = 0.5)) +
   scale_color_manual(values = c('black', 'darkgrey'), name = 'Sex')
   # scale_color_manual(values = rainbow2[c(2,6,7,8)], name = 'Sex')
-
-
-
 
 ```
 
@@ -344,7 +341,7 @@ enso_eff_plot <- ggplot(b.enso, aes(x = var_name, y = med)) +
 ```
 
 
-```{r metrics from MR fit, eval = T}
+```{r calculate metrics from MR fit, eval = T}
 
 library(imputeTS)
 
@@ -559,7 +556,7 @@ phi10.12Mcols <- paste0('phi10.12M.prob[', 1:n_occasions, ']')
 phi13.16Mcols <- paste0('phi13.16M.prob[', 1:n_occasions, ']')
 phiAMcols <- paste0('phiAM.prob[', 1:n_occasions, ']')
 
-cat("Running post-hoc reconstruction across", nsim, "CJS draws...\n")
+# cat("Running post-hoc reconstruction across", nsim, "CJS draws...\n")
 for (k in 1:nsim) {
 
   phiP <- outmat[k,phiPcols]
@@ -635,7 +632,7 @@ implied_fecundity <- pup_counts / adult_females
 
 ```
 
-```{r K from IPM and post pred checks, eval = T}
+```{r calculate metrics from IPM fit and post pred checks, eval = T, results = 'keep'}
 
 out_IPM <- readRDS(file = here('results', 'out_IPM_sst_DD_slice2.RDS'))
 outmat <- do.call(rbind, out_IPM)
@@ -685,7 +682,7 @@ fec_plot <- ggplot(fec_dat %>% reshape2::melt() %>%
                      transform(variable = factor(variable, levels = c('Age 4-9', 'Age 10+'))), 
                    aes(x = variable, y = value)) +
   geom_violin() +
-  ylab('Fecundity') xlab('') +
+  ylab('Fecundity') + xlab('') +
   theme_bw()
 
 DD_sum <- post_sumIPM %>% filter(grepl('beta.DD', variable))
@@ -731,23 +728,19 @@ pups_ppc_plot <- ggplot(pup_summary, aes(x = year)) +
 
 
 
-
-
-##calculate K and MNPL
+##calculate K and MNPL: theoretical K
 # Number of posterior draws to simulate (e.g., sample 1000 to save time)
 n_draws <- 500#0
 draw_indices <- sample(1:nrow(outmat), n_draws)
 
 # storage
-K_estimates <- numeric(n_draws)
+theo_K_estimates <- numeric(n_draws)
 N_tot_tracker <- numeric()
-mnpl_estimates <- numeric(n_draws)
-mnpl_ratio <- numeric(n_draws)
 
 # Run the simulation for each sampled posterior draw
 for (i in 1:n_draws) {
   row_idx <- draw_indices[i]
-  
+
   # extract vital rates for each MCMC draw
   b_sst_P <- outmat[row_idx, 'b.sst.P']
   int_phiP   <- outmat[row_idx, "int.phiP"]
@@ -761,7 +754,7 @@ for (i in 1:n_draws) {
   int_phiA   <- outmat[row_idx, "int.phiA"]
   fec_low  <- outmat[row_idx, "int.fec_low"]
   fec_high <- outmat[row_idx, "int.fec_high"]
-  
+
   int_phiPM   <- outmat[row_idx, "int.phiPM"]
   int_phi1M     <- outmat[row_idx, "int.phi1M"]
   int_phi2.3M   <- outmat[row_idx, "int.phi2.3M"]
@@ -780,7 +773,7 @@ for (i in 1:n_draws) {
   mu_10.12 <- qlogis(int_phi10.12)
   mu_13.16 <- qlogis(int_phi13.16)
   mu_A <- qlogis(int_phiA)
-   mu_PM <- qlogis(int_phiPM)
+  mu_PM <- qlogis(int_phiPM)
   mu_1M <- qlogis(int_phi1M)
   mu_2.3M <- qlogis(int_phi2.3M)
   mu_4.6M <- qlogis(int_phi4.6M)
@@ -797,19 +790,19 @@ for (i in 1:n_draws) {
   # project forward to reach equilibrium (K)
   for (y in 1:500) { # 200 years long enough?
 
-    N_tot <- sum(Nf_vec) + sum(Nm_vec) 
-    
-    N_tot_tracker[y] <- N_tot 
+    N_tot <- sum(Nf_vec) + sum(Nm_vec)
+
+    N_tot_tracker[y] <- N_tot
 
     # calculate density-dependent pup survival for THIS year
     # scale N as in the model
     #average SST always
-    # phiP_current <- plogis(mu_P-beta_DD*((N_tot)/100000))
-    # phiPM_current <- plogis(mu_PM-beta_DD*((N_tot)/100000))
-    
-    #heatwaves
-    phiP_current <- plogis(mu_P + (b_sst_P*1.5) - beta_DD*((N_tot)/100000))
-    phiPM_current <- plogis(mu_PM + (b_sst_P*1.5) - beta_DD*((N_tot)/100000))
+    phiP_current <- plogis(mu_P-beta_DD*((N_tot)/100000))
+    phiPM_current <- plogis(mu_PM-beta_DD*((N_tot)/100000))
+
+    # #heatwaves
+    # phiP_current <- plogis(mu_P + (b_sst_P*1.5) - beta_DD*((N_tot)/100000))
+    # phiPM_current <- plogis(mu_PM + (b_sst_P*1.5) - beta_DD*((N_tot)/100000))
 
     # calculate total pups born
     pups_born <- (sum(Nf_vec[5:10])*fec_low) + (sum(Nf_vec[11:23])*fec_high)
@@ -834,7 +827,7 @@ for (i in 1:n_draws) {
     Nm_vec_next[16] <- Nm_vec[15] * int_phi13.16M
     Nm_vec_next[17] <- Nm_vec[16] * int_phi13.16M
     Nm_vec_next[18] <- Nm_vec[17] * int_phi13.16M
-    
+
     Nf_vec_next <- numeric(25)
     Nf_vec_next[1] <- pups_born*0.5
     Nf_vec_next[2] <- Nf_vec[1] * phiP_current
@@ -859,7 +852,7 @@ for (i in 1:n_draws) {
     for (a in 18:24) {
       Nm_vec_next[a+1] <- Nm_vec[a] * int_phiAM
     }
-    
+
     for (a in 18:24) {
       Nf_vec_next[a+1] <- Nf_vec[a] * int_phiA
     }
@@ -868,7 +861,7 @@ for (i in 1:n_draws) {
     Nm_vec <- Nm_vec_next
     Nf_vec <- Nf_vec_next
   }
-  
+
   # if (i == 1) {
   #   plot(1:500, N_tot_tracker, type = "l", col = "purple", lwd = 2,
   #        main = "Diagnostic: Projection to K",
@@ -876,248 +869,153 @@ for (i in 1:n_draws) {
   # }
 
   # store stabilized population size
-  K_estimates[i] <- sum(Nm_vec) + sum(Nf_vec)
-  
-  
-  ##calculate MNLP
-  K_current <- sum(Nf_vec) + sum(Nm_vec)
-  prop_f <- Nf_vec / K_current
-  prop_m <- Nm_vec / K_current
-  
-  #create a sequence of 100 test population sizes from 1,000 up to K
-  n_test_points <- 100
-  N_test_seq <- seq(1000, K_current, length.out = n_test_points)
-  net_growth <- numeric(n_test_points)
-  
-  # define the average environmental condition for the MNPL test
-  eval_sst <- mean(sst_vec)
-  
-  # across test sizes
-  for (step in 1:n_test_points) {
-    N_test <- N_test_seq[step]
-    
-    # Scale the test population according to the SAD
-    Nf_temp <- prop_f * N_test
-    Nm_temp <- prop_m * N_test
-    
-    #for 1 year of the projection
-    # Apply density dependence to each test size
-    phiP_temp  <- plogis(mu_P  + (b_sst_P * eval_sst) - beta_DD*(N_test/100000))
-    phiPM_temp <- plogis(mu_PM + (b_sst_P * eval_sst) - beta_DD*(N_test/100000))
-    
-    # Apply average SST to yearlings and juveniles
-    phi1_temp  <- plogis(mu_1  + (b_sst_1 * eval_sst)) 
-    phi1M_temp <- plogis(mu_1M + (b_sst_1 * eval_sst)) 
-    phi2.3_temp  <- plogis(mu_2.3  + (b_sst_2.3 * eval_sst)) 
-    phi2.3M_temp <- plogis(mu_2.3M + (b_sst_2.3 * eval_sst)) 
-    
-    # Calculate births
-    pups_born <- (sum(Nf_temp[5:10])*fec_low) + (sum(Nf_temp[11:23])*fec_high)
-    
-    Nm_temp_next <- numeric(25)
-    Nf_temp_next <- numeric(25)
-    
-    Nm_temp_next[1] <- pups_born * 0.5
-    Nf_temp_next[1] <- pups_born * 0.5
-    
-    Nm_temp_next[2] <- Nm_temp[1] * phiPM_temp
-    Nf_temp_next[2] <- Nf_temp[1] * phiP_temp
-    
-    Nm_temp_next[3] <- Nm_temp[2] * phi1M_temp 
-    Nf_temp_next[3] <- Nf_temp[2] * phi1_temp
-    
-    Nm_temp_next[4] <- Nm_temp[3] * phi2.3M_temp 
-    Nm_temp_next[5] <- Nm_temp[4] * phi2.3M_temp 
-    Nf_temp_next[4] <- Nf_temp[3] * phi2.3_temp
-    Nf_temp_next[5] <- Nf_temp[4] * phi2.3_temp
-    
-    Nf_temp_next[6] <- Nf_temp[5] * int_phi4.6
-    Nf_temp_next[7] <- Nf_temp[6] * int_phi4.6
-    Nf_temp_next[8] <- Nf_temp[7] * int_phi4.6
-    Nf_temp_next[9] <- Nf_temp[8] * int_phi7.9
-    Nf_temp_next[10] <- Nf_temp[9] * int_phi7.9
-    Nf_temp_next[11] <- Nf_temp[10] * int_phi7.9
-    Nf_temp_next[12] <- Nf_temp[11] * int_phi10.12
-    Nf_temp_next[13] <- Nf_temp[12] * int_phi10.12
-    Nf_temp_next[14] <- Nf_temp[13] * int_phi10.12
-    Nf_temp_next[15] <- Nf_temp[14] * int_phi13.16
-    Nf_temp_next[16] <- Nf_temp[15] * int_phi13.16
-    Nf_temp_next[17] <- Nf_temp[16] * int_phi13.16
-    Nf_temp_next[18] <- Nf_temp[17] * int_phi13.16
-    
-    Nm_temp_next[6] <- Nm_temp[5] * int_phi4.6M
-    Nm_temp_next[7] <- Nm_temp[6] * int_phi4.6M
-    Nm_temp_next[8] <- Nm_temp[7] * int_phi4.6M
-    Nm_temp_next[9] <- Nm_temp[8] * int_phi7.9M
-    Nm_temp_next[10] <- Nm_temp[9] * int_phi7.9M
-    Nm_temp_next[11] <- Nm_temp[10] * int_phi7.9M
-    Nm_temp_next[12] <- Nm_temp[11] * int_phi10.12M
-    Nm_temp_next[13] <- Nm_temp[12] * int_phi10.12M
-    Nm_temp_next[14] <- Nm_temp[13] * int_phi10.12M
-    Nm_temp_next[15] <- Nm_temp[14] * int_phi13.16M
-    Nm_temp_next[16] <- Nm_temp[15] * int_phi13.16M
-    Nm_temp_next[17] <- Nm_temp[16] * int_phi13.16M
-    Nm_temp_next[18] <- Nm_temp[17] * int_phi13.16M
-    
-    for (a in 18:24) {
-      Nm_temp_next[a+1] <- Nm_temp[a] * int_phiAM
-      Nf_temp_next[a+1] <- Nf_temp[a] * int_phiA
-    }
-    
-    # Calculate net growth for this test size
-    N_next_total <- sum(Nm_temp_next) + sum(Nf_temp_next)
-    net_growth[step] <- N_next_total - N_test
-  }
-  
-  # identify max productivity level
-  max_idx <- which.max(net_growth)
-  mnpl_estimates[i] <- N_test_seq[max_idx]
-  mnpl_ratio[i] <- mnpl_estimates[i] / K_current
+  theo_K_estimates[i] <- sum(Nm_vec) + sum(Nf_vec)
 }
 
 # mean
-mean_K <- mean(K_estimates)
-K_CI <- quantile(K_estimates, probs = c(0.025, 0.975))
+theo_K <- mean(theo_K_estimates)
+theo_K_CI <- quantile(theo_K_estimates, probs = c(0.025, 0.975), names = F)
 
-# print(paste("Estimated K:", round(mean_K), "95% CI:", round(K_CI[1]), "-", round(K_CI[2])))
+# print(paste("Estimated theoretical K:", round(mean_K), "95% CI:", round(K_CI[1]), "-", round(K_CI[2])))
 
-##K across a temperature gradient
-sst_scenarios <- seq(0.0, 2.0, by = 0.2)
-mean_K_by_sst <- numeric(length(sst_scenarios))
-K_ci_lower    <- numeric(length(sst_scenarios))
-K_ci_upper    <- numeric(length(sst_scenarios))
-
-n_draws <- 100 
-draw_indices <- sample(1:nrow(outmat), n_draws)
-
-for (s in seq_along(sst_scenarios)) {
-  target_sst <- sst_scenarios[s]
-  K_estimates_sst <- numeric(n_draws)
   
-  for (i in 1:n_draws) {
-    row_idx <- draw_indices[i]
-    
-    # Extract vital rates and SST coefficients
-    int_phiP     <- outmat[row_idx, "int.phiP"]
-    b_sst_P      <- outmat[row_idx, "b.sst.P"] 
-    b_sst_1      <- outmat[row_idx, "b.sst.1"]
-    b_sst_2.3      <- outmat[row_idx, "b.sst.2.3"]
-    beta_DD      <- outmat[row_idx, "beta.DD"]
-    
-    int_phi1     <- outmat[row_idx, "int.phi1"]
-    int_phi2.3   <- outmat[row_idx, "int.phi2.3"]
-    int_phi4.6   <- outmat[row_idx, "int.phi4.6"]
-    int_phi7.9   <- outmat[row_idx, "int.phi7.9"]
-    int_phi10.12 <- outmat[row_idx, "int.phi10.12"]
-    int_phi13.16 <- outmat[row_idx, "int.phi13.16"]
-    int_phiA     <- outmat[row_idx, "int.phiA"]
-    fec_low      <- outmat[row_idx, "int.fec_low"]
-    fec_high     <- outmat[row_idx, "int.fec_high"]
-    
-    # Males
-    int_phiPM    <- outmat[row_idx, "int.phiPM"]
-    int_phi1M    <- outmat[row_idx, "int.phi1M"]
-    int_phi2.3M  <- outmat[row_idx, "int.phi2.3M"]
-    int_phi4.6M  <- outmat[row_idx, "int.phi4.6M"]
-    int_phi7.9M  <- outmat[row_idx, "int.phi7.9M"]
-    int_phi10.12M<- outmat[row_idx, "int.phi10.12M"]
-    int_phi13.16M<- outmat[row_idx, "int.phi13.16M"]
-    int_phiAM    <- outmat[row_idx, "int.phiAM"]
-
-    mu_P  <- qlogis(int_phiP)
-    mu_1  <- qlogis(int_phi1)
-  mu_2.3 <- qlogis(int_phi2.3)
-  mu_4.6 <- qlogis(int_phi4.6)
-  mu_7.9 <- qlogis(int_phi7.9)
-  mu_10.12 <- qlogis(int_phi10.12)
-  mu_13.16 <- qlogis(int_phi13.16)
-  mu_A <- qlogis(int_phiA)
-   mu_PM <- qlogis(int_phiPM)
-  mu_1M <- qlogis(int_phi1M)
-  mu_2.3M <- qlogis(int_phi2.3M)
-  mu_4.6M <- qlogis(int_phi4.6M)
-  mu_7.9M <- qlogis(int_phi7.9M)
-  mu_10.12M <- qlogis(int_phi10.12M)
-  mu_13.16M <- qlogis(int_phi13.16M)
-  mu_AM <- qlogis(int_phiAM)
-    
-    Nf_vec <- rep(50, 25)
-    Nm_vec <- rep(50, 25)
-
-    for (y in 1:400) {
-      N_tot <- sum(Nf_vec) + sum(Nm_vec)
-      
-      phiP_current  <- plogis(mu_P  + (b_sst_P * target_sst) - beta_DD*(N_tot/100000))
-      phiPM_current <- plogis(mu_PM + (b_sst_P * target_sst) - beta_DD*(N_tot/100000))
-      phi1_current  <- plogis(mu_1  + (b_sst_1 * target_sst)) 
-      phi1M_current  <- plogis(mu_1M  + (b_sst_1 * target_sst)) 
-      phi2.3_current  <- plogis(mu_2.3  + (b_sst_2.3 * target_sst)) 
-      phi2.3M_current  <- plogis(mu_2.3M  + (b_sst_2.3 * target_sst)) 
-      
-      pups_born <- (sum(Nf_vec[5:10])*fec_low) + (sum(Nf_vec[11:23])*fec_high)
-
-      Nm_vec_next <- numeric(25)
-      Nf_vec_next <- numeric(25)
-      
-      Nm_vec_next[1] <- pups_born * 0.5
-      Nf_vec_next[1] <- pups_born * 0.5
-      
-      Nm_vec_next[2] <- Nm_vec[1] * phiPM_current
-      Nf_vec_next[2] <- Nf_vec[1] * phiP_current
-      
-      Nm_vec_next[3] <- Nm_vec[2] * phi1M_current 
-      Nf_vec_next[3] <- Nf_vec[2] * phi1_current
-      
-      Nm_vec_next[4] <- Nm_vec[3] * phi2.3M_current 
-      Nm_vec_next[5] <- Nm_vec[4] * phi2.3M_current 
-      Nf_vec_next[4] <- Nf_vec[3] * phi2.3_current
-      Nf_vec_next[5] <- Nf_vec[4] * phi2.3_current
-      
-    Nf_vec_next[6] <- Nf_vec[5] * int_phi4.6
-    Nf_vec_next[7] <- Nf_vec[6] * int_phi4.6
-    Nf_vec_next[8] <- Nf_vec[7] * int_phi4.6
-    Nf_vec_next[9] <- Nf_vec[8] * int_phi7.9
-    Nf_vec_next[10] <- Nf_vec[9] * int_phi7.9
-    Nf_vec_next[11] <- Nf_vec[10] * int_phi7.9
-    Nf_vec_next[12] <- Nf_vec[11] * int_phi10.12
-    Nf_vec_next[13] <- Nf_vec[12] * int_phi10.12
-    Nf_vec_next[14] <- Nf_vec[13] * int_phi10.12
-    Nf_vec_next[15] <- Nf_vec[14] * int_phi13.16
-    Nf_vec_next[16] <- Nf_vec[15] * int_phi13.16
-    Nf_vec_next[17] <- Nf_vec[16] * int_phi13.16
-    Nf_vec_next[18] <- Nf_vec[17] * int_phi13.16
-    
-    Nm_vec_next[6] <- Nm_vec[5] * int_phi4.6M
-    Nm_vec_next[7] <- Nm_vec[6] * int_phi4.6M
-    Nm_vec_next[8] <- Nm_vec[7] * int_phi4.6M
-    Nm_vec_next[9] <- Nm_vec[8] * int_phi7.9M
-    Nm_vec_next[10] <- Nm_vec[9] * int_phi7.9M
-    Nm_vec_next[11] <- Nm_vec[10] * int_phi7.9M
-    Nm_vec_next[12] <- Nm_vec[11] * int_phi10.12M
-    Nm_vec_next[13] <- Nm_vec[12] * int_phi10.12M
-    Nm_vec_next[14] <- Nm_vec[13] * int_phi10.12M
-    Nm_vec_next[15] <- Nm_vec[14] * int_phi13.16M
-    Nm_vec_next[16] <- Nm_vec[15] * int_phi13.16M
-    Nm_vec_next[17] <- Nm_vec[16] * int_phi13.16M
-    Nm_vec_next[18] <- Nm_vec[17] * int_phi13.16M
-      
-      for (a in 18:24) {
-        Nm_vec_next[a+1] <- Nm_vec[a] * int_phiAM
-        Nf_vec_next[a+1] <- Nf_vec[a] * int_phiA
-      }
-
-      Nm_vec <- Nm_vec_next
-      Nf_vec <- Nf_vec_next
-    }
-    
-    K_estimates_sst[i] <- sum(Nm_vec) + sum(Nf_vec)
-  }
-  
-  mean_K_by_sst[s] <- mean(K_estimates_sst)
-  K_ci_lower[s]    <- quantile(K_estimates_sst, 0.025)
-  K_ci_upper[s]    <- quantile(K_estimates_sst, 0.975)
-}
-
+# ##K across a temperature gradient
+# sst_scenarios <- seq(0.0, 2.0, by = 0.2)
+# mean_K_by_sst <- numeric(length(sst_scenarios))
+# K_ci_lower    <- numeric(length(sst_scenarios))
+# K_ci_upper    <- numeric(length(sst_scenarios))
+# 
+# n_draws <- 100 
+# draw_indices <- sample(1:nrow(outmat), n_draws)
+# 
+# for (s in seq_along(sst_scenarios)) {
+#   target_sst <- sst_scenarios[s]
+#   K_estimates_sst <- numeric(n_draws)
+#   
+#   for (i in 1:n_draws) {
+#     row_idx <- draw_indices[i]
+#     
+#     # Extract vital rates and SST coefficients
+#     int_phiP     <- outmat[row_idx, "int.phiP"]
+#     b_sst_P      <- outmat[row_idx, "b.sst.P"] 
+#     b_sst_1      <- outmat[row_idx, "b.sst.1"]
+#     b_sst_2.3      <- outmat[row_idx, "b.sst.2.3"]
+#     beta_DD      <- outmat[row_idx, "beta.DD"]
+#     
+#     int_phi1     <- outmat[row_idx, "int.phi1"]
+#     int_phi2.3   <- outmat[row_idx, "int.phi2.3"]
+#     int_phi4.6   <- outmat[row_idx, "int.phi4.6"]
+#     int_phi7.9   <- outmat[row_idx, "int.phi7.9"]
+#     int_phi10.12 <- outmat[row_idx, "int.phi10.12"]
+#     int_phi13.16 <- outmat[row_idx, "int.phi13.16"]
+#     int_phiA     <- outmat[row_idx, "int.phiA"]
+#     fec_low      <- outmat[row_idx, "int.fec_low"]
+#     fec_high     <- outmat[row_idx, "int.fec_high"]
+#     
+#     # Males
+#     int_phiPM    <- outmat[row_idx, "int.phiPM"]
+#     int_phi1M    <- outmat[row_idx, "int.phi1M"]
+#     int_phi2.3M  <- outmat[row_idx, "int.phi2.3M"]
+#     int_phi4.6M  <- outmat[row_idx, "int.phi4.6M"]
+#     int_phi7.9M  <- outmat[row_idx, "int.phi7.9M"]
+#     int_phi10.12M<- outmat[row_idx, "int.phi10.12M"]
+#     int_phi13.16M<- outmat[row_idx, "int.phi13.16M"]
+#     int_phiAM    <- outmat[row_idx, "int.phiAM"]
+# 
+#     mu_P  <- qlogis(int_phiP)
+#     mu_1  <- qlogis(int_phi1)
+#   mu_2.3 <- qlogis(int_phi2.3)
+#   mu_4.6 <- qlogis(int_phi4.6)
+#   mu_7.9 <- qlogis(int_phi7.9)
+#   mu_10.12 <- qlogis(int_phi10.12)
+#   mu_13.16 <- qlogis(int_phi13.16)
+#   mu_A <- qlogis(int_phiA)
+#    mu_PM <- qlogis(int_phiPM)
+#   mu_1M <- qlogis(int_phi1M)
+#   mu_2.3M <- qlogis(int_phi2.3M)
+#   mu_4.6M <- qlogis(int_phi4.6M)
+#   mu_7.9M <- qlogis(int_phi7.9M)
+#   mu_10.12M <- qlogis(int_phi10.12M)
+#   mu_13.16M <- qlogis(int_phi13.16M)
+#   mu_AM <- qlogis(int_phiAM)
+#     
+#     Nf_vec <- rep(50, 25)
+#     Nm_vec <- rep(50, 25)
+# 
+#     for (y in 1:400) {
+#       N_tot <- sum(Nf_vec) + sum(Nm_vec)
+#       
+#       phiP_current  <- plogis(mu_P  + (b_sst_P * target_sst) - beta_DD*(N_tot/100000))
+#       phiPM_current <- plogis(mu_PM + (b_sst_P * target_sst) - beta_DD*(N_tot/100000))
+#       phi1_current  <- plogis(mu_1  + (b_sst_1 * target_sst)) 
+#       phi1M_current  <- plogis(mu_1M  + (b_sst_1 * target_sst)) 
+#       phi2.3_current  <- plogis(mu_2.3  + (b_sst_2.3 * target_sst)) 
+#       phi2.3M_current  <- plogis(mu_2.3M  + (b_sst_2.3 * target_sst)) 
+#       
+#       pups_born <- (sum(Nf_vec[5:10])*fec_low) + (sum(Nf_vec[11:23])*fec_high)
+# 
+#       Nm_vec_next <- numeric(25)
+#       Nf_vec_next <- numeric(25)
+#       
+#       Nm_vec_next[1] <- pups_born * 0.5
+#       Nf_vec_next[1] <- pups_born * 0.5
+#       
+#       Nm_vec_next[2] <- Nm_vec[1] * phiPM_current
+#       Nf_vec_next[2] <- Nf_vec[1] * phiP_current
+#       
+#       Nm_vec_next[3] <- Nm_vec[2] * phi1M_current 
+#       Nf_vec_next[3] <- Nf_vec[2] * phi1_current
+#       
+#       Nm_vec_next[4] <- Nm_vec[3] * phi2.3M_current 
+#       Nm_vec_next[5] <- Nm_vec[4] * phi2.3M_current 
+#       Nf_vec_next[4] <- Nf_vec[3] * phi2.3_current
+#       Nf_vec_next[5] <- Nf_vec[4] * phi2.3_current
+#       
+#     Nf_vec_next[6] <- Nf_vec[5] * int_phi4.6
+#     Nf_vec_next[7] <- Nf_vec[6] * int_phi4.6
+#     Nf_vec_next[8] <- Nf_vec[7] * int_phi4.6
+#     Nf_vec_next[9] <- Nf_vec[8] * int_phi7.9
+#     Nf_vec_next[10] <- Nf_vec[9] * int_phi7.9
+#     Nf_vec_next[11] <- Nf_vec[10] * int_phi7.9
+#     Nf_vec_next[12] <- Nf_vec[11] * int_phi10.12
+#     Nf_vec_next[13] <- Nf_vec[12] * int_phi10.12
+#     Nf_vec_next[14] <- Nf_vec[13] * int_phi10.12
+#     Nf_vec_next[15] <- Nf_vec[14] * int_phi13.16
+#     Nf_vec_next[16] <- Nf_vec[15] * int_phi13.16
+#     Nf_vec_next[17] <- Nf_vec[16] * int_phi13.16
+#     Nf_vec_next[18] <- Nf_vec[17] * int_phi13.16
+#     
+#     Nm_vec_next[6] <- Nm_vec[5] * int_phi4.6M
+#     Nm_vec_next[7] <- Nm_vec[6] * int_phi4.6M
+#     Nm_vec_next[8] <- Nm_vec[7] * int_phi4.6M
+#     Nm_vec_next[9] <- Nm_vec[8] * int_phi7.9M
+#     Nm_vec_next[10] <- Nm_vec[9] * int_phi7.9M
+#     Nm_vec_next[11] <- Nm_vec[10] * int_phi7.9M
+#     Nm_vec_next[12] <- Nm_vec[11] * int_phi10.12M
+#     Nm_vec_next[13] <- Nm_vec[12] * int_phi10.12M
+#     Nm_vec_next[14] <- Nm_vec[13] * int_phi10.12M
+#     Nm_vec_next[15] <- Nm_vec[14] * int_phi13.16M
+#     Nm_vec_next[16] <- Nm_vec[15] * int_phi13.16M
+#     Nm_vec_next[17] <- Nm_vec[16] * int_phi13.16M
+#     Nm_vec_next[18] <- Nm_vec[17] * int_phi13.16M
+#       
+#       for (a in 18:24) {
+#         Nm_vec_next[a+1] <- Nm_vec[a] * int_phiAM
+#         Nf_vec_next[a+1] <- Nf_vec[a] * int_phiA
+#       }
+# 
+#       Nm_vec <- Nm_vec_next
+#       Nf_vec <- Nf_vec_next
+#     }
+#     
+#     K_estimates_sst[i] <- sum(Nm_vec) + sum(Nf_vec)
+#   }
+#   
+#   mean_K_by_sst[s] <- mean(K_estimates_sst)
+#   K_ci_lower[s]    <- quantile(K_estimates_sst, 0.025)
+#   K_ci_upper[s]    <- quantile(K_estimates_sst, 0.975)
+# }
+# 
 # plot(sst_scenarios, mean_K_by_sst, type = "b", pch = 16, col = "darkblue", lwd = 2,
 #      ylim = c(min(K_ci_lower), max(K_ci_upper)),
 #      main = "Dynamic K across SST regimes",
@@ -1129,10 +1027,10 @@ for (s in seq_along(sst_scenarios)) {
 # grid()
 
 #### more realistic sst scenarios
-n_draws <- 300 
+n_draws <- 500 
 draw_indices <- sample(1:nrow(outmat), n_draws)
 
-n_years <- 400
+n_years <- 600
 
 # Scenario a: an illustrative cyclic pattern (1.5C heatwaves for 2 yrs, every 7 yrs)
 # sst_cyclic <- rep(0, n_years) # Baseline average
@@ -1152,6 +1050,8 @@ sst_vec <- sst_boot
 
 pop_trajectories <- matrix(0, nrow = n_draws, ncol = n_years)
 realized_K <- numeric(n_draws)
+mnpl_estimates <- numeric(n_draws)
+mnpl_ratio <- numeric(n_draws)
 
 for (i in 1:n_draws) {
   row_idx <- draw_indices[i]
@@ -1160,6 +1060,9 @@ for (i in 1:n_draws) {
     b_sst_P      <- outmat[row_idx, "b.sst.P"] 
     b_sst_1      <- outmat[row_idx, "b.sst.1"]
     b_sst_2.3      <- outmat[row_idx, "b.sst.2.3"]
+    b_sst_4.6      <- outmat[row_idx, "b.sst.4.6"]
+    b_sst_7.9      <- outmat[row_idx, "b.sst.7.9"]
+    b_sst_A      <- outmat[row_idx, "b.sst.A"]
     beta_DD      <- outmat[row_idx, "beta.DD"]
     
     int_phi1     <- outmat[row_idx, "int.phi1"]
@@ -1215,7 +1118,12 @@ for (i in 1:n_draws) {
     phi1M_current <- plogis(mu_1M + (b_sst_1 * current_sst)) 
     phi2.3_current  <- plogis(mu_2.3  + (b_sst_2.3 * current_sst)) 
     phi2.3M_current <- plogis(mu_2.3M + (b_sst_2.3 * current_sst)) 
-    
+    phi4.6_current  <- plogis(mu_4.6  + (b_sst_4.6 * current_sst)) 
+    phi7.9_current  <- plogis(mu_7.9  + (b_sst_7.9 * current_sst)) 
+    phi10.12_current  <- plogis(mu_10.12  + (b_sst_A * current_sst))
+    phi13.16_current  <- plogis(mu_13.16  + (b_sst_A * current_sst))
+    phiA_current  <- plogis(mu_A  + (b_sst_A * current_sst))
+
     pups_born <- (sum(Nf_vec[5:10])*fec_low) + (sum(Nf_vec[11:23])*fec_high)
     
     Nm_vec_next <- numeric(25)
@@ -1235,19 +1143,19 @@ for (i in 1:n_draws) {
     Nf_vec_next[4] <- Nf_vec[3] * phi2.3_current
     Nf_vec_next[5] <- Nf_vec[4] * phi2.3_current
     
-       Nf_vec_next[6] <- Nf_vec[5] * int_phi4.6
-    Nf_vec_next[7] <- Nf_vec[6] * int_phi4.6
-    Nf_vec_next[8] <- Nf_vec[7] * int_phi4.6
-    Nf_vec_next[9] <- Nf_vec[8] * int_phi7.9
-    Nf_vec_next[10] <- Nf_vec[9] * int_phi7.9
-    Nf_vec_next[11] <- Nf_vec[10] * int_phi7.9
-    Nf_vec_next[12] <- Nf_vec[11] * int_phi10.12
-    Nf_vec_next[13] <- Nf_vec[12] * int_phi10.12
-    Nf_vec_next[14] <- Nf_vec[13] * int_phi10.12
-    Nf_vec_next[15] <- Nf_vec[14] * int_phi13.16
-    Nf_vec_next[16] <- Nf_vec[15] * int_phi13.16
-    Nf_vec_next[17] <- Nf_vec[16] * int_phi13.16
-    Nf_vec_next[18] <- Nf_vec[17] * int_phi13.16
+       Nf_vec_next[6] <- Nf_vec[5] * phi4.6_current
+    Nf_vec_next[7] <- Nf_vec[6] * phi4.6_current
+    Nf_vec_next[8] <- Nf_vec[7] * phi4.6_current
+    Nf_vec_next[9] <- Nf_vec[8] * phi7.9_current
+    Nf_vec_next[10] <- Nf_vec[9] * phi7.9_current
+    Nf_vec_next[11] <- Nf_vec[10] * phi7.9_current
+    Nf_vec_next[12] <- Nf_vec[11] * phi10.12_current
+    Nf_vec_next[13] <- Nf_vec[12] * phi10.12_current
+    Nf_vec_next[14] <- Nf_vec[13] * phi10.12_current
+    Nf_vec_next[15] <- Nf_vec[14] * phi13.16_current
+    Nf_vec_next[16] <- Nf_vec[15] * phi13.16_current
+    Nf_vec_next[17] <- Nf_vec[16] * phi13.16_current
+    Nf_vec_next[18] <- Nf_vec[17] * phi13.16_current
     
     Nm_vec_next[6] <- Nm_vec[5] * int_phi4.6M
     Nm_vec_next[7] <- Nm_vec[6] * int_phi4.6M
@@ -1265,7 +1173,7 @@ for (i in 1:n_draws) {
       
       for (a in 18:24) {
         Nm_vec_next[a+1] <- Nm_vec[a] * int_phiAM
-        Nf_vec_next[a+1] <- Nf_vec[a] * int_phiA
+        Nf_vec_next[a+1] <- Nf_vec[a] * phiA_current
       }
     
     Nm_vec <- Nm_vec_next
@@ -1306,6 +1214,10 @@ for (i in 1:n_draws) {
     phi1M_temp <- plogis(mu_1M + (b_sst_1 * eval_sst)) 
     phi2.3_temp  <- plogis(mu_2.3  + (b_sst_2.3 * eval_sst)) 
     phi2.3M_temp <- plogis(mu_2.3M + (b_sst_2.3 * eval_sst)) 
+    phi7.9_temp  <- plogis(mu_7.9  + (b_sst_7.9 * eval_sst))
+    phi10.12_temp  <- plogis(mu_10.12  + (b_sst_A * eval_sst))
+    phi13.16_temp  <- plogis(mu_13.16  + (b_sst_A * eval_sst))
+    phiA_temp  <- plogis(mu_A  + (b_sst_A * eval_sst))
     
     # Calculate births
     pups_born <- (sum(Nf_temp[5:10])*fec_low) + (sum(Nf_temp[11:23])*fec_high)
@@ -1330,16 +1242,16 @@ for (i in 1:n_draws) {
     Nf_temp_next[6] <- Nf_temp[5] * int_phi4.6
     Nf_temp_next[7] <- Nf_temp[6] * int_phi4.6
     Nf_temp_next[8] <- Nf_temp[7] * int_phi4.6
-    Nf_temp_next[9] <- Nf_temp[8] * int_phi7.9
-    Nf_temp_next[10] <- Nf_temp[9] * int_phi7.9
-    Nf_temp_next[11] <- Nf_temp[10] * int_phi7.9
-    Nf_temp_next[12] <- Nf_temp[11] * int_phi10.12
-    Nf_temp_next[13] <- Nf_temp[12] * int_phi10.12
-    Nf_temp_next[14] <- Nf_temp[13] * int_phi10.12
-    Nf_temp_next[15] <- Nf_temp[14] * int_phi13.16
-    Nf_temp_next[16] <- Nf_temp[15] * int_phi13.16
-    Nf_temp_next[17] <- Nf_temp[16] * int_phi13.16
-    Nf_temp_next[18] <- Nf_temp[17] * int_phi13.16
+    Nf_temp_next[9] <- Nf_temp[8] * phi7.9_temp
+    Nf_temp_next[10] <- Nf_temp[9] * phi7.9_temp
+    Nf_temp_next[11] <- Nf_temp[10] * phi7.9_temp
+    Nf_temp_next[12] <- Nf_temp[11] * phi10.12_temp
+    Nf_temp_next[13] <- Nf_temp[12] * phi10.12_temp
+    Nf_temp_next[14] <- Nf_temp[13] * phi10.12_temp
+    Nf_temp_next[15] <- Nf_temp[14] * phi13.16_temp
+    Nf_temp_next[16] <- Nf_temp[15] * phi13.16_temp
+    Nf_temp_next[17] <- Nf_temp[16] * phi13.16_temp
+    Nf_temp_next[18] <- Nf_temp[17] * phi13.16_temp
     
     Nm_temp_next[6] <- Nm_temp[5] * int_phi4.6M
     Nm_temp_next[7] <- Nm_temp[6] * int_phi4.6M
@@ -1357,7 +1269,7 @@ for (i in 1:n_draws) {
     
     for (a in 18:24) {
       Nm_temp_next[a+1] <- Nm_temp[a] * int_phiAM
-      Nf_temp_next[a+1] <- Nf_temp[a] * int_phiA
+      Nf_temp_next[a+1] <- Nf_temp[a] * phiA_temp
     }
     
     # Calculate net growth for this test size
@@ -1379,15 +1291,18 @@ ci_upper_traj <- apply(pop_trajectories, 2, quantile, probs = 0.975)
 
 # realized K metrics (from the last 100 years of each draw)
 realized_K_mean <- mean(realized_K)
-real_K_CI <- quantile(realized_K, probs = c(0.025, 0.975))
+real_K_CI <- quantile(realized_K, probs = c(0.025, 0.975), names = F)
 
 mean_mnpl <- mean(mnpl_estimates)
+mnpl_CI <- quantile(mnpl_estimates, probs = c(0.025, 0.975), names = F)
 mean_mnpl_ratio <- mean(mnpl_ratio)
 
 N_current <- outmat[draw_indices, "N_total[35]"] 
+mean_N_current <- mean(N_current)
 
 # MNPL_vector <- realized_K * 0.60  # statutory default
 MNPL_vector <- mnpl_estimates       # empirical matrix results
+MNPL_mean <- mean(mnpl_estimates)
 
 # probability that the stock is within OSP: how often Ntot[35] is larger than MNPL 
 OSP_check <- N_current > MNPL_vector
@@ -1396,7 +1311,7 @@ prob_within_OSP <- mean(OSP_check)
 # ratio of Ntot[35] relative to MNPL; less than 1.0 means depleted, above means within OSP
 depletion_ratio <- N_current/MNPL_vector
 mean_ratio <- mean(depletion_ratio)
-ci_ratio <- quantile(depletion_ratio, probs = c(0.025, 0.975))
+ci_ratio <- quantile(depletion_ratio, probs = c(0.025, 0.975), names = F)
 
 # print(paste("Probability stock is within OSP:", round(prob_within_OSP * 100, 1), "%"))
 # print(paste("Current abundance is", round(mean_ratio, 2), "times the MNPL."))
@@ -1405,13 +1320,13 @@ ci_ratio <- quantile(depletion_ratio, probs = c(0.025, 0.975))
 # print(paste("Realized K:", round(realized_K_mean)))
 # print(paste("95% CI:", round(real_K_CI[1]), "-", round(real_K_CI[2])))
 
-# plot(1:n_years, mean_trajectory, type = "n", 
+# plot(1:n_years, mean_trajectory, type = "n",
 #      main = "Population trajectory with oscillating SST (Realized K)",
 #      xlab = "Projection year", ylab = "Total abundance",
 #      ylim = c(0, max(ci_upper_traj) * 1.05)) # Give a 5% buffer at the top
 # 
-# polygon(c(1:n_years, rev(1:n_years)), 
-#         c(ci_lower_traj, rev(ci_upper_traj)), 
+# polygon(c(1:n_years, rev(1:n_years)),
+#         c(ci_lower_traj, rev(ci_upper_traj)),
 #         col = rgb(0, 0, 1, alpha = 0.15), border = NA)
 # 
 # lines(1:n_years, mean_trajectory, col = "blue", lwd = 2)
@@ -1420,140 +1335,41 @@ ci_ratio <- quantile(depletion_ratio, probs = c(0.025, 0.975))
 # abline(h = real_K_CI[1], col = "darkred", lty = 3, lwd = 1.5)
 # abline(h = real_K_CI[2], col = "darkred", lty = 3, lwd = 1.5)
 # 
-# legend("bottomright", 
+# legend("bottomright",
 #        legend = c("Mean trajectory", "95% CI", "Mean realized K", "95% CI"),
 #        col = c("blue", rgb(0, 0, 1, alpha = 0.15), "darkred", "darkred"),
-#        lty = c(1, 1, 2, 3), 
-#        lwd = c(2, 10, 2, 1.5), 
+#        lty = c(1, 1, 2, 3),
+#        lwd = c(2, 10, 2, 1.5),
 #        bty = "n")
 
 #plot productivity curve
-peak_growth <- max(net_growth)
-peak_N <- N_test_seq[which.max(net_growth)]
-
-plot(N_test_seq, net_growth, type = "l", col = "forestgreen", lwd = 3,
-     main = "Density-Dependent productivity curve",
-     xlab = "Total population size (N)", 
-     ylab = "Net annual growth (new individuals)",
-     xlim = c(0, max(N_test_seq) * 1.05))
-
-# add a horizontal line at 0 where growth stops
-abline(h = 0, col = "black", lty = 1, lwd = 1)
-
-# add a vertical line at K where the curve hits 0
-abline(v = K_current, col = "blue", lty = 2, lwd = 2)
-
-# add a vertical line at MNPL - the peak of the curve
-abline(v = peak_N, col = "red", lty = 2, lwd = 2)
-
-points(peak_N, peak_growth, pch = 16, col = "red", cex = 1.5)
-
-legend("bottomleft", 
-       legend = c("Annual productivity", "MNPL (peak growth)", "Carrying capacity (K)"),
-       col = c("forestgreen", "red", "blue"),
-       lty = c(1, 2, 2), lwd = c(3, 2, 2), pch = c(NA, NA, NA), bty = "n")
-
-```
-
-```{r MNPL and OSP, eval = T}
-
-#60% of realized K method
-
-MNPL <- 0.6*realized_K_mean
-
-#taking advantage of IPM's inherent productivity curve
-
-
+# peak_growth <- max(net_growth)
+# peak_N <- N_test_seq[which.max(net_growth)]
+# 
+# plot(N_test_seq, net_growth, type = "l", col = "forestgreen", lwd = 3,
+#      main = "Density-Dependent productivity curve",
+#      xlab = "Total population size (N)", 
+#      ylab = "Net annual growth (new individuals)",
+#      xlim = c(0, max(N_test_seq) * 1.05))
+# 
+# # add a horizontal line at 0 where growth stops
+# abline(h = 0, col = "black", lty = 1, lwd = 1)
+# 
+# # add a vertical line at K where the curve hits 0
+# abline(v = K_current, col = "blue", lty = 2, lwd = 2)
+# 
+# # add a vertical line at MNPL - the peak of the curve
+# abline(v = peak_N, col = "red", lty = 2, lwd = 2)
+# 
+# points(peak_N, peak_growth, pch = 16, col = "red", cex = 1.5)
+# 
+# legend("bottomleft", 
+#        legend = c("Annual productivity", "MNPL (peak growth)", "Carrying capacity (K)"),
+#        col = c("forestgreen", "red", "blue"),
+#        lty = c(1, 2, 2), lwd = c(3, 2, 2), pch = c(NA, NA, NA), bty = "n")
 
 ```
 
-
-```{r temporal variance}
-
-phi.vals <- post_sum %>%
-  filter(grepl('.prob', variable)) %>%
-    transform(year = as.numeric(as.character(gsub('.+\\[([0-9]+)\\].*$', '\\1',
-                                                variable)))) %>%
-  #use when dataframe for phi.prob rather than vector
-  # transform(year = as.numeric(as.character(gsub('.+\\[([0-9]+), ([0-9]+)\\].*$', '\\2', 
-  #                                               variable)))) %>% 
-  # transform(region = gsub('.+\\[([0-9]+), ([0-9]+)\\].*$', '\\1', variable)) %>%
-  transform(variable = sub("\\[.*", "", variable)) %>%
-  transform(rate = ifelse(grepl('phi', variable), 'Survival', 'Detection')) %>%
-  transform(age = gsub('.prob', '', variable)) %>%
-  transform(age = ifelse(rate == 'Survival', gsub('phi', '', age), 
-                         ifelse(rate == 'Detection', gsub('p', '', age), NA))) %>%
-  transform(sex = ifelse(grepl('M', age), 'Male', 'Female')) %>%
-  transform(age = gsub('M', '', age)) %>%
-  transform(age = factor(age, levels = c('P', '1', '2.3', '4.6', '7.9', '10.12', '13.16', '7.12', 'A'))) %>%
-  # merge(mean.phi.vals %>% filter(site == 'Pyramid Rock'), by = c('age'), suffixes = c('', '.mean'))
-  transform(exclude_det = ifelse(age == '2.3' & year < 2, 'Y',
-                                   ifelse(age == '4.6' & year < 4, 'Y',
-                                    ifelse(age == '7.12' & year < 7, 'Y',
-                                           ifelse(age == 'A' & year < 13, 'Y', 'N'))))) %>%
-  transform(exclude_phi = ifelse(age == '1' & year < 2, 'Y',
-                             ifelse(age == '2.3' & year < 3, 'Y',
-                                   ifelse(age == '4.6' & year < 5, 'Y',
-                                    ifelse(age == '7.9' & year < 7, 'Y',
-                                           ifelse(age == '10.12' & year < 10, 'Y',
-                                                  ifelse(age == '13.16' & year < 13, 'Y',
-                                           ifelse(age == 'A' & year < 16, 'Y', 'N'))))))))
-
-#temporal variance with mean rates; intercept represents female, so can't show males
-ggplot(phi.vals %>% filter(rate == 'Detection' & exclude_det != 'Y' & year != 20),
-       aes(year, med)) +
-  geom_errorbar(aes(x = year, ymin=lower, ymax=upper), position = position_dodge(0.5),
-                width = 0.5, show.legend = F) +
-  geom_point(size = 0.8, position = position_dodge(0.5)) +
-  geom_line(linewidth = 0.7, position = position_dodge(0.5)) +
-  # geom_line(aes(year, med.mean), col = 'grey20', linetype = 'dotted') +
-  xlab('') + ylab(expression(paste('Detection probability ',  '(', p, ')'))) +
-  ggtitle('') +
-    facet_grid(age ~ sex) +
-  plot_theme(legend.position = 'top', panel.border = element_rect(fill = NA),
-             plot.title = element_text(hjust = 0.5)) +
-  guides(color = guide_legend("", nrow = 1, byrow = T)) +
-  scale_color_manual(values = rainbow2[c(2,3,5,6,7,8)], name = '') +
-  scale_x_continuous(breaks = c(seq(1, 35, by = 5)), 
-                     labels = c(seq(1990, (1990+n_occasions-1), by = 5)))
-
-#survival
-ggplot(phi.vals %>% filter(rate == 'Survival' & exclude_phi != 'Y'),
-       aes(year, med)) +
-  geom_errorbar(aes(x = year, ymin=lower, ymax=upper), position = position_dodge(0.5),
-                width = 0.5, show.legend = F) +
-  geom_point(size = 0.8, position = position_dodge(0.5)) +
-  geom_line(linewidth = 0.7, position = position_dodge(0.5)) +
-  # geom_line(aes(year, med.mean), col = 'grey20', linetype = 'dotted') +
-  xlab('') + ylab(expression(paste('Survival probability ',  '(', phi, ')'))) +
-  ggtitle('') +
-    facet_grid(age ~ sex) +
-  plot_theme(legend.position = 'top', panel.border = element_rect(fill = NA),
-             plot.title = element_text(hjust = 0.5)) +
-  guides(color = guide_legend("", nrow = 1, byrow = T)) +
-  scale_color_manual(values = rainbow2[c(2,3,5,6,7,8)], name = '') +
-  scale_x_continuous(breaks = c(seq(1, 25, by = 5)), labels = c(seq(2000, (2000+n_occasions-1), by = 5)))
-
-ggplot(phi.vals %>% filter(rate == 'Survival' & exclude_phi != 'Y' &
-                             age %in% c('P', '1') & sex == 'Female'),
-       aes(year, med)) +
-  geom_errorbar(aes(x = year, ymin=lower, ymax=upper), position = position_dodge(0.5),
-                width = 0.5, show.legend = F) +
-  geom_point(size = 0.8, position = position_dodge(0.5)) +
-  geom_line(linewidth = 0.7, position = position_dodge(0.5)) +
-  # geom_line(aes(year, med.mean), col = 'grey20', linetype = 'dotted') +
-  xlab('') + ylab(expression(paste('Survival probability ',  ' (', phi, ')'))) +
-  ggtitle('') +
-    facet_grid(age ~ sex) +
-  # theme_classic() +
-  pres_theme(legend.position = 'top', #panel.border = element_rect(fill = NA),
-             plot.title = element_text(hjust = 0.5)) +
-  guides(color = guide_legend("", nrow = 1, byrow = T)) +
-  scale_color_manual(values = rainbow2[c(2,3,5,6,7,8)], name = '') +
-  scale_x_continuous(breaks = c(seq(1, 25, by = 5)), labels = c(seq(2000, (2000+n_occasions-1), by = 5)))
-
-
-```
 
 #### CSL population dynamics and environmental effects  
 
@@ -1714,17 +1530,17 @@ Results described from the IPM are still only a subset (50-100 marked individual
 
 ##### Vital rates  
 
-```{r phi plot}
+```{r phi plot, eval = T}
 
 phi_plot
 phi_plot_compare
 
 ```
 
-The first plot shows sex- and age class-specific survival probabilities and associated 95% credible intervals. The second plot shows very strong agreement between these MR estimates and those from the IPM for female survival probabilities. 
+The first plot shows sex- and age class-specific survival probabilities and associated 95% credible intervals. The second plot shows very strong agreement between these MR-only model estimates and those from the IPM for female survival probabilities. 
 
 
-```{r p plot}
+```{r p plot, eval = T}
 
 p_plot
 
@@ -1732,9 +1548,17 @@ p_plot
 
 Sex- and age-specific annual detection probabilities, though yearlings seem low? Should it be sex-specific for yearlings and juveniles too? Males lower makes sense too?  
 
+```{r fec plot, eval = T}
+
+fec_plot
+
+```
+
+Fecundity estimates for younger and older adult females based on the integrated population model. 
+
 ##### Covariate effects  
 
-```{r cov plots}
+```{r cov plots, eval = T}
 
 sst_eff_plot
 sst_preds_plot
@@ -1748,17 +1572,32 @@ Figure (B): probability-scale effects of the SST covariate effect for each age: 
 
 Figure (C): I'm calling this the "ENSO memory" effect: whether individuals are affected in subsequent years if born in an ENSO year. This shows that (for example) survival is high at ages 2-6 for individuals born in ENSO years and lower for adults that were born in ENSO years. We should talk through this a bit more, but my guess is that this is more showing us a cyclic effect rather than some sort of lasting ENSO effect that pups carry with them as they age. Once pups that were born in an ENSO event have reached ages 2-6, those years are probably cold, and once those same pups that were born in an ENSO event have reached 7+ survival is maybe lower again because they're back into an ENSO event. 
 
-##### Management metrics: *K*, and MNPL 
+##### Management metrics: *K* and MNPL 
 
-The two-step approach (e.g., Laake et al update) produces the following estimates of *K* and MNLP: approximately 292k individuals for a carrying capacity, and a MNPL of 175,364. 
+*Mark-recapture reconstruction estimates* 
 
-```{r post hoc metrics}
+The two-step approach (e.g., Laake et al update) produces the following estimates of *K* and MNLP.... keeping in mind that these are lower because the model can't distinguish between density effects versus environmental effects (e.g., downturns in ENSO years can be misconstrued as density dependence). 
 
-print(round(summary_table))
+Carrying capacity: `r format(round(summary_table[1,1]), big.mark = ',')` (95% CI: `r format(round(summary_table[1,2]), big.mark = ',')`-`r format(round(summary_table[1,3]), big.mark = ',')`).
+
+MNPL: `r format(round(summary_table[1,4]), big.mark = ',')` (95% CI: `r format(round(summary_table[1,5]), big.mark = ',')`-`r format(round(summary_table[1,6]), big.mark = ',')`).
+
+```{r post hoc MR metrics 1, eval = T}
+
+# print(round(summary_table))
 
 plot(x = 1990:2024, y = recon$Ntot, type = "l", col = "darkblue", lwd = 2, 
      main = "Reconstructed population trajectory",
      ylab = "Total abundance", xlab = "")
+
+```
+
+Reconstructed population trajectory based on mark-recapture estimates (does this look reasonable?). 
+
+
+```{r post hoc MR metrics 2, eval = T}
+
+# print(round(summary_table))
 
 plot(x = 1990:2024, y = implied_fecundity, type = "b", col = "darkred", pch = 16,
      # main = "Implied birth rate",
@@ -1766,35 +1605,58 @@ plot(x = 1990:2024, y = implied_fecundity, type = "b", col = "darkred", pch = 16
 
 ```
 
-Plots show reconstructed population trajectory (were pup counts increasing that rapidly 2000-2010?) and implied fecundity rate (is this about right for CSL? seems a bit low for the pinnipeds I'm used to, or at least more volatile). 
+Implied fecundity rate derived from reconstructed population (is this about right for CSL? Seems a bit low, or at least a bit volatile). Could consider two fecundity rates as in the IPM. 
+ 
+*Integrated population model estimates*   
 
-The integrated population model produces the following estimates: 
+**These are just prototypes!!**
 
-```{r IPM metrics}
+The estimate of final-year abundance: `r format(round(mean_N_current), big.mark = ',')`. 
+
+Estimate of theoretical *K*: `r format(round(theo_K), big.mark = ',')` (95% CI: `r format(round(theo_K_CI), big.mark = ',')`).  
+
+Estimate of realized *K*: `r format(round(realized_K_mean), big.mark = ',')`. 
+
+The estimate of MNPL is `r format(round(mean_mnpl), big.mark = ',')` (95% CI: `r format(round(mnpl_CI), big.mark = ',')`) and current abundance is `r format(round(mean_ratio, 2), big.mark = ',')` times the MNPL. 
 
 
+``` {r IPM metrics 2, eval = T}
 
-fec_plot
+#theoretical K
+# theo_K
+# theo_K_CI
 
-DD_plot
-
-```
-
-```{r IPM K}
-
-realized_K_mean <- mean(realized_K)
-real_K_CI <- quantile(realized_K, probs = c(0.025, 0.975))
-
-# print(paste("Realized K:", round(realized_K_mean)))
+#realized K
+# print(paste('Realized K:', round(realized_K_mean)))
 # print(paste("95% CI:", round(real_K_CI[1]), "-", round(real_K_CI[2])))
 
-plot(1:n_years, mean_trajectory, type = "n", 
+#current abundance
+# mean_N_current #<- mean(N_current)
+
+#MNPL
+# mean_mnpl #<- mean(mnpl_estimates)
+# mean_mnpl_ratio #<- mean(mnpl_ratio)
+
+# probability that the stock is within OSP: how often Ntot[35] is larger than MNPL 
+# prob_within_OSP #<- mean(OSP_check)
+
+# ratio of Ntot[35] relative to MNPL; less than 1.0 means depleted, above means within OSP
+# depletion_ratio <- N_current/MNPL_vector
+# mean_ratio <- mean(depletion_ratio)
+# ci_ratio <- quantile(depletion_ratio, probs = c(0.025, 0.975), names = F)
+
+
+# print(paste("Probability stock is within OSP:", round(prob_within_OSP * 100, 1), "%"))
+# print(paste("Current abundance is", round(mean_ratio, 2), "times the MNPL."))
+# print(paste("95% CI of that ratio:", round(ci_ratio[1], 2), "-", round(ci_ratio[2], 2)))
+
+plot(1:n_years, mean_trajectory, type = "n",
      main = "Population trajectory with oscillating SST (Realized K)",
      xlab = "Projection year", ylab = "Total abundance",
      ylim = c(0, max(ci_upper_traj) * 1.05)) # Give a 5% buffer at the top
 
-polygon(c(1:n_years, rev(1:n_years)), 
-        c(ci_lower_traj, rev(ci_upper_traj)), 
+polygon(c(1:n_years, rev(1:n_years)),
+        c(ci_lower_traj, rev(ci_upper_traj)),
         col = rgb(0, 0, 1, alpha = 0.15), border = NA)
 
 lines(1:n_years, mean_trajectory, col = "blue", lwd = 2)
@@ -1803,94 +1665,45 @@ abline(h = realized_K_mean, col = "darkred", lty = 2, lwd = 2)
 abline(h = real_K_CI[1], col = "darkred", lty = 3, lwd = 1.5)
 abline(h = real_K_CI[2], col = "darkred", lty = 3, lwd = 1.5)
 
-legend("bottomright", 
+legend("bottomright",
        legend = c("Mean trajectory", "95% CI", "Mean realized K", "95% CI"),
        col = c("blue", rgb(0, 0, 1, alpha = 0.15), "darkred", "darkred"),
-       lty = c(1, 1, 2, 3), 
-       lwd = c(2, 10, 2, 1.5), 
+       lty = c(1, 1, 2, 3),
+       lwd = c(2, 10, 2, 1.5),
        bty = "n")
 
 
 ```
 
 
-```{r MNPL and OSP}
+```{r IPM metrics 1, eval = T}
 
-
+#density dependence
+DD_plot
 
 ```
-
-##### Abundance and posterior predictive checks  
 
 
 #### Discussion
 
-Laake et al. 2018 metrics: 
+<!-- Laake et al. 2018 metrics:  -->
 
-- ~275,000 (K)
-- MNPL: 183,481... though just based on pups, right...? 
-- abundance in 2014: 258k animals, 40% above MNPL so within OSP range
-- N/K DD: -1.68 (-3.78,-0.03)
+<!-- - ~275,000 (K) -->
+<!-- - MNPL: 183,481... though just based on pups, right...?  -->
+<!-- - abundance in 2014: 258k animals, 40% above MNPL so within OSP range -->
+<!-- - N/K DD: -1.68 (-3.78,-0.03) -->
 
-#### Figures and tables 
-
-Figure 1. Map?
-
-```{r phi plot}
-
-phi_plot
-
-```
-Figure 2. Posterior median and 95% credible intervals for average age-specific CSL survival probabilities over the study period. 
-
-```{r fec plot}
-
-fec_plot
-
-```
-Figure 3. Posterior median and 95% credible intervals for average fecundity (pooled for ages 4:9 and 10:22) probabilities over the study period.
-
-
-```{r p plot}
-
-```
-Figure 4. Posterior median and 95% credible intervals for average age-specific CSL detection probabilities over the study period.
-
-```{r N and pp plot}
-
-```
-Figure 5. Posterior median and 95% credible intervals for annual CSL abundance and predicted number of pups (color) and imputed census counts (color) over the study period.
-
-```{r sst predictions}
-
-sst_plot
-
-```
-Figure 6. Posterior median and 95% credible intervals of (a) age- and sex-specific logit-scale effects of sea surface temperature on CSL survival probabilities, and (b) predicted age- and sex-specific survival probabilities across the range of sea surface temperature anomalies over the study period. 
-
-
-```{r MNPL curve}
-
-```
-Figure 7. Maximum net productivity level curve, showing....?
-
-```{r table 1}
-
-```
-Table 1: Annual abundances for M and F and tot and pup multiplier over time.
-
-```{r table 2}
-
-```
-Table 2: Median and 95% credible intervals for population model parameters, including of B_sst_a, beta.DD, K, MNPL median and 95% CI, MNPL/K, N in start/stop yrs, annual growth/max growth, and N_2024/MNPL (OSP status). 
 
 #### Appendix
 
 Describe model diagnostics and fit. 
 
-```{r ppc and posterior prior overlaps}
+```{r ppc and posterior prior overlaps, eval = T}
 
+pups_ppc_plot
 
 
 ```
+
+Posterior predictive check for number of pups estimated in the IPM relative to census data. Are these low pup counts truly real? 
 
