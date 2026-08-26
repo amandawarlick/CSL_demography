@@ -203,7 +203,11 @@ library(imputeTS)
 pup_cnts <- read_tsv(here('data', 'CSL_San Miguel Island_PupCounts_20260622.txt')) %>%
   filter(Year > 1989)
 
-pup_cnt_filled <- na_interpolation(pup_cnts, option = 'stine')
+pup_cnt_filled <- na_interpolation(pup_cnts[,1:5]) %>%
+  mutate(US_PupCnt = rowSums(across(-Year)))
+
+#old - was just filling all the columns and now I'm summing them instead above
+# pup_cnt_filled <- na_interpolation(pup_cnts, option = 'stine')
 
 ```
 
@@ -1515,7 +1519,7 @@ init_pop_m <- N_m_track[, 1]
 ```
 
 
-```{r osp integration}
+```{r IPM}
 
 CSL_IPM <- nimbleCode({
 
@@ -2161,7 +2165,7 @@ K_CI <- quantile(K_estimates, probs = c(0.025, 0.975))
 
 ```
 
-```{r osp post-hoc}
+```{r MR post-hoc}
 
 # ##instead of a fully integrated approach, post-hoc calculations similar to Laake et al.
 # start_pups_f <- pup_counts[1] / 2
