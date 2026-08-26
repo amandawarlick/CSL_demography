@@ -119,6 +119,10 @@ ch_dat_m <- read.csv(here::here('data', 'res_dat_m_20260623.csv'),
 EN_yes <- c(1991, 1997, 2015, 2023)
 EN_yes <- c(1991, 1994, 1997, 2002, 2009, 2015, 2023) #includes moderate
 
+##fecundity EN 
+
+##pup survival EN
+
 EN_f <- ch_dat_f %>%
   dplyr::select(brand, cohort) %>%
   transform(EN = ifelse(cohort %in% EN_yes, 1, 2)) %>%
