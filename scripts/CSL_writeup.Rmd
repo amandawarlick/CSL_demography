@@ -390,15 +390,17 @@ pup_cnt_filled <- na_interpolation(pup_cnts[,1:5]) %>%
 #stable age logic to initialize N_f and N_m
 # define survival rates
 n_occasions <- 36
-phi_P <- 0.7
+phi_P <- 0.65
 phi_1 <- 0.8
-phi_J <- 0.85 # Juveniles (Ages 2-5)
-phi_A <- 0.92 # Adults (Ages 6-13)
-phi_AA <- 0.78
+phi_J <- 0.92 # Juveniles (Ages 2-5)
+phi_A <- 0.85 # Adults (Ages 6-13)
+phi_AA <- 0.75
+phi_AM <- 0.8
+phi_AAM <- 0.5
 
 # storage
 N_f_track <- matrix(0, nrow = 25, ncol = (n_occasions-1))
-N_m_track <- matrix(0, nrow = 25, ncol = (n_occasions-1))
+N_m_track <- matrix(0, nrow = 20, ncol = (n_occasions-1))
 
 # year 1; assuming 50:50 sex ratio for pups
 N_f_track[1, 1] <- round(pup_cnt_filled$US_PupCnt[1] / 2)
@@ -408,17 +410,25 @@ for (a in 1:24) {
   surv <- ifelse(a == 1, phi_P, 
           ifelse(a == 2, phi_1, 
           ifelse(a >= 3 & a <= 5, phi_J,
-          ifelse(a >= 6 & a <= 12, phi_A, phi_AA))))
+          ifelse(a >= 6 & a <= 16, phi_A, phi_AA))))
           
   N_f_track[a + 1, 1] <- round(N_f_track[a, 1] * surv)
+}
+
+for (a in 1:19) {
+  surv <- ifelse(a == 1, phi_P, 
+          ifelse(a == 2, phi_1, 
+          ifelse(a >= 3 & a <= 5, phi_J,
+          ifelse(a >= 6 & a <= 12, phi_AM, phi_AAM))))
+          
   N_m_track[a + 1, 1] <- round(N_m_track[a, 1] * surv)
 }
 
-# 4. Dynamically project the rest of the matrix forward through time
+# dynamically project the rest of the matrix forward through time
 for (t in 1:(n_occasions - 2)) {
   
-  # Insert the REAL pup count for the next year
-  N_f_track[1, t+1] <- round(pup_cnt_filled$US_PupCnt[t+1] / 2)
+  # Insert the pup count for the next year
+  N_f_track[1, t+1] <- round(pup_cnt_filled$US_PupCnt[t+1]/2)
   N_m_track[1, t+1] <- pup_cnt_filled$US_PupCnt[t+1] - N_f_track[1, t+1]
   
   # Pups transition to yearlings (Index 1 -> 2)
@@ -438,12 +448,15 @@ for (t in 1:(n_occasions - 2)) {
   # Adults transition (Indices 6-24 -> 7-25)
   for (a in 6:12) {
     N_f_track[a+1, t+1] <- round(N_f_track[a, t] * phi_A)
-    N_m_track[a+1, t+1] <- round(N_m_track[a, t] * phi_A)
+    N_m_track[a+1, t+1] <- round(N_m_track[a, t] * phi_AM)
   }
   
     for (a in 13:24) {
     N_f_track[a+1, t+1] <- round(N_f_track[a, t] * phi_AA)
-    N_m_track[a+1, t+1] <- round(N_m_track[a, t] * phi_AA)
+    }
+  
+  for (a in 13:19) {
+    N_m_track[a+1, t+1] <- round(N_m_track[a, t] * phi_AAM)
   }
 }
 
@@ -482,9 +495,10 @@ init_m <- N_m_track[,1]
 reconstruct_pop <- function(pup_counts, phi_f, phi_m, init_f, init_m) {
   n_occasions <- length(pup_counts)
   max_age <- nrow(phi_f)
+  max_age_m <- nrow(phi_m)
   
   N_f <- matrix(0, nrow = max_age, ncol = n_occasions)
-  N_m <- matrix(0, nrow = max_age, ncol = n_occasions)
+  N_m <- matrix(0, nrow = max_age_m, ncol = n_occasions)
   
   # Seed Year 1 with starting age distribution
   N_f[,1] <- N_f_track[,1]
@@ -499,6 +513,9 @@ reconstruct_pop <- function(pup_counts, phi_f, phi_m, init_f, init_m) {
     # age up older cohorts deterministically using CJS survival rates
     for (a in 1:(max_age - 1)) {
       N_f[a+1,t+1] <- N_f[a,t]*phi_f[a,t]
+    }
+  
+  for (a in 1:(max_age_m - 1)) {
       N_m[a+1,t+1] <- N_m[a,t]*phi_m[a,t]
     }
   }
@@ -617,11 +634,10 @@ for (k in 1:nsim) {
                  phi7.9, phi7.9, phi7.9, phi10.12, phi10.12, phi10.12, 
                  phi13.16, phi13.16, phi13.16, phi13.16,
                  phiA, phiA, phiA, phiA, phiA, phiA, phiA, phiA)
-  phi_m <- rbind(phiPM, phi1M, #phi2.3M, phi2.3M, phi4.6M, phi4.6M, phi4.6M,
-                 phi2.3, phi2.3, phi4.6, phi4.6, phi4.6,
+  phi_m <- rbind(phiPM, phi1M, phi2.3M, phi2.3M, phi4.6M, phi4.6M, phi4.6M,
                  phi7.9M, phi7.9M, phi7.9M, phi10.12M, phi10.12M, phi10.12M, 
                  phi13.16M, phi13.16M, phi13.16M, phi13.16M, 
-                 phiAM, phiAM, phiAM, phiAM, phiAM, phiAM, phiAM, phiAM)
+                 phiAM, phiAM, phiAM)
 
   # Run deterministic projection
   recon <- reconstruct_pop(pup_counts, phi_f, phi_m, init_f, init_m)
@@ -654,8 +670,21 @@ summary_table <- post %>%
 
 # calculate the implied fecundity
 # How many pups were born per adult female (assuming ages 4-24 are adults)?
-adult_females <- colSums(recon$N_f[4:24, ])
-implied_fecundity <- pup_counts / adult_females
+# adult_females <- colSums(recon$N_f[4:24, ])
+# implied_fecundity_low <- pup_counts / adult_females
+
+fem_5.7 <- colSums(recon$N_f[6:8, ])
+fem_8.17 <- colSums(recon$N_f[9:18, ])
+fem_18 <- colSums(recon$N_f[19:24, ])
+
+implied_fec_5.7 <- pup_counts/fem_5.7
+implied_fec_8.17 <- pup_counts/fem_8.17
+implied_fec_18 <- pup_counts/fem_18
+
+fec_long <- data.frame(fec5.7 = implied_fec_5.7,
+                       fec8.17 = implied_fec_8.17,
+                       fec18 = implied_fec_18,
+                       yr = 1990:2024)
 
 # Ntot_recon_plot <- plot(x = 1990:2024, y = recon$Ntot, type = "l", col = "darkblue", lwd = 2, 
 #      main = "Reconstructed population trajectory",
@@ -821,7 +850,7 @@ for (i in 1:n_draws) {
   # initialize a starting population vector
   # (e.g., 50 females per age class to the simulation)
   Nf_vec <- rep(50, 25)
-  Nm_vec <- rep(50, 25)
+  Nm_vec <- rep(50, 20)
 
   # project forward to reach equilibrium (K)
   for (y in 1:500) { # 200 years long enough?
@@ -844,7 +873,7 @@ for (i in 1:n_draws) {
     pups_born <- (sum(Nf_vec[5:10])*fec_low) + (sum(Nf_vec[11:23])*fec_high)
 
     # Create the next year's population vector
-    Nm_vec_next <- numeric(25)
+    Nm_vec_next <- numeric(20)
     Nm_vec_next[1] <- pups_born*0.5
     Nm_vec_next[2] <- Nm_vec[1] * phiPM_current
     Nm_vec_next[3] <- Nm_vec[2] * int_phi1M
@@ -889,7 +918,7 @@ for (i in 1:n_draws) {
       Nm_vec_next[a+1] <- Nm_vec[a] * int_phiAM
     }
 
-    for (a in 18:24) {
+    for (a in 18:19) {
       Nf_vec_next[a+1] <- Nf_vec[a] * int_phiA
     }
 
@@ -1139,7 +1168,7 @@ for (i in 1:n_draws) {
   mu_AM <- qlogis(int_phiAM)
   
   Nf_vec <- rep(1000, 25)
-  Nm_vec <- rep(1000, 25)
+  Nm_vec <- rep(1000, 20)
   
   for (y in 1:n_years) {
     N_tot <- sum(Nf_vec) + sum(Nm_vec)
@@ -1153,17 +1182,22 @@ for (i in 1:n_draws) {
     phi1_current  <- plogis(mu_1  + (b_sst_1 * current_sst)) 
     phi1M_current <- plogis(mu_1M + (b_sst_1 * current_sst)) 
     phi2.3_current  <- plogis(mu_2.3  + (b_sst_2.3 * current_sst)) 
-    phi2.3M_current <- plogis(mu_2.3M + (b_sst_2.3 * current_sst)) 
+    phi2.3M_current <- plogis(mu_2.3M + (b_sst_2.3M * current_sst)) 
     phi4.6_current  <- plogis(mu_4.6  + (b_sst_4.6 * current_sst)) 
+    phi4.6M_current  <- plogis(mu_4.6M  + (b_sst_4.6M * current_sst)) 
     phi7.9_current  <- plogis(mu_7.9  + (b_sst_7.9 * current_sst)) 
-    phi10.12_current  <- plogis(mu_10.12  + (b_sst_A * current_sst))
-    phi13.16_current  <- plogis(mu_13.16  + (b_sst_A * current_sst))
+    phi7.9M_current  <- plogis(mu_7.9M  + (b_sst_7.9M * current_sst)) 
+    phi10.12_current  <- plogis(mu_10.12  + (b_sst_10.12 * current_sst))
+    phi10.12M_current  <- plogis(mu_10.12M  + (b_sst_10.12M * current_sst))
+    phi13.16_current  <- plogis(mu_13.16  + (b_sst_13.16 * current_sst))
+    phi13.16M_current  <- plogis(mu_13.16M  + (b_sst_13.16M * current_sst))
     phiA_current  <- plogis(mu_A  + (b_sst_A * current_sst))
+    phiAM_current  <- plogis(mu_AM  + (b_sst_AM * current_sst))
 
     pups_born <- (sum(Nf_vec[5:10])*fec_low) + (sum(Nf_vec[11:23])*fec_high)
     
     Nm_vec_next <- numeric(25)
-    Nf_vec_next <- numeric(25)
+    Nf_vec_next <- numeric(20)
     
     Nm_vec_next[1] <- pups_born * 0.5
     Nf_vec_next[1] <- pups_born * 0.5
@@ -1193,23 +1227,26 @@ for (i in 1:n_draws) {
     Nf_vec_next[17] <- Nf_vec[16] * phi13.16_current
     Nf_vec_next[18] <- Nf_vec[17] * phi13.16_current
     
-    Nm_vec_next[6] <- Nm_vec[5] * int_phi4.6M
-    Nm_vec_next[7] <- Nm_vec[6] * int_phi4.6M
-    Nm_vec_next[8] <- Nm_vec[7] * int_phi4.6M
-    Nm_vec_next[9] <- Nm_vec[8] * int_phi7.9M
-    Nm_vec_next[10] <- Nm_vec[9] * int_phi7.9M
-    Nm_vec_next[11] <- Nm_vec[10] * int_phi7.9M
-    Nm_vec_next[12] <- Nm_vec[11] * int_phi10.12M
-    Nm_vec_next[13] <- Nm_vec[12] * int_phi10.12M
-    Nm_vec_next[14] <- Nm_vec[13] * int_phi10.12M
-    Nm_vec_next[15] <- Nm_vec[14] * int_phi13.16M
-    Nm_vec_next[16] <- Nm_vec[15] * int_phi13.16M
-    Nm_vec_next[17] <- Nm_vec[16] * int_phi13.16M
-    Nm_vec_next[18] <- Nm_vec[17] * int_phi13.16M
+    Nm_vec_next[6] <- Nm_vec[5] * phi4.6M_current
+    Nm_vec_next[7] <- Nm_vec[6] * phi4.6M_current
+    Nm_vec_next[8] <- Nm_vec[7] * phi4.6M_current
+    Nm_vec_next[9] <- Nm_vec[8] * phi7.9M_current
+    Nm_vec_next[10] <- Nm_vec[9] * phi7.9M_current
+    Nm_vec_next[11] <- Nm_vec[10] * phi7.9M_current
+    Nm_vec_next[12] <- Nm_vec[11] * phi10.12M_current
+    Nm_vec_next[13] <- Nm_vec[12] * phi10.12M_current
+    Nm_vec_next[14] <- Nm_vec[13] * phi10.12M_current
+    Nm_vec_next[15] <- Nm_vec[14] * phi13.16M_current
+    Nm_vec_next[16] <- Nm_vec[15] * phi13.16M_current
+    Nm_vec_next[17] <- Nm_vec[16] * phi13.16M_current
+    Nm_vec_next[18] <- Nm_vec[17] * phi13.16M_current
       
       for (a in 18:24) {
-        Nm_vec_next[a+1] <- Nm_vec[a] * int_phiAM
         Nf_vec_next[a+1] <- Nf_vec[a] * phiA_current
+      }
+    
+        for (a in 18:19) {
+        Nm_vec_next[a+1] <- Nm_vec[a] * phiAM_current
       }
     
     Nm_vec <- Nm_vec_next

@@ -105,32 +105,39 @@ ch_dat_f <- read.csv(here::here('data', 'res_dat_f_20260623.csv'),
                    header = T, stringsAsFactors = F) %>% 
   transform(adjsex == 'Fem') %>%
   dplyr::select(-adjsex) %>%
-  group_by(cohort) %>%
-  slice_sample(n = 80, replace = F) %>%
+  # group_by(cohort) %>%
+  # slice_sample(n = 80, replace = F) %>%
   arrange(brand)
 
 ch_dat_m <- read.csv(here::here('data', 'res_dat_m_20260623.csv'),
-                   header = T, stringsAsFactors = F) %>% 
+                   header = T, stringsAsFactors = F) %>%
   dplyr::select(-adjsex) %>%
-  group_by(cohort) %>%
-  slice_sample(n = 80, replace = F) %>%
+  # group_by(cohort) %>%
+  # slice_sample(n = 80, replace = F) %>%
   arrange(brand)
 
-EN_yes <- c(1991, 1997, 2015, 2023)
-EN_yes <- c(1991, 1994, 1997, 2002, 2009, 2015, 2023) #includes moderate
+EN_phi <- c(1991, 1992, 1996, 1997, 2002, 2009, 2010, 2012, 2013, 2014, 2015, 
+                2022, 2023) #includes moderate
 
-##fecundity EN 
+EN_fec <- c(1992, 1993, 1997, 1998, 2003, 2009, 2010, 2013, 2014, 2015, 2016, 2024)
 
-##pup survival EN
+all_yrs <- c(1990:2024)
+
+##1 == cold, 2 == warm
+EN_phi_vec <- as.numeric(all_yrs %in% EN_phi)+1 
+EN_fec_vec <- as.numeric(all_yrs %in% EN_fec)+1 
+
+## occasions
+EN_phi_occ <- which(EN_phi_vec > 1)
 
 EN_f <- ch_dat_f %>%
   dplyr::select(brand, cohort) %>%
-  transform(EN = ifelse(cohort %in% EN_yes, 1, 2)) %>%
+  transform(EN = ifelse(cohort %in% EN_phi, 1, 2)) %>%
   arrange(brand)
 
 EN_m <- ch_dat_m %>%
   dplyr::select(brand, cohort) %>%
-  transform(EN = ifelse(cohort %in% EN_yes, 1, 2)) %>%
+  transform(EN = ifelse(cohort %in% EN_phi, 1, 2)) %>%
   arrange(brand)
 
 ## variables and dimensions
@@ -1080,6 +1087,412 @@ saveRDS(out, here::here('results', 'out_sst_probs.RDS'))
 
 ```
 
+
+```{r sst2 model}
+
+CSL_CJS <- nimbleCode({
+
+# Priors and constraints
+   for (i in 1:n_f) { 
+    for (t in 1:(n_occasions - 1)) {
+      logit(phiP[i,t]) <- mu.P  + b.sst.P*sst_pupForage[t] 
+      logit(p1[i,t]) <- mu.p1 #+ eps.p[t]
+      logit(phi1[i,t]) <- mu.1  + b.sst.1*sst_np[t] 
+      logit(p2[i,t]) <- mu.p2.3  #+ eps.p[t]
+      logit(phi2[i,t]) <- mu.2.3 + b.sst.2.3*sst_np[t]#+ eps2[t] 
+      logit(p3[i,t]) <- mu.p2.3 #+ eps.p[t]
+      logit(phi3[i,t]) <- mu.2.3 + b.sst.2.3*sst_np[t] #+ epsJ[t] 
+      logit(p4[i,t]) <- mu.p4.6 #+ eps.p[t]
+      logit(phi4[i,t]) <- mu.4.6 + b.sst.4.6*sst_np[t]#+ epsJ[t] 
+      logit(p5[i,t]) <- mu.p4.6 #+ eps.p[t]
+      logit(phi5[i,t]) <- mu.4.6 + b.sst.4.6*sst_np[t]#+ epsA[t] 
+      logit(p6[i,t]) <- mu.p4.6 #+ eps.p[t]
+      logit(phi6[i,t]) <- mu.4.6 + b.sst.4.6*sst_np[t] #+ epsA[t] 
+      logit(p7[i,t]) <- mu.p7.12 #+ eps.p[t]
+      logit(phi7[i,t]) <- mu.7.9 + b.sst.7.9*sst_np[t]#+ epsA[t] 
+      logit(p8[i,t]) <- mu.p7.12 #+ eps.p[t]
+      logit(phi8[i,t]) <- mu.7.9 + b.sst.7.9*sst_np[t]#+ epsA[t] 
+      logit(p9[i,t]) <- mu.p7.12 #+ eps.p[t]
+      logit(phi9[i,t]) <- mu.7.9 + b.sst.7.9*sst_np[t]#+ epsA[t] 
+      logit(p10[i,t]) <- mu.p7.12 #+ eps.p[t]
+      logit(phi10[i,t]) <- mu.10.12 + b.sst.10.12*sst_np[t]# + epsA[t] 
+      logit(p11[i,t]) <- mu.p7.12 #+ eps.p[t]
+      logit(phi11[i,t]) <- mu.10.12 + b.sst.10.12*sst_np[t]# + epsA[t] 
+      logit(p12[i,t]) <- mu.p7.12 #+ eps.p[t]
+      logit(phi12[i,t]) <- mu.10.12 + b.sst.10.12*sst_np[t]# + epsA[t] 
+      logit(p13[i,t]) <- mu.pA #+ eps.p[t]
+      logit(phi13[i,t]) <- mu.13.16 + b.sst.13.16*sst_np[t]# + epsA[t] 
+      logit(p14[i,t]) <- mu.pA
+      logit(phi14[i,t]) <- mu.13.16 + b.sst.13.16*sst_np[t]# + epsA[t] 
+      logit(p15[i,t]) <- mu.pA
+      logit(phi15[i,t]) <- mu.13.16 + b.sst.13.16*sst_np[t]# + epsA[t] 
+      logit(p16[i,t]) <- mu.pA
+      logit(phi16[i,t]) <- mu.13.16 + b.sst.13.16*sst_np[t]# + epsA[t] 
+      logit(pA[i,t]) <- mu.pA
+      logit(phiA[i,t]) <- mu.A + b.sst.A*sst_np[t]# + epsA[t] 
+    } #t  
+  } #females
+  
+  #males
+    for (i in 1:n_m) { 
+    for (t in 1:(n_occasions - 1)) {
+      logit(phiPM[i,t]) <- mu.PM + b.sst.P*sst_pupForage[t] #+ epsP[t]
+      logit(p1M[i,t]) <- mu.p1M #+ eps.p1[t]
+    } #t 
+    
+    for (t in 2:(n_occasions-1)) {
+      logit(phi1M[i,t]) <- mu.1M + b.sst.1*sst_np[t] #+ b.mass1M*mass_m[i] #+ eps1[t] 
+      logit(p2M[i,t]) <- mu.p2.3M # + eps.p2.3[t]
+    }
+    
+    for (t in 3:(n_occasions-1)) {
+      logit(phi2M[i,t]) <- mu.2.3M + b.sst.2.3M*sst_np[t]#+ eps2.3[t]
+      logit(p3M[i,t]) <- mu.p2.3M #+ eps.p2.3[t]
+    }
+    
+    for (t in 4:(n_occasions-1)) { 
+      logit(phi3M[i,t]) <- mu.2.3M + b.sst.2.3M*sst_np[t] #+ eps2.3[t] 
+      logit(p4M[i,t]) <- mu.p4.6M #+ eps.p4.6[t]
+    } #t psi
+    
+    for (t in 5:(n_occasions-1)) {
+      logit(phi4M[i,t]) <- mu.4.6M + b.sst.4.6M*sst_np[t]#+ eps4.6[t] 
+      logit(p5M[i,t]) <- mu.p4.6M #+ eps.p4.6[t]
+    } #t 
+    
+    for (t in 6:(n_occasions-1)) {  
+      logit(phi5M[i,t]) <- mu.4.6M + b.sst.4.6M*sst_np[t] #+ eps4.6[t] 
+      logit(p6M[i,t]) <- mu.p4.6M #+ eps.p4.6[t]
+    } #t 
+    
+    for (t in 7:(n_occasions-1)) {  
+      logit(phi6M[i,t]) <- mu.4.6M + b.sst.4.6M*sst_np[t]#+ eps4.6[t] 
+      logit(p7M[i,t]) <- mu.p7.12M #+ eps.pAM[t]
+    } #t 
+    
+    for (t in 8:(n_occasions-1)) {  
+      logit(phi7M[i,t]) <- mu.7.9M + b.sst.7.9M*sst_np[t]#+ epsAM[t] 
+      logit(p8M[i,t]) <- mu.p7.12M #+ eps.pAM[t]
+    } #t 
+    
+    for (t in 9:(n_occasions-1)) {  
+      logit(phi8M[i,t]) <- mu.7.9M + b.sst.7.9M*sst_np[t]
+      logit(p9M[i,t]) <- mu.p7.12M #+ eps.pAM[t]
+    } #t 
+    
+    for (t in 10:(n_occasions-1)) {  
+      logit(phi9M[i,t]) <- mu.7.9M + b.sst.7.9M*sst_np[t]
+      logit(p10M[i,t]) <- mu.p7.12M #+ eps.pAM[t]
+    } #t 
+    
+    for (t in 11:(n_occasions-1)) {  
+      logit(phi10M[i,t]) <- mu.10.12M + b.sst.10.12M*sst_np[t]
+      logit(p11M[i,t]) <- mu.p7.12M #+ eps.pAM[t]
+    } #t 
+  
+    for (t in 12:(n_occasions-1)) {  
+      logit(phi11M[i,t]) <- mu.10.12M + b.sst.10.12M*sst_np[t]
+      logit(p12M[i,t]) <- mu.p7.12M #+ eps.pAM[t]
+    } #t   
+    
+        for (t in 13:(n_occasions-1)) {  
+      logit(phi12M[i,t]) <- mu.10.12M + b.sst.10.12M*sst_np[t]
+      logit(p13M[i,t]) <- mu.pAM #+ eps.pAM[t]
+    } #t  
+    
+        for (t in 14:(n_occasions-1)) {  
+      logit(phi13M[i,t]) <- mu.13.16M + b.sst.13.16M*sst_np[t] 
+       logit(p14M[i,t]) <- mu.pAM 
+    } #t  
+    
+        for (t in 15:(n_occasions-1)) {  
+      logit(phi14M[i,t]) <- mu.13.16M + b.sst.13.16M*sst_np[t]
+       logit(p15M[i,t]) <- mu.pAM 
+    } #t  
+    
+        for (t in 16:(n_occasions-1)) {  
+      logit(phi15M[i,t]) <- mu.13.16M + b.sst.13.16M*sst_np[t]
+       logit(p16M[i,t]) <- mu.pAM 
+    } #t  
+    
+        for (t in 17:(n_occasions-1)) {  
+      logit(phi16M[i,t]) <- mu.13.16M + b.sst.13.16M*sst_np[t]
+       logit(pAM[i,t]) <- mu.pAM 
+    } #t  
+    
+        for (t in 18:(n_occasions-1)) {  
+      logit(phiAM[i,t]) <- mu.AM + b.sst.AM*sst_np[t] 
+    } #t  
+  } #males
+    
+   
+### Priors
+     mu.p1 <- log(int.p1/(1 - int.p1))
+    mu.p2.3 <- log(int.p2.3/(1 - int.p2.3))
+    mu.p4.6 <- log(int.p4.6/(1 - int.p4.6))
+    mu.p7.12 <- log(int.p7.12/(1 - int.p7.12))
+    mu.pA <- log(int.pA/(1 - int.pA))
+
+    int.p1 ~ dunif(0,1)
+    int.p2.3 ~ dunif(0,1)
+    int.p4.6 ~ dunif(0,1)
+    int.p7.12 ~ dunif(0,1)
+    int.pA ~ dunif(0,1)
+    
+    mu.p1M <- log(int.p1M/(1 - int.p1M))
+    mu.p2.3M <- log(int.p2.3M/(1 - int.p2.3M))
+    mu.p4.6M <- log(int.p4.6M/(1 - int.p4.6M))
+    mu.p7.12M <- log(int.p7.12M/(1 - int.p7.12M))
+    mu.pAM <- log(int.pAM/(1 - int.pAM))
+
+    int.p1M ~ dunif(0,1)
+    int.p2.3M ~ dunif(0,1)
+    int.p4.6M ~ dunif(0,1)
+    int.p7.12M ~ dunif(0,1)
+    int.pAM ~ dunif(0,1)
+
+    #survival
+    mu.P <- log(int.phiP/(1 - int.phiP))
+    mu.1 <- log(int.phi1/(1 - int.phi1))
+    mu.2.3 <- log(int.phi2.3/(1 - int.phi2.3))
+    mu.4.6 <- log(int.phi4.6/(1 - int.phi4.6))
+    mu.7.9 <- log(int.phi7.9/(1 - int.phi7.9))
+    mu.10.12 <- log(int.phi10.12/(1 - int.phi10.12))
+    mu.13.16 <- log(int.phi13.16/(1 - int.phi13.16))
+    mu.A <- log(int.phiA/(1 - int.phiA))
+    
+    int.phiP ~ dunif(0,1)
+    int.phi1 ~ dunif(0,1)
+    int.phi2.3 ~ dunif(0,1)
+    int.phi4.6 ~ dunif(0,1)
+    int.phi7.9 ~ dunif(0,1)
+    int.phi10.12 ~ dunif(0,1)
+    int.phi13.16 ~ dunif(0,1)
+    int.phiA ~ dunif(0,1)
+    
+    #males
+    mu.PM <- log(int.phiPM/(1 - int.phiPM))
+    mu.1M <- log(int.phi1M/(1 - int.phi1M))
+    mu.2.3M <- log(int.phi2.3M/(1 - int.phi2.3M))
+    mu.4.6M <- log(int.phi4.6M/(1 - int.phi4.6M))
+    mu.7.9M <- log(int.phi7.9M/(1 - int.phi7.9M))
+    mu.10.12M <- log(int.phi10.12M/(1 - int.phi10.12M))
+    mu.13.16M <- log(int.phi10.12M/(1 - int.phi13.16M))
+    mu.AM <- log(int.phiAM/(1 - int.phiAM))
+    
+    int.phiPM ~ dunif(0,1)
+    int.phi1M ~ dunif(0,1)
+    int.phi2.3M ~ dunif(0,1)
+    int.phi4.6M ~ dunif(0,1)
+    int.phi7.9M ~ dunif(0,1)
+    int.phi10.12M ~ dunif(0,1)
+    int.phi13.16M ~ dunif(0,1)
+    int.phiAM ~ dunif(0,1)
+    
+    # b.massP ~ dnorm(0, sd = s.mass)
+    # b.mass1 ~ dnorm(0, sd = s.mass)
+    # b.massPM ~ dnorm(0, sd = s.mass)
+    # b.mass1M ~ dnorm(0, sd = s.mass)
+    # s.mass ~ dexp(1)
+    
+    b.sst.P ~ dnorm(0,sd = s.sstP)
+    b.sst.1 ~ dnorm(0, sd = s.sst1)
+    b.sst.2.3 ~ dnorm(0,sd = s.sst2.3)
+    b.sst.4.6 ~ dnorm(0,sd = s.sstJ)
+    b.sst.7.9 ~ dnorm(0,sd = s.sst.A)
+    b.sst.10.12 ~ dnorm(0,sd = s.sst.A)
+    b.sst.13.16 ~ dnorm(0,sd = s.sst.A)
+    b.sst.A ~ dnorm(0,sd = s.sst.A)
+    s.sstP ~ dexp(1)
+    s.sst1 ~ dexp(1)
+    s.sst2.3 ~ dexp(1)
+    s.sstJ ~ dexp(1)
+    s.sst.A ~ dexp(1)
+    
+    b.sst.2.3M ~ dnorm(0,sd = s.sst2.3M)
+    b.sst.4.6M ~ dnorm(0,sd = s.sstJM)
+    b.sst.7.9M ~ dnorm(0,sd = s.sst.AM)
+    b.sst.10.12M ~ dnorm(0,sd = s.sst.AM)
+    b.sst.13.16M ~ dnorm(0,sd = s.sst.AM)
+    b.sst.AM ~ dnorm(0,sd = s.sst.AM)
+    s.sstPM ~ dexp(1)
+    s.sst1M ~ dexp(1)
+    s.sst2.3M ~ dexp(1)
+    s.sstJM ~ dexp(1)
+    s.sst.AM ~ dexp(1)
+    
+     for (t in 1:(n_occasions-1)){
+        phiP.prob[t] <- ilogit(mu.P + b.sst.P*sst_pupForage[t])
+        phi1.prob[t] <- ilogit(mu.1  + b.sst.1*sst_np[t])
+        phi2.3.prob[t] <- ilogit(mu.2.3  + b.sst.2.3*sst_np[t])
+        phi4.6.prob[t] <- ilogit(mu.4.6  + b.sst.4.6*sst_np[t])
+        phi7.9.prob[t] <- ilogit(mu.7.9  + b.sst.7.9*sst_np[t])
+        phi10.12.prob[t] <- ilogit(mu.10.12 + b.sst.10.12*sst_np[t])
+        phi13.16.prob[t] <- ilogit(mu.13.16 + b.sst.13.16*sst_np[t])
+        phiA.prob[t] <- ilogit(mu.A + b.sst.A*sst_np[t])
+        
+        phiPM.prob[t] <- ilogit(mu.PM + b.sst.P*sst_pupForage[t])
+        phi1M.prob[t] <- ilogit(mu.1M + b.sst.1*sst_np[t])
+        phi2.3M.prob[t] <- ilogit(mu.2.3M + b.sst.2.3M*sst_np[t])
+        phi4.6M.prob[t] <- ilogit(mu.4.6M + b.sst.4.6M*sst_np[t])
+        phi7.9M.prob[t] <- ilogit(mu.7.9M + b.sst.7.9M*sst_np[t])
+        phi10.12M.prob[t] <- ilogit(mu.10.12M + b.sst.10.12M*sst_np[t])
+        phi13.16M.prob[t] <- ilogit(mu.13.16M + b.sst.13.16M*sst_np[t])
+        phiAM.prob[t] <- ilogit(mu.AM + b.sst.AM*sst_np[t])
+    }
+  
+    #likelihood
+for (i in 1:n_f) { #females
+    z[i, fc[i]:fc[i]] <- 1 #pups at first capture
+
+for (t in (fc[i] + 1):n_occasions) {
+      z[i,t] ~ dcat(state_probs[i,t-1,1:19])
+      y[i,t] ~ dcat(event_probs[i,t,1:19])
+      
+    state_probs[i,t-1,1:19] <- getPHI(z = z[i,t-1], 
+                                      phiP = phiP[i,t-1], phi1 = phi1[i,t-1], phi2 = phi2[i,t-1], 
+                                      phi3 = phi3[i,t-1], phi4 = phi4[i,t-1], phi5 = phi5[i,t-1], 
+                                      phi6 = phi6[i,t-1], phi7 = phi7[i,t-1], phi8 = phi8[i,t-1],
+                                      phi9 = phi9[i,t-1], phi10 = phi10[i,t-1], 
+                                      phi11 = phi11[i,t-1], phi12 = phi12[i,t-1],
+                                      phi13 = phi13[i,t-1], phi14 = phi14[i,t-1], 
+                                      phi15 = phi15[i,t-1], phi16 = phi16[i,t-1],
+                                      phiA = phiA[i,t-1])
+    
+    event_probs[i,t,1:19] <- getP(z = z[i,t], 
+                                    p1 = p1[i,t-1], p2 = p2[i,t-1], p3 = p3[i,t-1], 
+                                    p4 = p4[i,t-1], p5 = p5[i,t-1], p6 = p6[i,t-1],
+                                    p7 = p7[i,t-1], p8 = p8[i,t-1], p9 = p9[i,t-1],
+                                  p10 = p10[i,t-1], p11 = p11[i,t-1], p12 = p12[i,t-1],
+                                  p13 = p13[i,t-1], p14 = p14[i,t-1], p15 = p15[i,t-1],
+                                    p16 = p16[i,t-1], pA = pA[i,t-1])
+    } #t likelihood 
+} #i likelihood 
+    
+    for (i in 1:n_m) { #males
+    zm[i, fc_m[i]:fc_m[i]] <- 1 #pups at first capture
+
+for (t in (fc_m[i] + 1):n_occasions) {
+      zm[i,t] ~ dcat(state_probsM[i,t-1,1:19])
+      ym[i,t] ~ dcat(event_probsM[i,t,1:19])
+      
+    state_probsM[i,t-1,1:19] <- getPHI(z = zm[i,t-1], 
+                                      phiP = phiPM[i,t-1], phi1 = phi1M[i,t-1], 
+                                      phi2 = phi2M[i,t-1], 
+                                      phi3 = phi3M[i,t-1], 
+                                      phi4 = phi4M[i,t-1], phi5 = phi5M[i,t-1], 
+                                      phi6 = phi6M[i,t-1], phi7 = phi7M[i,t-1], 
+                                      phi8 = phi8M[i,t-1], phiA = phiAM[i,t-1],
+                                      phi9 = phi9M[i,t-1], phi10 = phi10M[i,t-1],
+                                      phi11 = phi11M[i,t-1], phi12 = phi12M[i,t-1],
+                                      phi13 = phi13M[i,t-1], phi14 = phi14M[i,t-1],
+                                      phi15 = phi15M[i,t-1], phi16 = phi16M[i,t-1])
+    
+    event_probsM[i,t,1:19] <- getP(z = zm[i,t], 
+                                    p1 = p1M[i,t-1], p2 = p2M[i,t-1], p3 = p3M[i,t-1], 
+                                    p4 = p4M[i,t-1], p5 = p5M[i,t-1], p6 = p6M[i,t-1],
+                                    p7 = p7M[i,t-1], p8 = p8M[i,t-1], p9 = p9M[i,t-1],
+                                    p10 = p10M[i,t-1], p11 = p11M[i,t-1], p12 = p12M[i,t-1], 
+                                  p13 = p13M[i,t-1],
+                                  p14 = p14M[i,t-1], p15 = p15M[i,t-1], p16 = p16M[i,t-1], 
+                                  pA = pAM[i,t-1])
+    } #t likelihood 
+} #i likelihood 
+    
+}) # mod   
+
+##### run model ####
+nim.data <- list(y = y, ym = ym)
+
+nim.constants <- list(n_f = dim(y)[1], n_m = dim(ym)[1], 
+                      n_occasions = n_occasions,
+                      sst_pupForage = sst_dat[,2],
+                      sst_np = sst_dat[,4],
+                      # mass_f = mass_f, mass_m = mass_m, #site = rook, sex = sex,
+                      fc = fc, fc_m = fc_m)
+
+inits <- list(int.phiP = 0.6, int.phi1 = 0.6, int.phi2.3 = 0.9, 
+              int.phi4.6 = 0.9, int.phi7.9 = 0.9, 
+              int.phi10.12 = 0.9, int.phi13.16 = 0.8, int.phiA = 0.6,
+              int.phiPM = 0.9, int.phi1M = 0.9, int.phi2.3M = 0.9, int.phi4.6M = 0.9, 
+              int.phi7.9M = 0.9, 
+              int.phi10.12M = 0.9, int.phi13.16M = 0.8, int.phiAM = 0.6,
+              int.p1 = 0.4, int.p2.3 = 0.4, int.p4.6 = 0.5, int.p7.12 = 0.7, int.pA = 0.8,
+              int.p1M = 0.4, int.p2.3M = 0.4, int.p4.6M = 0.5, int.p7.12M = 0.7, int.pAM = 0.8,
+              # b.massP = 0, b.mass1 = 0, b.massPM = 0, b.mass1M = 0, 
+              b.sst.P = 0, b.sst.1 = 0,
+              z = z.init, zm = z.init.m)
+
+### parameters
+params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA', 
+            'int.p1M', 'int.p2.3M', 'int.p4.6M', 'int.p7.12M', 'int.pAM',
+            # 'b.massP', 'b.mass1', 'b.massPM', 'b.mass1M',
+            'phiP.prob', 'phi1.prob', 'phi2.3.prob', 'phi4.6.prob', 'phi7.9.prob', 'phi10.12.prob',
+            'phi13.16.prob', 'phiA.prob',
+            'phiPM.prob', 'phi1M.prob', 'phi2.3M.prob', 'phi4.6M.prob', 'phi7.9M.prob',
+            'phi10.12M.prob', 'phi13.16M.prob', 'phiAM.prob',
+            'b.sst.P', 'b.sst.1', 'b.sst.2.3', 'b.sst.4.6', 'b.sst.7.9', 'b.sst.10.12', 'b.sst.13.16', 'b.sst.A',
+            # 'b.sst.PM', 'b.sst.1M', 
+            'b.sst.2.3M', 'b.sst.4.6M', 'b.sst.7.9M', 'b.sst.10.12M',
+            'b.sst.13.16M','b.sst.AM',
+            'int.phiP', 'int.phi1', 'int.phi2.3', 'int.phi4.6', 'int.phi7.9',
+            'int.phi10.12', 'int.phi13.16', 'int.phiA',
+            'int.phiPM', 'int.phi1M', 'int.phi2.3M', 'int.phi4.6M', 'int.phi7.9M',
+            'int.phi10.12M', 'int.phi13.16M', 'int.phiAM')
+
+### run model
+# n.iter = 3500; n.chains = 3; n.burnin = 2000; nthin = 3; nAdapt = 20
+n.iter = 10000; n.chains = 3; n.burnin = 5000; nthin = 2; nAdapt = 20
+# n.iter = 200; n.chains = 1; n.burnin = 50; nthin = 2; nAdapt = 20
+
+
+# start <- Sys.time()
+# 
+cores=detectCores()
+used.cores = min(n.chains, cores)
+cl <- makeCluster(n.chains, setup_strategy = "sequential")
+registerDoParallel(cl)
+
+foreach(i = 1:n.chains) %dopar% {
+  library(nimble)
+  library(here)
+  source(here("scripts", "nimbleFunctions.R"))
+
+Rmodel <- nimbleModel(code = CSL_CJS, 
+                      constants = nim.constants, data = nim.data, 
+                      calculate = F, check = F, inits = inits)
+
+conf <- configureMCMC(Rmodel, monitors = params, control = list(adaptInterval = nAdapt), 
+                      thin = nthin, useConjugacy = FALSE)
+
+Rmcmc <- buildMCMC(conf)  #produce uncompiled R mcmc function
+Cmodel <- compileNimble(Rmodel)
+Cmcmc <- compileNimble(Rmcmc, project = Rmodel)
+
+# sink(here('results', 'errors_CJS_sst.txt'))
+
+out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin, 
+               # nchains = n.chains,
+               nchains = 1,
+               inits = inits,
+                 setSeed = FALSE, progressBar = TRUE,
+               samplesAsCodaMCMC = TRUE)
+
+saveRDS(out, here::here('results', paste0('out_sst_probs_', i,'.RDS', sep = '')))
+}
+
+out_1 <- readRDS(here::here('results', paste("out_sst_probs_", "1.RDS", sep = "")))
+out_2 <- readRDS(here::here('results', paste("out_sst_probs_", "2.RDS", sep = "")))
+out_3 <- readRDS(here::here('results', paste("out_sst_probs_", "3.RDS", sep = "")))
+
+library(coda)
+out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
+
+saveRDS(out, here::here('results', 'out_sst_probs_v2.RDS'))
+
+```
+
+
 ```{r enso memory model}
 
 CSL_CJS <- nimbleCode({
@@ -1452,15 +1865,17 @@ out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin,
 
 #stable age logic to initialize N_f and N_m
 # define survival rates
-phi_P <- 0.7
+phi_P <- 0.65
 phi_1 <- 0.8
 phi_J <- 0.85 # Juveniles (Ages 2-5)
 phi_A <- 0.92 # Adults (Ages 6-13)
 phi_AA <- 0.78
+phi_AM <- 0.8
+phi_AAM <- 0.4
 
 # storage
 N_f_track <- matrix(0, nrow = 25, ncol = (n_occasions-1))
-N_m_track <- matrix(0, nrow = 25, ncol = (n_occasions-1))
+N_m_track <- matrix(0, nrow = 20, ncol = (n_occasions-1))
 
 # year 1; assuming 50:50 sex ratio for pups
 N_f_track[1, 1] <- round(pup_cnt_filled$US_PupCnt[1] / 2)
@@ -1473,14 +1888,22 @@ for (a in 1:24) {
           ifelse(a >= 6 & a <= 12, phi_A, phi_AA))))
           
   N_f_track[a + 1, 1] <- round(N_f_track[a, 1] * surv)
+}
+
+for (a in 1:19) {
+  surv <- ifelse(a == 1, phi_P, 
+          ifelse(a == 2, phi_1, 
+          ifelse(a >= 3 & a <= 5, phi_J,
+          ifelse(a >= 6 & a <= 12, phi_AM, phi_AAM))))
+          
   N_m_track[a + 1, 1] <- round(N_m_track[a, 1] * surv)
 }
 
-# 4. Dynamically project the rest of the matrix forward through time
+# dynamically project the rest of the matrix forward through time
 for (t in 1:(n_occasions - 2)) {
   
-  # Insert the REAL pup count for the next year
-  N_f_track[1, t+1] <- round(pup_cnt_filled$US_PupCnt[t+1] / 2)
+  # Insert the pup count for the next year
+  N_f_track[1, t+1] <- round(pup_cnt_filled$US_PupCnt[t+1]/2)
   N_m_track[1, t+1] <- pup_cnt_filled$US_PupCnt[t+1] - N_f_track[1, t+1]
   
   # Pups transition to yearlings (Index 1 -> 2)
@@ -1505,6 +1928,9 @@ for (t in 1:(n_occasions - 2)) {
   
     for (a in 13:24) {
     N_f_track[a+1, t+1] <- round(N_f_track[a, t] * phi_AA)
+    }
+  
+  for (a in 13:19) {
     N_m_track[a+1, t+1] <- round(N_m_track[a, t] * phi_AA)
   }
 }
@@ -1535,45 +1961,45 @@ CSL_IPM <- nimbleCode({
   
   # scaled population density dependence
   for (t in 1:(n_occasions - 1)) {
-    N_total[t] <- sum(N_f[1:25, t]) + sum(N_m[1:25, t])
+    N_total[t] <- sum(N_f[1:25, t]) + sum(N_m[1:20, t])
     N_scaled[t] <- N_total[t] / 100000 
   }
   
-   for (i in 1:n_f) { 
+    for (i in 1:n_f) { 
     for (t in 1:(n_occasions - 1)) {
-      logit(phiP[i,t]) <- mu.P + b.sst.P*sst_pupForage[t] - beta.DD*N_scaled[t]
-      logit(p1[i,t]) <- mu.p1 
+      logit(phiP[i,t]) <- mu.P  + b.sst.P*sst_pupForage[t] 
+      logit(p1[i,t]) <- mu.p1 #+ eps.p[t]
       logit(phi1[i,t]) <- mu.1  + b.sst.1*sst_np[t] 
-      logit(p2[i,t]) <- mu.p2.3  
-      logit(phi2[i,t]) <- mu.2.3 + b.sst.2.3*sst_np[t]
-      logit(p3[i,t]) <- mu.p2.3 
-      logit(phi3[i,t]) <- mu.2.3 + b.sst.2.3*sst_np[t] 
-      logit(p4[i,t]) <- mu.p4.6 
-      logit(phi4[i,t]) <- mu.4.6 + b.sst.4.6*sst_np[t]
-      logit(p5[i,t]) <- mu.p4.6 
-      logit(phi5[i,t]) <- mu.4.6 + b.sst.4.6*sst_np[t]
-      logit(p6[i,t]) <- mu.p4.6 
-      logit(phi6[i,t]) <- mu.4.6 + b.sst.4.6*sst_np[t] 
-      logit(p7[i,t]) <- mu.p7.12 #+ eps.pA[t]
-      logit(phi7[i,t]) <- mu.7.9 + b.sst.7.9*sst_np[t]
-      logit(p8[i,t]) <- mu.p7.12 #+ eps.pA[t]
-      logit(phi8[i,t]) <- mu.7.9 + b.sst.7.9*sst_np[t]
-      logit(p9[i,t]) <- mu.p7.12 #+ eps.pA[t]
-      logit(phi9[i,t]) <- mu.7.9 + b.sst.7.9*sst_np[t]
-      logit(p10[i,t]) <- mu.p7.12 #+ eps.pA[t]
-      logit(phi10[i,t]) <- mu.10.12 + b.sst.A*sst_np[t]
-      logit(p11[i,t]) <- mu.p7.12 #+ eps.pA[t]
-      logit(phi11[i,t]) <- mu.10.12 + b.sst.A*sst_np[t]# + epsA[t] 
-      logit(p12[i,t]) <- mu.p7.12 #+ eps.pA[t]
-      logit(phi12[i,t]) <- mu.10.12 + b.sst.A*sst_np[t]# + epsA[t] 
-      logit(p13[i,t]) <- mu.pA #+ eps.pA[t]
-      logit(phi13[i,t]) <- mu.13.16 + b.sst.A*sst_np[t]# + epsA[t] 
+      logit(p2[i,t]) <- mu.p2.3  #+ eps.p[t]
+      logit(phi2[i,t]) <- mu.2.3 + b.sst.2.3*sst_np[t]#+ eps2[t] 
+      logit(p3[i,t]) <- mu.p2.3 #+ eps.p[t]
+      logit(phi3[i,t]) <- mu.2.3 + b.sst.2.3*sst_np[t] #+ epsJ[t] 
+      logit(p4[i,t]) <- mu.p4.6 #+ eps.p[t]
+      logit(phi4[i,t]) <- mu.4.6 + b.sst.4.6*sst_np[t]#+ epsJ[t] 
+      logit(p5[i,t]) <- mu.p4.6 #+ eps.p[t]
+      logit(phi5[i,t]) <- mu.4.6 + b.sst.4.6*sst_np[t]#+ epsA[t] 
+      logit(p6[i,t]) <- mu.p4.6 #+ eps.p[t]
+      logit(phi6[i,t]) <- mu.4.6 + b.sst.4.6*sst_np[t] #+ epsA[t] 
+      logit(p7[i,t]) <- mu.p7.12 #+ eps.p[t]
+      logit(phi7[i,t]) <- mu.7.9 + b.sst.7.9*sst_np[t]#+ epsA[t] 
+      logit(p8[i,t]) <- mu.p7.12 #+ eps.p[t]
+      logit(phi8[i,t]) <- mu.7.9 + b.sst.7.9*sst_np[t]#+ epsA[t] 
+      logit(p9[i,t]) <- mu.p7.12 #+ eps.p[t]
+      logit(phi9[i,t]) <- mu.7.9 + b.sst.7.9*sst_np[t]#+ epsA[t] 
+      logit(p10[i,t]) <- mu.p7.12 #+ eps.p[t]
+      logit(phi10[i,t]) <- mu.10.12 + b.sst.10.12*sst_np[t]# + epsA[t] 
+      logit(p11[i,t]) <- mu.p7.12 #+ eps.p[t]
+      logit(phi11[i,t]) <- mu.10.12 + b.sst.10.12*sst_np[t]# + epsA[t] 
+      logit(p12[i,t]) <- mu.p7.12 #+ eps.p[t]
+      logit(phi12[i,t]) <- mu.10.12 + b.sst.10.12*sst_np[t]# + epsA[t] 
+      logit(p13[i,t]) <- mu.pA #+ eps.p[t]
+      logit(phi13[i,t]) <- mu.13.16 + b.sst.13.16*sst_np[t]# + epsA[t] 
       logit(p14[i,t]) <- mu.pA
-      logit(phi14[i,t]) <- mu.13.16 + b.sst.A*sst_np[t]# + epsA[t] 
+      logit(phi14[i,t]) <- mu.13.16 + b.sst.13.16*sst_np[t]# + epsA[t] 
       logit(p15[i,t]) <- mu.pA
-      logit(phi15[i,t]) <- mu.13.16 + b.sst.A*sst_np[t]# + epsA[t] 
+      logit(phi15[i,t]) <- mu.13.16 + b.sst.13.16*sst_np[t]# + epsA[t] 
       logit(p16[i,t]) <- mu.pA
-      logit(phi16[i,t]) <- mu.13.16 + b.sst.A*sst_np[t]# + epsA[t] 
+      logit(phi16[i,t]) <- mu.13.16 + b.sst.13.16*sst_np[t]# + epsA[t] 
       logit(pA[i,t]) <- mu.pA
       logit(phiA[i,t]) <- mu.A + b.sst.A*sst_np[t]# + epsA[t] 
     } #t  
@@ -1582,47 +2008,96 @@ CSL_IPM <- nimbleCode({
   #males
     for (i in 1:n_m) { 
     for (t in 1:(n_occasions - 1)) {
-      logit(phiPM[i,t]) <- mu.PM + b.sst.P*sst_pupForage[t] - beta.DD*N_scaled[t]
-      logit(p1M[i,t]) <- mu.p1 #+ eps.p1[t]
-      logit(phi1M[i,t]) <- mu.1M + 
-        b.sst.1*sst_np[t] #+ b.mass1M*mass_m[i] #+ eps1[t] 
-      logit(p2M[i,t]) <- mu.p2.3 # + eps.p2.3[t]
-      logit(phi2M[i,t]) <- mu.2.3M + b.sst.2.3*sst_np[t]#+ eps2.3[t]
-      logit(p3M[i,t]) <- mu.p2.3 #+ eps.p2.3[t]
-      logit(phi3M[i,t]) <- mu.2.3M + b.sst.2.3*sst_np[t] #+ eps2.3[t] 
+      logit(phiPM[i,t]) <- mu.PM + b.sst.P*sst_pupForage[t] #+ epsP[t]
+      logit(p1M[i,t]) <- mu.p1M #+ eps.p1[t]
+    } #t 
+    
+    for (t in 2:(n_occasions-1)) {
+      logit(phi1M[i,t]) <- mu.1M + b.sst.1*sst_np[t] #+ b.mass1M*mass_m[i] #+ eps1[t] 
+      logit(p2M[i,t]) <- mu.p2.3M # + eps.p2.3[t]
+    }
+    
+    for (t in 3:(n_occasions-1)) {
+      logit(phi2M[i,t]) <- mu.2.3M + b.sst.2.3M*sst_np[t]#+ eps2.3[t]
+      logit(p3M[i,t]) <- mu.p2.3M #+ eps.p2.3[t]
+    }
+    
+    for (t in 4:(n_occasions-1)) { 
+      logit(phi3M[i,t]) <- mu.2.3M + b.sst.2.3M*sst_np[t] #+ eps2.3[t] 
       logit(p4M[i,t]) <- mu.p4.6M #+ eps.p4.6[t]
+    } #t psi
+    
+    for (t in 5:(n_occasions-1)) {
       logit(phi4M[i,t]) <- mu.4.6M + b.sst.4.6M*sst_np[t]#+ eps4.6[t] 
       logit(p5M[i,t]) <- mu.p4.6M #+ eps.p4.6[t]
+    } #t 
+    
+    for (t in 6:(n_occasions-1)) {  
       logit(phi5M[i,t]) <- mu.4.6M + b.sst.4.6M*sst_np[t] #+ eps4.6[t] 
       logit(p6M[i,t]) <- mu.p4.6M #+ eps.p4.6[t]
+    } #t 
+    
+    for (t in 7:(n_occasions-1)) {  
       logit(phi6M[i,t]) <- mu.4.6M + b.sst.4.6M*sst_np[t]#+ eps4.6[t] 
       logit(p7M[i,t]) <- mu.p7.12M #+ eps.pAM[t]
-      logit(phi7M[i,t]) <- mu.7.9M #+ b.sst.A*sst_np[t]#+ epsAM[t] 
+    } #t 
+    
+    for (t in 8:(n_occasions-1)) {  
+      logit(phi7M[i,t]) <- mu.7.9M + b.sst.7.9M*sst_np[t]#+ epsAM[t] 
       logit(p8M[i,t]) <- mu.p7.12M #+ eps.pAM[t]
-      logit(phi8M[i,t]) <- mu.7.9M #+ epsAM[t] 
+    } #t 
+    
+    for (t in 9:(n_occasions-1)) {  
+      logit(phi8M[i,t]) <- mu.7.9M + b.sst.7.9M*sst_np[t]
       logit(p9M[i,t]) <- mu.p7.12M #+ eps.pAM[t]
-      logit(phi9M[i,t]) <- mu.7.9M #+ epsAM[t] 
+    } #t 
+    
+    for (t in 10:(n_occasions-1)) {  
+      logit(phi9M[i,t]) <- mu.7.9M + b.sst.7.9M*sst_np[t]
       logit(p10M[i,t]) <- mu.p7.12M #+ eps.pAM[t]
-      logit(phi10M[i,t]) <- mu.10.12M #+ epsAM[t] 
+    } #t 
+    
+    for (t in 11:(n_occasions-1)) {  
+      logit(phi10M[i,t]) <- mu.10.12M + b.sst.10.12M*sst_np[t]
       logit(p11M[i,t]) <- mu.p7.12M #+ eps.pAM[t]
-      logit(phi11M[i,t]) <- mu.10.12M #+ epsAM[t] 
+    } #t 
+  
+    for (t in 12:(n_occasions-1)) {  
+      logit(phi11M[i,t]) <- mu.10.12M + b.sst.10.12M*sst_np[t]
       logit(p12M[i,t]) <- mu.p7.12M #+ eps.pAM[t]
-      logit(phi12M[i,t]) <- mu.10.12M #+ epsAM[t] 
+    } #t   
+    
+        for (t in 13:(n_occasions-1)) {  
+      logit(phi12M[i,t]) <- mu.10.12M + b.sst.10.12M*sst_np[t]
       logit(p13M[i,t]) <- mu.pAM #+ eps.pAM[t]
-      logit(phi13M[i,t]) <- mu.13.16M #+ epsAM[t] 
+    } #t  
+    
+        for (t in 14:(n_occasions-1)) {  
+      logit(phi13M[i,t]) <- mu.13.16M + b.sst.13.16M*sst_np[t] 
        logit(p14M[i,t]) <- mu.pAM 
-      logit(phi14M[i,t]) <- mu.13.16M #+ epsAM[t]
+    } #t  
+    
+        for (t in 15:(n_occasions-1)) {  
+      logit(phi14M[i,t]) <- mu.13.16M + b.sst.13.16M*sst_np[t]
        logit(p15M[i,t]) <- mu.pAM 
-      logit(phi15M[i,t]) <- mu.13.16M #+ epsAM[t] 
+    } #t  
+    
+        for (t in 16:(n_occasions-1)) {  
+      logit(phi15M[i,t]) <- mu.13.16M + b.sst.13.16M*sst_np[t]
        logit(p16M[i,t]) <- mu.pAM 
-      logit(phi16M[i,t]) <- mu.13.16M #+ epsAM[t] 
+    } #t  
+    
+        for (t in 17:(n_occasions-1)) {  
+      logit(phi16M[i,t]) <- mu.13.16M + b.sst.13.16M*sst_np[t]
        logit(pAM[i,t]) <- mu.pAM 
-      logit(phiAM[i,t]) <- mu.AM #+ epsAM[t] 
+    } #t  
+    
+        for (t in 18:(n_occasions-1)) {  
+      logit(phiAM[i,t]) <- mu.AM + b.sst.AM*sst_np[t] 
     } #t  
   } #males
    
-### Priors
-    mu.p1 <- log(int.p1/(1 - int.p1))
+     mu.p1 <- log(int.p1/(1 - int.p1))
     mu.p2.3 <- log(int.p2.3/(1 - int.p2.3))
     mu.p4.6 <- log(int.p4.6/(1 - int.p4.6))
     mu.p7.12 <- log(int.p7.12/(1 - int.p7.12))
@@ -1634,10 +2109,14 @@ CSL_IPM <- nimbleCode({
     int.p7.12 ~ dunif(0,1)
     int.pA ~ dunif(0,1)
     
+    mu.p1M <- log(int.p1M/(1 - int.p1M))
+    mu.p2.3M <- log(int.p2.3M/(1 - int.p2.3M))
     mu.p4.6M <- log(int.p4.6M/(1 - int.p4.6M))
     mu.p7.12M <- log(int.p7.12M/(1 - int.p7.12M))
     mu.pAM <- log(int.pAM/(1 - int.pAM))
 
+    int.p1M ~ dunif(0,1)
+    int.p2.3M ~ dunif(0,1)
     int.p4.6M ~ dunif(0,1)
     int.p7.12M ~ dunif(0,1)
     int.pAM ~ dunif(0,1)
@@ -1652,14 +2131,14 @@ CSL_IPM <- nimbleCode({
     mu.13.16 <- log(int.phi13.16/(1 - int.phi13.16))
     mu.A <- log(int.phiA/(1 - int.phiA))
     
-    int.phiP ~ dunif(0.05,0.8)
-    int.phi1 ~ dunif(0.1,0.9)
-    int.phi2.3 ~ dunif(0.1,0.93)
-    int.phi4.6 ~ dunif(0.2,0.98)
-    int.phi7.9 ~ dunif(0.2,0.98)
-    int.phi10.12 ~ dunif(0.2,0.98)
-    int.phi13.16 ~ dunif(0.2,0.98)
-    int.phiA ~ dunif(0.2,0.98)
+    int.phiP ~ dunif(0,1)
+    int.phi1 ~ dunif(0,1)
+    int.phi2.3 ~ dunif(0,1)
+    int.phi4.6 ~ dunif(0,1)
+    int.phi7.9 ~ dunif(0,1)
+    int.phi10.12 ~ dunif(0,1)
+    int.phi13.16 ~ dunif(0,1)
+    int.phiA ~ dunif(0,1)
     
     #males
     mu.PM <- log(int.phiPM/(1 - int.phiPM))
@@ -1671,14 +2150,14 @@ CSL_IPM <- nimbleCode({
     mu.13.16M <- log(int.phi10.12M/(1 - int.phi13.16M))
     mu.AM <- log(int.phiAM/(1 - int.phiAM))
     
-    int.phiPM ~ dunif(0.05,0.8)
-    int.phi1M ~ dunif(0.1,0.9)
-    int.phi2.3M ~ dunif(0.1,0.95)
-    int.phi4.6M ~ dunif(0.1,0.95)
-    int.phi7.9M ~ dunif(0.1,0.95)
-    int.phi10.12M ~ dunif(0.1,0.95)
-    int.phi13.16M ~ dunif(0.1,0.95)
-    int.phiAM ~ dunif(0.1,0.9)
+    int.phiPM ~ dunif(0,1)
+    int.phi1M ~ dunif(0,1)
+    int.phi2.3M ~ dunif(0,1)
+    int.phi4.6M ~ dunif(0,1)
+    int.phi7.9M ~ dunif(0,1)
+    int.phi10.12M ~ dunif(0,1)
+    int.phi13.16M ~ dunif(0,1)
+    int.phiAM ~ dunif(0,1)
     
     # b.massP ~ dnorm(0, sd = s.mass)
     # b.mass1 ~ dnorm(0, sd = s.mass)
@@ -1686,46 +2165,50 @@ CSL_IPM <- nimbleCode({
     # b.mass1M ~ dnorm(0, sd = s.mass)
     # s.mass ~ dexp(1)
     
-    # b.sst.P ~ dnorm(0,sd = s.sst)
-    # b.sst.1 ~ dnorm(0, sd = s.sst)
-    # b.sst.2.3 ~ dnorm(0,sd = s.sst)
-    # b.sst.4.6 ~ dnorm(0,sd = s.sst)
-    # b.sst.2.3M ~ dnorm(0,sd = s.sst)
-    # b.sst.4.6M ~ dnorm(0,sd = s.sst)
-    # b.sst.7.9 ~ dnorm(0,sd = s.sst.A)
-    # b.sst.A ~ dnorm(0,sd = s.sst.A)
-    # s.sst ~ dexp(1)
-    # s.sst.A ~ dexp(1)
+    b.sst.P ~ dnorm(0,sd = s.sstP)
+    b.sst.1 ~ dnorm(0, sd = s.sst1)
+    b.sst.2.3 ~ dnorm(0,sd = s.sst2.3)
+    b.sst.4.6 ~ dnorm(0,sd = s.sstJ)
+    b.sst.7.9 ~ dnorm(0,sd = s.sst.A)
+    b.sst.10.12 ~ dnorm(0,sd = s.sst.A)
+    b.sst.13.16 ~ dnorm(0,sd = s.sst.A)
+    b.sst.A ~ dnorm(0,sd = s.sst.A)
+    s.sstP ~ dexp(1)
+    s.sst1 ~ dexp(1)
+    s.sst2.3 ~ dexp(1)
+    s.sstJ ~ dexp(1)
+    s.sst.A ~ dexp(1)
     
-    b.sst.P ~ dunif(-3,3)
-    b.sst.1 ~ dunif(-3,3)
-    b.sst.2.3 ~ dunif(-3,3)
-    b.sst.4.6 ~ dunif(-3,3)
-    b.sst.2.3M ~ dunif(-3,3)
-    b.sst.4.6M ~ dunif(-3,3)
-    b.sst.7.9 ~ dunif(-3,3)
-    b.sst.A ~ dunif(-3,3)
- 
+    b.sst.2.3M ~ dnorm(0,sd = s.sst2.3M)
+    b.sst.4.6M ~ dnorm(0,sd = s.sstJM)
+    b.sst.7.9M ~ dnorm(0,sd = s.sst.AM)
+    b.sst.10.12M ~ dnorm(0,sd = s.sst.AM)
+    b.sst.13.16M ~ dnorm(0,sd = s.sst.AM)
+    b.sst.AM ~ dnorm(0,sd = s.sst.AM)
+    s.sstPM ~ dexp(1)
+    s.sst1M ~ dexp(1)
+    s.sst2.3M ~ dexp(1)
+    s.sstJM ~ dexp(1)
+    s.sst.AM ~ dexp(1)
     
-    for (t in 1:(n_occasions-1)){
-        phiP.prob[t] <- ilogit(mu.P + b.sst.P*sst_pupForage[t] - beta.DD*N_scaled[t])
+     for (t in 1:(n_occasions-1)){
+        phiP.prob[t] <- ilogit(mu.P + b.sst.P*sst_pupForage[t])
         phi1.prob[t] <- ilogit(mu.1  + b.sst.1*sst_np[t])
         phi2.3.prob[t] <- ilogit(mu.2.3  + b.sst.2.3*sst_np[t])
         phi4.6.prob[t] <- ilogit(mu.4.6  + b.sst.4.6*sst_np[t])
         phi7.9.prob[t] <- ilogit(mu.7.9  + b.sst.7.9*sst_np[t])
-        phi10.12.prob[t] <- ilogit(mu.10.12 + b.sst.A*sst_np[t])
-        phi13.16.prob[t] <- ilogit(mu.13.16 + b.sst.A*sst_np[t])
+        phi10.12.prob[t] <- ilogit(mu.10.12 + b.sst.10.12*sst_np[t])
+        phi13.16.prob[t] <- ilogit(mu.13.16 + b.sst.13.16*sst_np[t])
         phiA.prob[t] <- ilogit(mu.A + b.sst.A*sst_np[t])
         
-        phiPM.prob[t] <- ilogit(mu.PM + b.sst.P*sst_pupForage[t] - beta.DD*N_scaled[t])
-        phi1M.prob[t] <- ilogit(mu.1M  + b.sst.1*sst_np[t])
-        phi2.3M.prob[t] <- ilogit(mu.2.3M  + b.sst.2.3M*sst_np[t])
-        phi4.6M.prob[t] <- ilogit(mu.4.6M  + b.sst.4.6M*sst_np[t])
-        phi7.9M.prob[t] <- ilogit(mu.7.9M)
-        phi10.12M.prob[t] <- ilogit(mu.10.12M)
-        phi13.16M.prob[t] <- ilogit(mu.13.16M)
-        phiAM.prob[t] <- ilogit(mu.AM)
-      
+        phiPM.prob[t] <- ilogit(mu.PM + b.sst.P*sst_pupForage[t])
+        phi1M.prob[t] <- ilogit(mu.1M + b.sst.1*sst_np[t])
+        phi2.3M.prob[t] <- ilogit(mu.2.3M + b.sst.2.3M*sst_np[t])
+        phi4.6M.prob[t] <- ilogit(mu.4.6M + b.sst.4.6M*sst_np[t])
+        phi7.9M.prob[t] <- ilogit(mu.7.9M + b.sst.7.9M*sst_np[t])
+        phi10.12M.prob[t] <- ilogit(mu.10.12M + b.sst.10.12M*sst_np[t])
+        phi13.16M.prob[t] <- ilogit(mu.13.16M + b.sst.13.16M*sst_np[t])
+        phiAM.prob[t] <- ilogit(mu.AM + b.sst.AM*sst_np[t])
     }
   
     #likelihood
@@ -1791,13 +2274,23 @@ for (t in (fc_m[i] + 1):n_occasions) {
 # fecundity 
   # int.fec_low ~ dunif(0, 1)  
   # int.fec_high ~ dunif(0, 1) 
-  int.fec_low ~ dunif(0.05, 0.8)  
-  int.fec_high ~ dunif(0.25,0.95)
+  int.fec_low ~ dunif(0.05, 0.6)  
+  int.fec_med ~ dunif(0.2,0.95)
+  int.fec_high ~ dunif(0.2,0.8)
+  
+  #warm year penalties, but probably not identifiable with b.sst
+  # mu.fec_low ~ dlogis(0.1,0.8)
+  # mu.fec_med ~ dlogis(0.2,0.95)
+  # mu.fec_high ~ dlogis(0.1,0.8)
+  # b.warm-fec ~ dnorm(0, sd = 2)
   
   # initial pop size at t = 1 
   # pups omitted here because they are set by the census below
   for(a in 2:25) {
     N_f[a, 1] ~ dpois(init_pop_size_f[a]) 
+  }
+  
+   for(a in 2:20) {
     N_m[a, 1] ~ dpois(init_pop_size_m[a])
   }
   
@@ -1810,78 +2303,6 @@ for (t in (fc_m[i] + 1):n_occasions) {
   # demographic transitions 
   #minus 2 bc counts only go up to 2024, so 35 yrs of counts instead of the 36 MR data
   for (t in 1:(n_occasions - 2)) {
-    
-    # N_f[2, t+1] ~ dbin(phiP.prob[t], N_f[1, t]) #pups survived to become yearlings
-    # N_m[2, t+1] ~ dbin(phiPM.prob[t], N_m[1, t])
-    # 
-    # N_f[3, t+1] ~ dbin(phi1.prob[t], N_f[2, t]) 
-    # N_m[3, t+1] ~ dbin(phi1M.prob[t], N_m[2, t])
-    # 
-    # N_f[4, t+1] ~ dbin(phi2.3.prob[t], N_f[3, t]) 
-    # N_m[4, t+1] ~ dbin(phi2.3M.prob[t], N_m[3, t])
-    # 
-    # N_f[5, t+1] ~ dbin(phi4.6.prob[t], N_f[4, t]) 
-    # N_m[5, t+1] ~ dbin(phi4.6M.prob[t], N_m[4, t])
-    # 
-    # N_f[6, t+1] ~ dbin(phi4.6.prob[t], N_f[5, t]) 
-    # N_m[6, t+1] ~ dbin(phi4.6M.prob[t], N_m[5, t])
-    # 
-    # N_f[7, t+1] ~ dbin(phi4.6.prob[t], N_f[6, t]) 
-    # N_m[7, t+1] ~ dbin(phi4.6M.prob[t], N_m[6, t])
-    # 
-    # N_f[8, t+1] ~ dbin(phi7.9.prob[t], N_f[7, t]) 
-    # N_m[8, t+1] ~ dbin(phi7.9M.prob[t], N_m[7, t])
-    # 
-    # N_f[9, t+1] ~ dbin(phi7.9.prob[t], N_f[8, t]) 
-    # N_m[9, t+1] ~ dbin(phi7.9M.prob[t], N_m[8, t])
-    # 
-    # N_f[10, t+1] ~ dbin(phi7.9.prob[t], N_f[9, t]) 
-    # N_m[10, t+1] ~ dbin(phi7.9M.prob[t], N_m[9, t])
-    # 
-    # N_f[11, t+1] ~ dbin(phi10.12.prob[t], N_f[10, t]) 
-    # N_m[11, t+1] ~ dbin(phi10.12M.prob[t], N_m[10, t])
-    # 
-    # N_f[12, t+1] ~ dbin(phi10.12.prob[t], N_f[11, t]) 
-    # N_m[12, t+1] ~ dbin(phi10.12M.prob[t], N_m[11, t])
-    # 
-    # N_f[13, t+1] ~ dbin(phi10.12.prob[t], N_f[12, t]) 
-    # N_m[13, t+1] ~ dbin(phi10.12M.prob[t], N_m[12, t])
-    # 
-    # N_f[14, t+1] ~ dbin(phi13.16.prob[t], N_f[13, t]) 
-    # N_m[14, t+1] ~ dbin(phi13.16M.prob[t], N_m[13, t])
-    # 
-    # N_f[15, t+1] ~ dbin(phi13.16.prob[t], N_f[14, t]) 
-    # N_m[15, t+1] ~ dbin(phi13.16M.prob[t], N_m[14, t])
-    # 
-    # N_f[16, t+1] ~ dbin(phi13.16.prob[t], N_f[15, t]) 
-    # N_m[16, t+1] ~ dbin(phi13.16M.prob[t], N_m[15, t])
-    # 
-    # N_f[17, t+1] ~ dbin(phi13.16.prob[t], N_f[16, t]) 
-    # N_m[17, t+1] ~ dbin(phi13.16M.prob[t], N_m[16, t])
-    # 
-    # N_f[18, t+1] ~ dbin(phiA.prob[t], N_f[17, t]) 
-    # N_m[18, t+1] ~ dbin(phiAM.prob[t], N_m[17, t])
-    # 
-    # N_f[19, t+1] ~ dbin(phiA.prob[t], N_f[18, t]) 
-    # N_m[19, t+1] ~ dbin(phiAM.prob[t], N_m[18, t])
-    # 
-    # N_f[20, t+1] ~ dbin(phiA.prob[t], N_f[19, t]) 
-    # N_m[20, t+1] ~ dbin(phiAM.prob[t], N_m[19, t])
-    # 
-    # N_f[21, t+1] ~ dbin(phiA.prob[t], N_f[20, t]) 
-    # N_m[21, t+1] ~ dbin(phiAM.prob[t], N_m[20, t])
-    # 
-    # N_f[22, t+1] ~ dbin(phiA.prob[t], N_f[21, t]) 
-    # N_m[22, t+1] ~ dbin(phiAM.prob[t], N_m[21, t])
-    # 
-    # N_f[23, t+1] ~ dbin(phiA.prob[t], N_f[22, t]) 
-    # N_m[23, t+1] ~ dbin(phiAM.prob[t], N_m[22, t])
-    # 
-    # N_f[24, t+1] ~ dbin(phiA.prob[t], N_f[23, t]) 
-    # N_m[24, t+1] ~ dbin(phiAM.prob[t], N_m[23, t])
-    # 
-    # N_f[25, t+1] ~ dbin(phiA.prob[t], N_f[24, t]) #24 is max allowable age
-    # N_m[25, t+1] ~ dbin(phiAM.prob[t], N_m[24, t])
     
     N_f[2, t+1] ~ dpois(phiP.prob[t]*N_f[1, t]) #pups survived to become yearlings
     N_m[2, t+1] ~ dpois(phiPM.prob[t]*N_m[1, t])
@@ -1941,24 +2362,35 @@ for (t in (fc_m[i] + 1):n_occasions) {
     N_m[20, t+1] ~ dpois(phiAM.prob[t]*N_m[19, t])
     
     N_f[21, t+1] ~ dpois(phiA.prob[t]*N_f[20, t]) 
-    N_m[21, t+1] ~ dpois(phiAM.prob[t]*N_m[20, t])
+    # N_m[21, t+1] ~ dpois(phiAM.prob[t]*N_m[20, t])
     
     N_f[22, t+1] ~ dpois(phiA.prob[t]*N_f[21, t]) 
-    N_m[22, t+1] ~ dpois(phiAM.prob[t]*N_m[21, t])
+    # N_m[22, t+1] ~ dpois(phiAM.prob[t]*N_m[21, t])
     
     N_f[23, t+1] ~ dpois(phiA.prob[t]*N_f[22, t]) 
-    N_m[23, t+1] ~ dpois(phiAM.prob[t]*N_m[22, t])
+    # N_m[23, t+1] ~ dpois(phiAM.prob[t]*N_m[22, t])
     
     N_f[24, t+1] ~ dpois(phiA.prob[t]*N_f[23, t]) 
-    N_m[24, t+1] ~ dpois(phiAM.prob[t]*N_m[23, t])
+    # N_m[24, t+1] ~ dpois(phiAM.prob[t]*N_m[23, t])
     
     N_f[25, t+1] ~ dpois(phiA.prob[t]*N_f[24, t]) #24 is max allowable age
-    N_m[25, t+1] ~ dpois(phiAM.prob[t]*N_m[24, t])
+    # N_m[25, t+1] ~ dpois(phiAM.prob[t]*N_m[24, t])
     
     # calculate the total expected pups from the unobserved adults
-    expected_pups_tot[t+1] <- (sum(N_f[5:10, t+1]) * int.fec_low) + 
-                              (sum(N_f[11:23, t+1]) * int.fec_high) + 0.1 #0.1 to prevent logProb
-                            
+    # expected_pups_tot[t+1] <- (sum(N_f[5:10, t+1]) * int.fec_low) + 
+    #                           (sum(N_f[11:23, t+1]) * int.fec_high) + 0.1 #0.1 to prevent logProb
+    
+    expected_pups_tot[t+1] <- (sum(N_f[6:8, t+1]) * int.fec_low) + #5-7yos
+                              (sum(N_f[9:18, t+1]) * int.fec_med) + #8-17yos
+                              (sum(N_f[19:23, t+1]) * int.fec_high) + 0.1 #0.1 to prevent logProb
+    
+    #warm year penality approach
+    # logit(int.fec_low[t]) <- mu.fec_low + b.warm.fec*(EN_fec_vec[t]-1)
+    # logit(int.fec_med[t]) <- mu.fec_med + b.warm.fec*(EN_fec_vec[t]-1)
+    # logit(int.fec_high[t]) <- mu.fec_high + b.warm.fec*(EN_fec_vec[t]-1)
+    # expected_pups_born[t+1] <- (sum(N_vec[6:8])*int.fec_low[t]*0.5) + 
+    #             (sum(N_vec[9:18])*int.fec_med[t]*0.5) + (sum(N_vec[19:23])*int.fec_high[t]*0.5)
+    
     # evaluate the biological expected pups directly against the census data
     # y_pup_counts[t+1] ~ dpois(expected_pups_tot[t+1]) 
     y_pup_counts[t+1] ~ dnorm(expected_pups_tot[t+1], tau.cnt) #more flexible for age structure
@@ -1991,8 +2423,7 @@ inits <- list(int.phiP = 0.6, int.phi1 = 0.6, int.phi2.3 = 0.85,
               b.massP = 0, b.mass1 = 0, b.massPM = 0, b.mass1M = 0, 
               b.sst.P = 0, b.sst.1 = 0,
               beta.DD = 0.02,
-              int.fec_low = 0.4, 
-              int.fec_high = 0.7,
+              int.fec_low = 0.4, int.fec_med = 0.6, int.fec_high = 0.7,
               sigma.cnt = 2000,
               b.sst.2.3 = 0, b.sst.4.6 = 0, b.sst.7.9 = 0, b.sst.A = 0,
               b.sst.2.3M = 0, b.sst.4.6M = 0,
@@ -2000,13 +2431,15 @@ inits <- list(int.phiP = 0.6, int.phi1 = 0.6, int.phi2.3 = 0.85,
               z = z.init, zm = z.init.m)
 
 ### parameters
-params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA', 'int.p4.6M', 
-            'int.p7.12M', 'int.pAM',
+params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA', 
+             'int.p2.3M', 'int.p4.6M', 'int.p7.12M', 'int.pAM',
             'N_f', 'N_m', 'beta.DD', 'N_total', 'expected_pups_tot',
             # 'b.massP', 'b.mass1', 'b.massPM', 'b.mass1M',
-            'b.sst.P', 'b.sst.1', 'b.sst.2.3', 'b.sst.4.6', 
-            'b.sst.2.3M', 'b.sst.4.6M', 'b.sst.7.9', 'b.sst.A',
-            'int.fec_low', 'int.fec_high',
+            'b.sst.P', 'b.sst.1', 'b.sst.2.3', 'b.sst.4.6', 'b.sst.7.9', 
+            'b.sst.10.12', 'b.sst.13.16', 'b.sst.A',
+            'b.sst.PM', 'b.sst.1M', 'b.sst.2.3M', 'b.sst.4.6M', 'b.sst.7.9M', 
+            'b.sst.10.12M', 'b.sst.13.16M', 'b.sst.AM',
+            'int.fec_low', 'int.fec_med', 'int.fec_high',
             'phiP.prob', 'phi1.prob', 'phi2.3.prob', 'phi4.6.prob', 'phi7.9.prob', 'phi10.12.prob',
             'phi13.16.prob', 'phiA.prob',
             'phiPM.prob', 'phi1M.prob', 'phi2.3M.prob', 'phi4.6M.prob', 'phi7.9M.prob',
@@ -2098,6 +2531,7 @@ for (i in 1:n_draws) {
   int_phi13.16   <- mcmc_matrix[row_idx, "int.phi13.16"]
   int_phiA   <- mcmc_matrix[row_idx, "int.phiA"]
   fec_low  <- mcmc_matrix[row_idx, "int.fec_low"]
+  fec_med  <- mcmc_matrix[row_idx, "int.fec_med"]
   fec_high <- mcmc_matrix[row_idx, "int.fec_high"]
 
   # convert baseline survival to probability scale (assuming SST = 0)
@@ -2125,7 +2559,9 @@ for (i in 1:n_draws) {
     phiP_current <- plogis(mu_P-beta_DD*((N_tot*2)/100000))
 
     # calculate total pups born
-    pups_born <- (sum(N_vec[5:10])*fec_low*0.5) + (sum(N_vec[11:23])*fec_high*0.5)
+    # pups_born <- (sum(N_vec[5:10])*fec_low*0.5) + (sum(N_vec[11:23])*fec_high*0.5)
+    pups_born <- (sum(N_vec[6:8])*fec_low*0.5) + 
+                (sum(N_vec[9:18])*fec_med*0.5) + (sum(N_vec[19:23])*fec_high*0.5)
 
     # Create the next year's population vector
     N_vec_next <- numeric(25)
