@@ -106,14 +106,22 @@ ch_dat_f <- read.csv(here::here('data', 'res_dat_f_20260623.csv'),
   transform(adjsex == 'Fem') %>%
   dplyr::select(-adjsex) %>%
   group_by(cohort) %>%
+<<<<<<< HEAD
   slice_sample(n = 120, replace = F) %>%
+=======
+  slice_sample(n = 150, replace = F) %>%
+>>>>>>> 7362f3512b0b130d450d0dc82f85c94bb0b89552
   arrange(brand)
 
 ch_dat_m <- read.csv(here::here('data', 'res_dat_m_20260623.csv'),
                    header = T, stringsAsFactors = F) %>%
   dplyr::select(-adjsex) %>%
   group_by(cohort) %>%
+<<<<<<< HEAD
   slice_sample(n = 80, replace = F) %>%
+=======
+  slice_sample(n = 150, replace = F) %>%
+>>>>>>> 7362f3512b0b130d450d0dc82f85c94bb0b89552
   arrange(brand)
 
 EN_phi <- c(1991, 1992, 1996, 1997, 2002, 2009, 2010, 2012, 2013, 2014, 2015, 
@@ -2489,21 +2497,35 @@ out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin,
                samplesAsCodaMCMC = TRUE)
 
 
+<<<<<<< HEAD
   saveRDS(out, here('results', paste("out_IPM_sst_DD_slice120_", i, ".RDS", sep = "")))
+=======
+  saveRDS(out, here('results', paste("out_IPM_sst_DD_slice150_", i, ".RDS", sep = "")))
+>>>>>>> 7362f3512b0b130d450d0dc82f85c94bb0b89552
 # saveRDS(out, here('results', paste("out_IPM_sst_DD.RDS", sep = "")))
 
 } # closes parallel loop
 
+<<<<<<< HEAD
 out_1 <- readRDS(here::here('results', "out_IPM_sst_DD_slice120_1.RDS", sep = ""))
 out_2 <- readRDS(here::here('results', "out_IPM_sst_DD_slice120_2.RDS", sep = ""))
 out_3 <- readRDS(here::here('results', "out_IPM_sst_DD_slice120_3.RDS", sep = ""))
+=======
+out_1 <- readRDS(here::here('results', "out_IPM_sst_DD_slice150_1.RDS", sep = ""))
+out_2 <- readRDS(here::here('results', "out_IPM_sst_DD_slice150_2.RDS", sep = ""))
+out_3 <- readRDS(here::here('results', "out_IPM_sst_DD_slice150_3.RDS", sep = ""))
+>>>>>>> 7362f3512b0b130d450d0dc82f85c94bb0b89552
 
 # combine them and make an mcmc object
 library(coda)
 # out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
 out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
 
+<<<<<<< HEAD
 saveRDS(out, file = here('results', 'out_IPM_sst_DD_slice120.rds'))
+=======
+saveRDS(out, file = here('results', 'out_IPM_sst_DD_slice150.rds'))
+>>>>>>> 7362f3512b0b130d450d0dc82f85c94bb0b89552
 
 ##k and osp
 # Extract your MCMC matrix
