@@ -8,7 +8,7 @@ library(here) #v1.0.1
 library(dplyr) #v1.0.5
 library(coda)
 library(nimble) #v0.12.1
-library(ggplot2)
+library(ggplot2)   
 library(nimbleEcology)
 library(foreach)
 library(doParallel)
@@ -98,7 +98,7 @@ getP <- nimbleFunction(
 
 ```{r load MR data, echo = F, eval = T}
 
-filter_yr <- 1989
+filter_yr <- 1989 
 
 ## capture histories
 ch_dat_f <- read.csv(here::here('data', 'res_dat_f_20260623.csv'),
@@ -2282,7 +2282,7 @@ for (t in (fc_m[i] + 1):n_occasions) {
   # mu.fec_low ~ dlogis(0.1,0.8)
   # mu.fec_med ~ dlogis(0.2,0.95)
   # mu.fec_high ~ dlogis(0.1,0.8)
-  # b.warm.fec ~ dnorm(0, sd = 2)
+  # b.warm-fec ~ dnorm(0, sd = 2)
   
   # initial pop size at t = 1 
   # pups omitted here because they are set by the census below
@@ -2437,8 +2437,7 @@ params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA',
             # 'b.massP', 'b.mass1', 'b.massPM', 'b.mass1M',
             'b.sst.P', 'b.sst.1', 'b.sst.2.3', 'b.sst.4.6', 'b.sst.7.9', 
             'b.sst.10.12', 'b.sst.13.16', 'b.sst.A',
-            # 'b.sst.PM', 'b.sst.1M', 
-            'b.sst.2.3M', 'b.sst.4.6M', 'b.sst.7.9M', 
+            'b.sst.PM', 'b.sst.1M', 'b.sst.2.3M', 'b.sst.4.6M', 'b.sst.7.9M', 
             'b.sst.10.12M', 'b.sst.13.16M', 'b.sst.AM',
             'int.fec_low', 'int.fec_med', 'int.fec_high',
             'phiP.prob', 'phi1.prob', 'phi2.3.prob', 'phi4.6.prob', 'phi7.9.prob', 'phi10.12.prob',
@@ -2452,7 +2451,7 @@ params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA',
 
 ### run model
 n.iter = 15000; n.chains = 3; n.burnin = 7000; nthin = 2; nAdapt = 20
-n.iter = 12000; n.chains = 1; n.burnin = 7000; nthin = 2; nAdapt = 20
+n.iter = 12000; n.chains = 3; n.burnin = 7000; nthin = 2; nAdapt = 20
 # n.iter = 5000; n.chains = 2; n.burnin = 2000; nthin = 2; nAdapt = 20
 
 
@@ -2479,7 +2478,7 @@ Rmcmc <- buildMCMC(conf)  #produce uncompiled R mcmc function
 Cmodel <- compileNimble(Rmodel)
 Cmcmc <- compileNimble(Rmcmc, project = Rmodel)
 
-sink(here('results', 'IPM_errors_DD_slice120.txt'))
+sink(here('results', 'IPM_errors_DD_slice80.txt'))
 
 out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin, 
                # nchains = n.chains,
@@ -2489,24 +2488,21 @@ out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin,
                samplesAsCodaMCMC = TRUE)
 
 
-  saveRDS(out, here('results', paste("out_IPM_sst_DD_slice120_", i, ".RDS", sep = "")))
+  saveRDS(out, here('results', paste("out_IPM_sst_DD_slice80_", i, ".RDS", sep = "")))
 # saveRDS(out, here('results', paste("out_IPM_sst_DD.RDS", sep = "")))
 
 } # closes parallel loop
 
-out_1 <- readRDS(here::here('results', "out_IPM_sst_DD_slice120_1.RDS", sep = ""))
-out_2 <- readRDS(here::here('results', "out_IPM_sst_DD_slice120_2.RDS", sep = ""))
-out_3 <- readRDS(here::here('results', "out_IPM_sst_DD_slice120_3.RDS", sep = ""))
-
-#override merge conflicts
+out_1 <- readRDS(here::here('results', "out_IPM_sst_DD_slice80_1.RDS", sep = ""))
+out_2 <- readRDS(here::here('results', "out_IPM_sst_DD_slice80_2.RDS", sep = ""))
+out_3 <- readRDS(here::here('results', "out_IPM_sst_DD_slice80_3.RDS", sep = ""))
 
 # combine them and make an mcmc object
 library(coda)
 # out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
 out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
 
-saveRDS(out, file = here('results', 'out_IPM_sst_DD_slice120.rds'))
-
+saveRDS(out, file = here('results', 'out_IPM_sst_DD_slice80.rds'))
 
 ##k and osp
 # Extract your MCMC matrix
