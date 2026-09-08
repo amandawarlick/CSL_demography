@@ -457,7 +457,6 @@ enso_eff_plot <- ggplot(b.enso, aes(x = var_name, y = med)) +
 
 ```
 
-
 ```{r calculate metrics from MR fit, eval = T}
 
 library(imputeTS)
@@ -794,7 +793,9 @@ implied_fec_all <- pup_counts/adult_females
 
 ```{r calculate metrics from IPM fit and post pred checks, eval = T, results = 'keep'}
 
-out_IPM <- readRDS(file = here('results', 'out_IPM_sst_DD_slice120.RDS'))
+# out_IPM <- readRDS(file = here('results', 'out_IPM_sst_DD_slice120.RDS'))
+out_IPM <- readRDS(file = here('results', 'out_IPM_sst_DD_slice2.RDS'))
+
 # outmat <- do.call(rbind, out_IPM)
 
 outmat <- as.matrix(out_IPM)
@@ -967,8 +968,10 @@ for (i in 1:n_draws) {
 
     # calculate total pups born
     # pups_born <- (sum(N_vec[5:10])*fec_low*0.5) + (sum(N_vec[11:23])*fec_high*0.5)
-    pups_born <- (sum(Nf_vec[6:8])*fec_low*0.5) + 
-                (sum(Nf_vec[9:18])*fec_med*0.5) + (sum(Nf_vec[19:23])*fec_high*0.5)
+    # pups_born <- as.numeric((sum(Nf_vec[6:8])*fec_low*0.5) + 
+    #             (sum(Nf_vec[9:18])*fec_med*0.5) + (sum(Nf_vec[19:23])*fec_high*0.5))
+    pups_born <- as.numeric((sum(Nf_vec[6:8])*fec_low) + 
+                (sum(Nf_vec[9:18])*fec_med) + (sum(Nf_vec[19:23])*fec_high))
 
     # Create the next year's population vector
     Nm_vec_next <- numeric(20)
@@ -1012,11 +1015,11 @@ for (i in 1:n_draws) {
     Nf_vec_next[18] <- Nf_vec[17] * int_phi13.16
 
     # absorbing state (ages 17-23)
-    for (a in 18:24) {
+    for (a in 18:19) {
       Nm_vec_next[a+1] <- Nm_vec[a] * int_phiAM
     }
 
-    for (a in 18:19) {
+    for (a in 18:24) {
       Nf_vec_next[a+1] <- Nf_vec[a] * int_phiA
     }
 
@@ -1225,7 +1228,16 @@ for (i in 1:n_draws) {
     b_sst_2.3      <- outmat[row_idx, "b.sst.2.3"]
     b_sst_4.6      <- outmat[row_idx, "b.sst.4.6"]
     b_sst_7.9      <- outmat[row_idx, "b.sst.7.9"]
+    b_sst_10.12      <- outmat[row_idx, "b.sst.10.12"]
+    b_sst_13.16      <- outmat[row_idx, "b.sst.13.16"]
+    
     b_sst_A      <- outmat[row_idx, "b.sst.A"]
+    b_sst_2.3M      <- outmat[row_idx, "b.sst.2.3M"]
+    b_sst_4.6M      <- outmat[row_idx, "b.sst.4.6M"]
+    b_sst_7.9M      <- outmat[row_idx, "b.sst.7.9M"]
+    b_sst_10.12M      <- outmat[row_idx, "b.sst.10.12M"]
+    b_sst_13.16M      <- outmat[row_idx, "b.sst.13.16M"]
+    b_sst_AM      <- outmat[row_idx, "b.sst.AM"]
     beta_DD      <- outmat[row_idx, "beta.DD"]
     
     int_phi1     <- outmat[row_idx, "int.phi1"]
@@ -1292,8 +1304,10 @@ for (i in 1:n_draws) {
     phiA_current  <- plogis(mu_A  + (b_sst_A * current_sst))
     phiAM_current  <- plogis(mu_AM  + (b_sst_AM * current_sst))
 
-     pups_born <- (sum(Nf_vec[6:8])*fec_low*0.5) + 
-                (sum(Nf_vec[9:18])*fec_med*0.5) + (sum(Nf_vec[19:23])*fec_high*0.5)
+     # pups_born <- (sum(Nf_vec[6:8])*fec_low*0.5) + 
+     #            (sum(Nf_vec[9:18])*fec_med*0.5) + (sum(Nf_vec[19:23])*fec_high*0.5)
+    pups_born <- (sum(Nf_vec[6:8])*fec_low) + 
+                (sum(Nf_vec[9:18])*fec_med) + (sum(Nf_vec[19:23])*fec_high)
     
     Nm_vec_next <- numeric(25)
     Nf_vec_next <- numeric(20)

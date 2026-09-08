@@ -105,15 +105,15 @@ ch_dat_f <- read.csv(here::here('data', 'res_dat_f_20260623.csv'),
                    header = T, stringsAsFactors = F) %>% 
   transform(adjsex == 'Fem') %>%
   dplyr::select(-adjsex) %>%
-  # group_by(cohort) %>%
-  # slice_sample(n = 120, replace = F) %>%
+  group_by(cohort) %>%
+  slice_sample(n = 150, replace = F) %>%
   arrange(brand)
 
 ch_dat_m <- read.csv(here::here('data', 'res_dat_m_20260623.csv'),
                    header = T, stringsAsFactors = F) %>%
   dplyr::select(-adjsex) %>%
-  # group_by(cohort) %>%
-  # slice_sample(n = 80, replace = F) %>%
+  group_by(cohort) %>%
+  slice_sample(n = 100, replace = F) %>%
   arrange(brand)
 
 EN_phi <- c(1991, 1992, 1996, 1997, 2002, 2009, 2010, 2012, 2013, 2014, 2015, 
@@ -156,7 +156,6 @@ mass_m <- as.numeric(scale(ch_dat_m$weight))
 
 
 ```
-
 
 ```{r load covariates data}
 
@@ -205,7 +204,6 @@ ggplot(plot_dat, aes(nonpupJulytoJuneSSTAnomalies, mean_wt, col = sex)) +
 
 
 ```
-
 
 ```{r load pup production data}
 
@@ -1087,7 +1085,6 @@ saveRDS(out, here::here('results', 'out_sst_probs.RDS'))
 
 ```
 
-
 ```{r sst2 model}
 
 #has unique young male detection probabilities and b.sst coefficients
@@ -1494,7 +1491,6 @@ saveRDS(out, here::here('results', 'out_sst_probs_v2.RDS'))
 
 ```
 
-
 ```{r enso memory model}
 
 CSL_CJS <- nimbleCode({
@@ -1867,7 +1863,7 @@ out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin,
 
 #stable age logic to initialize N_f and N_m
 # define survival rates
-phi_P <- 0.65
+phi_P <- 0.68
 phi_1 <- 0.8
 phi_J <- 0.85 # Juveniles (Ages 2-5)
 phi_A <- 0.92 # Adults (Ages 6-13)
@@ -1949,7 +1945,6 @@ init_pop_f <- N_f_track[, 1]
 init_pop_m <- N_m_track[, 1]
 
 ```
-
 
 ```{r IPM}
 
@@ -2274,11 +2269,14 @@ for (t in (fc_m[i] + 1):n_occasions) {
 ###population model
     
 # fecundity 
-  # int.fec_low ~ dunif(0, 1)  
-  # int.fec_high ~ dunif(0, 1) 
-  int.fec_low ~ dunif(0.05, 0.6)  
-  int.fec_med ~ dunif(0.2,0.95)
-  int.fec_high ~ dunif(0.2,0.8)
+  # int.fec_low ~ dunif(0,1)
+  # int.fec_high ~ dunif(0,1)
+    int.fec_low ~ dunif(0.05,0.7)
+    int.fec_high ~ dunif(0.2,0.95)
+  
+  # int.fec_low ~ dunif(0.05,0.6)  
+  # int.fec_med ~ dunif(0.2,0.95)
+  # int.fec_high ~ dunif(0.2,0.8)
   
   #warm year penalties, but probably not identifiable with b.sst
   # mu.fec_low ~ dlogis(0.1,0.8)
@@ -2382,9 +2380,13 @@ for (t in (fc_m[i] + 1):n_occasions) {
     # expected_pups_tot[t+1] <- (sum(N_f[5:10, t+1]) * int.fec_low) + 
     #                           (sum(N_f[11:23, t+1]) * int.fec_high) + 0.1 #0.1 to prevent logProb
     
+    # expected_pups_tot[t+1] <- (sum(N_f[6:8, t+1]) * int.fec_low) + #5-7yos
+    #                           (sum(N_f[9:18, t+1]) * int.fec_med) + #8-17yos
+    #                           (sum(N_f[19:23, t+1]) * int.fec_high) + 0.1 #0.1 to prevent logProb
+    
     expected_pups_tot[t+1] <- (sum(N_f[6:8, t+1]) * int.fec_low) + #5-7yos
-                              (sum(N_f[9:18, t+1]) * int.fec_med) + #8-17yos
-                              (sum(N_f[19:23, t+1]) * int.fec_high) + 0.1 #0.1 to prevent logProb
+                              (sum(N_f[9:18, t+1]) * int.fec_high) + #8-17yos
+                              (sum(N_f[19:23, t+1]) * int.fec_low) + 0.1 #0.1 to prevent logProb
     
     #warm year penality approach
     # logit(int.fec_low[t]) <- mu.fec_low + b.warm.fec*(EN_fec_vec[t]-1)
@@ -2439,9 +2441,10 @@ params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA',
             # 'b.massP', 'b.mass1', 'b.massPM', 'b.mass1M',
             'b.sst.P', 'b.sst.1', 'b.sst.2.3', 'b.sst.4.6', 'b.sst.7.9', 
             'b.sst.10.12', 'b.sst.13.16', 'b.sst.A',
-            'b.sst.PM', 'b.sst.1M', 'b.sst.2.3M', 'b.sst.4.6M', 'b.sst.7.9M', 
+            # 'b.sst.PM', 'b.sst.1M',
+            'b.sst.2.3M', 'b.sst.4.6M', 'b.sst.7.9M', 
             'b.sst.10.12M', 'b.sst.13.16M', 'b.sst.AM',
-            'int.fec_low', 'int.fec_med', 'int.fec_high',
+            'int.fec_low', 'int.fec_high', #'int.fec_med', 
             'phiP.prob', 'phi1.prob', 'phi2.3.prob', 'phi4.6.prob', 'phi7.9.prob', 'phi10.12.prob',
             'phi13.16.prob', 'phiA.prob',
             'phiPM.prob', 'phi1M.prob', 'phi2.3M.prob', 'phi4.6M.prob', 'phi7.9M.prob',
@@ -2453,7 +2456,7 @@ params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA',
 
 ### run model
 n.iter = 15000; n.chains = 3; n.burnin = 7000; nthin = 2; nAdapt = 20
-n.iter = 12000; n.chains = 3; n.burnin = 7000; nthin = 2; nAdapt = 20
+n.iter = 12000; n.chains = 1; n.burnin = 7000; nthin = 2; nAdapt = 20
 # n.iter = 5000; n.chains = 2; n.burnin = 2000; nthin = 2; nAdapt = 20
 
 
@@ -2464,7 +2467,7 @@ used.cores = min(n.chains, cores)
 cl <- makeCluster(n.chains, setup_strategy = "sequential")
 registerDoParallel(cl)
 
-foreach(i = 2:n.chains) %dopar% {
+foreach(i = 1:n.chains) %dopar% {
   library(nimble)
   library(here)
   source(here("scripts", "nimbleFunctions.R"))
@@ -2480,7 +2483,7 @@ Rmcmc <- buildMCMC(conf)  #produce uncompiled R mcmc function
 Cmodel <- compileNimble(Rmodel)
 Cmcmc <- compileNimble(Rmcmc, project = Rmodel)
 
-sink(here('results', 'IPM_errors_DD_slice80.txt'))
+# sink(here('results', 'IPM_errors_DD_slice80.txt'))
 
 out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin, 
                # nchains = n.chains,
@@ -2490,118 +2493,118 @@ out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin,
                samplesAsCodaMCMC = TRUE)
 
 
-  saveRDS(out, here('results', paste("out_IPM_sst_DD_slice80_", i, ".RDS", sep = "")))
+  saveRDS(out, here('results', paste("out_IPM_sst_DD_slice150_", i, ".RDS", sep = "")))
 # saveRDS(out, here('results', paste("out_IPM_sst_DD.RDS", sep = "")))
 
 } # closes parallel loop
 
-out_1 <- readRDS(here::here('results', "out_IPM_sst_DD_slice120_1.RDS", sep = ""))
-out_2 <- readRDS(here::here('results', "out_IPM_sst_DD_slice120_2.RDS", sep = ""))
-out_3 <- readRDS(here::here('results', "out_IPM_sst_DD_slice120_3.RDS", sep = ""))
+out_1 <- readRDS(here::here('results', "out_IPM_sst_DD_slice150_1.RDS", sep = ""))
+out_2 <- readRDS(here::here('results', "out_IPM_sst_DD_slice150_2.RDS", sep = ""))
+out_3 <- readRDS(here::here('results', "out_IPM_sst_DD_slice150_3.RDS", sep = ""))
 
 # combine them and make an mcmc object
 library(coda)
 # out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
 out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
 
-saveRDS(out, file = here('results', 'out_IPM_sst_DD_slice120.rds'))
+saveRDS(out, file = here('results', 'out_IPM_sst_DD_slice150.rds'))
 
 ##k and osp
-# Extract your MCMC matrix
-# Assuming 3 chains combined into one matrix
-mcmc_matrix <- as.matrix(out)
-
-# Number of posterior draws to simulate (e.g., sample 1000 to save time)
-n_draws <- 100#0
-draw_indices <- sample(1:nrow(mcmc_matrix), n_draws)
-
-# Vector to store K estimates
-K_estimates <- numeric(n_draws)
-
-# Run the simulation for each sampled posterior draw
-for (i in 1:n_draws) {
-  row_idx <- draw_indices[i]
-
-  # extract vital rates for each MCMC draw
-  int_phiP   <- mcmc_matrix[row_idx, "int.phiP"]
-  beta_DD <- mcmc_matrix[row_idx, "beta.DD"]
-  int_phi1   <- mcmc_matrix[row_idx, "int.phi1"]
-  int_phi2.3   <- mcmc_matrix[row_idx, "int.phi2.3"]
-  int_phi4.6   <- mcmc_matrix[row_idx, "int.phi4.6"]
-  int_phi7.9   <- mcmc_matrix[row_idx, "int.phi7.9"]
-  int_phi10.12   <- mcmc_matrix[row_idx, "int.phi10.12"]
-  int_phi13.16   <- mcmc_matrix[row_idx, "int.phi13.16"]
-  int_phiA   <- mcmc_matrix[row_idx, "int.phiA"]
-  fec_low  <- mcmc_matrix[row_idx, "int.fec_low"]
-  fec_med  <- mcmc_matrix[row_idx, "int.fec_med"]
-  fec_high <- mcmc_matrix[row_idx, "int.fec_high"]
-
-  # convert baseline survival to probability scale (assuming SST = 0)
-  mu_P <- qlogis(int_phiP)
-  mu_1 <- qlogis(int_phi1)
-  mu_2.3 <- qlogis(int_phi2.3)
-  mu_4.6 <- qlogis(int_phi4.6)
-  mu_7.9 <- qlogis(int_phi7.9)
-  mu_10.12 <- qlogis(int_phi10.12)
-  mu_13.16 <- qlogis(int_phi13.16)
-  mu_A <- qlogis(int_phiA)
-
-  # initialize a starting population vector
-  # (e.g., 50 females per age class to the simulation)
-  N_vec <- rep(50, 25)
-
-  # project forward to reach equilibrium (K)
-  for (y in 1:200) { # 200 years long enough?
-
-    N_tot <- sum(N_vec) # just modeling females here for simplicity,
-                        # or multiply by 2 if assuming equal male population.
-
-    # calculate density-dependent pup survival for THIS year
-    # scale N as in the model
-    phiP_current <- plogis(mu_P-beta_DD*((N_tot*2)/100000))
-
-    # calculate total pups born
-    # pups_born <- (sum(N_vec[5:10])*fec_low*0.5) + (sum(N_vec[11:23])*fec_high*0.5)
-    pups_born <- (sum(N_vec[6:8])*fec_low*0.5) + 
-                (sum(N_vec[9:18])*fec_med*0.5) + (sum(N_vec[19:23])*fec_high*0.5)
-
-    # Create the next year's population vector
-    N_vec_next <- numeric(25)
-    N_vec_next[1] <- pups_born
-    N_vec_next[2] <- N_vec[1] * phiP_current
-    N_vec_next[3] <- N_vec[2] * int_phi1
-    N_vec_next[4] <- N_vec[3] * int_phi2.3
-    N_vec_next[5] <- N_vec[4] * int_phi2.3
-    N_vec_next[6] <- N_vec[5] * int_phi4.6
-    N_vec_next[7] <- N_vec[6] * int_phi4.6
-    N_vec_next[8] <- N_vec[7] * int_phi4.6
-    N_vec_next[9] <- N_vec[8] * int_phi7.9
-    N_vec_next[10] <- N_vec[9] * int_phi7.9
-    N_vec_next[11] <- N_vec[10] * int_phi7.9
-    N_vec_next[12] <- N_vec[11] * int_phi10.12
-    N_vec_next[13] <- N_vec[12] * int_phi10.12
-    N_vec_next[14] <- N_vec[13] * int_phi10.12
-    N_vec_next[15] <- N_vec[14] * int_phi13.16
-    N_vec_next[16] <- N_vec[15] * int_phi13.16
-    N_vec_next[17] <- N_vec[16] * int_phi13.16
-    N_vec_next[18] <- N_vec[17] * int_phi13.16
-
-    # absorbing state (ages 17-23)
-    for (a in 18:24) {
-      N_vec_next[a+1] <- N_vec[a] * int_phiA
-    }
-
-    # update population
-    N_vec <- N_vec_next
-  }
-
-  # store stabilized population size (multiply by 2 to account for males)
-  K_estimates[i] <- sum(N_vec) * 2
-}
-
-# mean
-mean_K <- mean(K_estimates)
-K_CI <- quantile(K_estimates, probs = c(0.025, 0.975))
+## Extract your MCMC matrix
+## Assuming 3 chains combined into one matrix
+# mcmc_matrix <- as.matrix(out)
+# 
+# # Number of posterior draws to simulate (e.g., sample 1000 to save time)
+# n_draws <- 100#0
+# draw_indices <- sample(1:nrow(mcmc_matrix), n_draws)
+# 
+# # Vector to store K estimates
+# K_estimates <- numeric(n_draws)
+# 
+# # Run the simulation for each sampled posterior draw
+# for (i in 1:n_draws) {
+#   row_idx <- draw_indices[i]
+# 
+#   # extract vital rates for each MCMC draw
+#   int_phiP   <- mcmc_matrix[row_idx, "int.phiP"]
+#   beta_DD <- mcmc_matrix[row_idx, "beta.DD"]
+#   int_phi1   <- mcmc_matrix[row_idx, "int.phi1"]
+#   int_phi2.3   <- mcmc_matrix[row_idx, "int.phi2.3"]
+#   int_phi4.6   <- mcmc_matrix[row_idx, "int.phi4.6"]
+#   int_phi7.9   <- mcmc_matrix[row_idx, "int.phi7.9"]
+#   int_phi10.12   <- mcmc_matrix[row_idx, "int.phi10.12"]
+#   int_phi13.16   <- mcmc_matrix[row_idx, "int.phi13.16"]
+#   int_phiA   <- mcmc_matrix[row_idx, "int.phiA"]
+#   fec_low  <- mcmc_matrix[row_idx, "int.fec_low"]
+#   fec_med  <- mcmc_matrix[row_idx, "int.fec_med"]
+#   fec_high <- mcmc_matrix[row_idx, "int.fec_high"]
+# 
+#   # convert baseline survival to probability scale (assuming SST = 0)
+#   mu_P <- qlogis(int_phiP)
+#   mu_1 <- qlogis(int_phi1)
+#   mu_2.3 <- qlogis(int_phi2.3)
+#   mu_4.6 <- qlogis(int_phi4.6)
+#   mu_7.9 <- qlogis(int_phi7.9)
+#   mu_10.12 <- qlogis(int_phi10.12)
+#   mu_13.16 <- qlogis(int_phi13.16)
+#   mu_A <- qlogis(int_phiA)
+# 
+#   # initialize a starting population vector
+#   # (e.g., 50 females per age class to the simulation)
+#   N_vec <- rep(50, 25)
+# 
+#   # project forward to reach equilibrium (K)
+#   for (y in 1:200) { # 200 years long enough?
+# 
+#     N_tot <- sum(N_vec) # just modeling females here for simplicity,
+#                         # or multiply by 2 if assuming equal male population.
+# 
+#     # calculate density-dependent pup survival for THIS year
+#     # scale N as in the model
+#     phiP_current <- plogis(mu_P-beta_DD*((N_tot*2)/100000))
+# 
+#     # calculate total pups born
+#     # pups_born <- (sum(N_vec[5:10])*fec_low*0.5) + (sum(N_vec[11:23])*fec_high*0.5)
+#     pups_born <- (sum(N_vec[6:8])*fec_low*0.5) + 
+#                 (sum(N_vec[9:18])*fec_med*0.5) + (sum(N_vec[19:23])*fec_high*0.5)
+# 
+#     # Create the next year's population vector
+#     N_vec_next <- numeric(25)
+#     N_vec_next[1] <- pups_born
+#     N_vec_next[2] <- N_vec[1] * phiP_current
+#     N_vec_next[3] <- N_vec[2] * int_phi1
+#     N_vec_next[4] <- N_vec[3] * int_phi2.3
+#     N_vec_next[5] <- N_vec[4] * int_phi2.3
+#     N_vec_next[6] <- N_vec[5] * int_phi4.6
+#     N_vec_next[7] <- N_vec[6] * int_phi4.6
+#     N_vec_next[8] <- N_vec[7] * int_phi4.6
+#     N_vec_next[9] <- N_vec[8] * int_phi7.9
+#     N_vec_next[10] <- N_vec[9] * int_phi7.9
+#     N_vec_next[11] <- N_vec[10] * int_phi7.9
+#     N_vec_next[12] <- N_vec[11] * int_phi10.12
+#     N_vec_next[13] <- N_vec[12] * int_phi10.12
+#     N_vec_next[14] <- N_vec[13] * int_phi10.12
+#     N_vec_next[15] <- N_vec[14] * int_phi13.16
+#     N_vec_next[16] <- N_vec[15] * int_phi13.16
+#     N_vec_next[17] <- N_vec[16] * int_phi13.16
+#     N_vec_next[18] <- N_vec[17] * int_phi13.16
+# 
+#     # absorbing state (ages 17-23)
+#     for (a in 18:24) {
+#       N_vec_next[a+1] <- N_vec[a] * int_phiA
+#     }
+# 
+#     # update population
+#     N_vec <- N_vec_next
+#   }
+# 
+#   # store stabilized population size (multiply by 2 to account for males)
+#   K_estimates[i] <- sum(N_vec) * 2
+# }
+# 
+# # mean
+# mean_K <- mean(K_estimates)
+# K_CI <- quantile(K_estimates, probs = c(0.025, 0.975))
 
 # print(paste("Estimated K:", round(mean_K), "95% CI:", round(K_CI[1]), "-", round(K_CI[2])))
 
