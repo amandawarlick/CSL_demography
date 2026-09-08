@@ -105,15 +105,15 @@ ch_dat_f <- read.csv(here::here('data', 'res_dat_f_20260623.csv'),
                    header = T, stringsAsFactors = F) %>% 
   transform(adjsex == 'Fem') %>%
   dplyr::select(-adjsex) %>%
-  group_by(cohort) %>%
-  slice_sample(n = 120, replace = F) %>%
+  # group_by(cohort) %>%
+  # slice_sample(n = 120, replace = F) %>%
   arrange(brand)
 
 ch_dat_m <- read.csv(here::here('data', 'res_dat_m_20260623.csv'),
                    header = T, stringsAsFactors = F) %>%
   dplyr::select(-adjsex) %>%
-  group_by(cohort) %>%
-  slice_sample(n = 80, replace = F) %>%
+  # group_by(cohort) %>%
+  # slice_sample(n = 80, replace = F) %>%
   arrange(brand)
 
 EN_phi <- c(1991, 1992, 1996, 1997, 2002, 2009, 2010, 2012, 2013, 2014, 2015, 
@@ -1089,6 +1089,8 @@ saveRDS(out, here::here('results', 'out_sst_probs.RDS'))
 
 
 ```{r sst2 model}
+
+#has unique young male detection probabilities and b.sst coefficients
 
 CSL_CJS <- nimbleCode({
 
@@ -2463,7 +2465,7 @@ used.cores = min(n.chains, cores)
 cl <- makeCluster(n.chains, setup_strategy = "sequential")
 registerDoParallel(cl)
 
-foreach(i = 1:n.chains) %dopar% {
+foreach(i = 2:n.chains) %dopar% {
   library(nimble)
   library(here)
   source(here("scripts", "nimbleFunctions.R"))
@@ -2498,7 +2500,6 @@ out_1 <- readRDS(here::here('results', "out_IPM_sst_DD_slice120_1.RDS", sep = ""
 out_2 <- readRDS(here::here('results', "out_IPM_sst_DD_slice120_2.RDS", sep = ""))
 out_3 <- readRDS(here::here('results', "out_IPM_sst_DD_slice120_3.RDS", sep = ""))
 
-#override merge conflicts
 
 # combine them and make an mcmc object
 library(coda)
