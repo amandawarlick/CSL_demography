@@ -2504,7 +2504,7 @@ library(coda)
 # out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
 out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
 
-saveRDS(out, file = here('results', 'out_IPM_sst_DD_slice80.rds'))
+saveRDS(out, file = here('results', 'out_IPM_sst_DD_slice120.rds'))
 
 ##k and osp
 # Extract your MCMC matrix

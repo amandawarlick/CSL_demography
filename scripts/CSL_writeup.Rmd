@@ -23,7 +23,7 @@ source(here::here('scripts', 'PlotTheme.R'))
 ```{r vital rates, eval = T}
 
 library(coda)
-out <- readRDS(here::here('results', 'out_sst_probs.RDS'))
+out <- readRDS(here::here('results', 'out_sst_probs_v2.RDS'))
 
 all_pars <- colnames(out[[1]])
 outmat <- as.matrix(out)
@@ -361,6 +361,69 @@ sst_preds_plot <- ggplot(preds_all %>% filter(sex != 'M'), aes(x = sst_val, y = 
   # scale_x_continuous(limits = c(-1.5, 2.5), breaks = c(seq(-1.5,2.5, length = 5)),
   #                    labels = round(c(seq(0.3,0.65, length = 5)),2))
 
+#discrete prediction values
+
+seq(min(sst_dat[,2]), max(sst_dat[,2]), length.out = 100)
+preds_all <- data.frame()
+sst_pup_vals <- list(min(sst_dat[,2]), max(sst_dat[,2]))
+sst_np_vals <- list(min(sst_dat[,4]), max(sst_dat[,4]))
+sst_names <- c('low', 'high')
+
+for (c in 1:length(sst_pup_vals)) { #low vs high vals of covariate
+
+    cov_val_pup <- sst_pup_vals[[c]]
+    cov_val_np <- sst_np_vals[[c]]
+    
+    logit_p <- qlogis(outmat[, 'int.phiP']) + outmat[, 'b.sst.P']*cov_val_pup
+    logit_1 <- qlogis(outmat[, 'int.phi1']) + outmat[, 'b.sst.1']*cov_val_np
+    logit_2.3 <- qlogis(outmat[, 'int.phi2.3']) + outmat[, 'b.sst.2.3']*cov_val_np
+    logit_4.6 <- qlogis(outmat[, 'int.phi4.6']) + outmat[, 'b.sst.4.6']*cov_val_np
+    logit_7.9 <- qlogis(outmat[, 'int.phi7.9']) + outmat[, 'b.sst.7.9']*cov_val_np
+    logit_10.12 <- qlogis(outmat[, 'int.phi10.12']) + outmat[, 'b.sst.10.12']*cov_val_np
+    logit_13.16 <- qlogis(outmat[, 'int.phi13.16']) + outmat[, 'b.sst.13.16']*cov_val_np
+    logit_A <- qlogis(outmat[, 'int.phiA']) + outmat[, 'b.sst.A']*cov_val_np
+    
+    preds_p <- data.frame(estimate = plogis(logit_p), rate = 'P')
+    preds_1 <- data.frame(estimate = plogis(logit_1), rate = '1')
+    preds_2 <- data.frame(estimate = plogis(logit_2.3), rate = '2.3')
+    preds_3 <- data.frame(estimate = plogis(logit_4.6), rate = '4.6')
+    preds_4 <- data.frame(estimate = plogis(logit_7.9), rate = '7.9')
+    preds_5 <- data.frame(estimate = plogis(logit_10.12), rate = '10.12')
+    preds_6 <- data.frame(estimate = plogis(logit_13.16), rate = '13.16')
+    preds_7 <- data.frame(estimate = plogis(logit_A), rate = 'A')
+    
+    preds <- bind_rows(preds_p, preds_1, preds_2, preds_3, preds_4, preds_5, preds_6, preds_7) %>%
+      mutate(cov = sst_names[c])
+    # preds <- bind_rows(preds_p, preds_1) %>% 
+    #   mutate(cov = cov_names[c])
+    
+    preds_all <- bind_rows(preds_all, preds)
+}
+
+preds <- preds_all %>%
+  group_by(rate, cov) %>%
+  dplyr::summarize(med = median(estimate),
+                   lower = quantile(estimate, probs = 0.025),
+                   upper = quantile(estimate, probs = 0.975)) %>%
+  transform(rate = factor(rate, levels = c('P', '1', '2.3', '4.6', '7.9', '10.12', '13.16', 'A'), 
+                          labels = c('0-1', '1-2', '2-4', '4-7', '7-10', '10-13', '13-17', '17+'))) %>%
+  transform(cov = factor(cov, levels = c('low', 'high'), labels = c('Low', 'High')))
+                   
+sst_preds_hilo_plot <- ggplot(preds, aes(x = cov, y = med)) +
+  geom_point(position = position_dodge(width = 0.5)) +
+  geom_errorbar(aes(ymin = lower, ymax = upper), position = position_dodge(width = 0.5),
+                show.legend = F, width = 0.3) +
+  geom_line(aes(group = rate), linewidth = 0.7, linetype = 'dashed', position = position_dodge(width = 0.5)) +
+  facet_grid(.~rate) +
+  labs(x = "SST",
+       y = "Female predicted survival probability") +
+  theme_bw() +
+  theme(legend.position = 'none',
+                axis.title.x = element_text(margin = margin(t = 7))) +
+  scale_y_continuous(limits = c(0,1)) + 
+  scale_color_manual(values = rainbow2[c(1,2,5,6,7,8)], name = '') 
+
+
 #ENSO "memory" effects
 out_ENSO <- readRDS(file = here('results', 'out_ENSO_memory.RDS'))
 
@@ -408,9 +471,9 @@ pup_cnt_filled <- na_interpolation(pup_cnts[,1:5]) %>%
 #stable age logic to initialize N_f and N_m
 # define survival rates
 n_occasions <- 36
-phi_P <- 0.65
+phi_P <- 0.68
 phi_1 <- 0.8
-phi_J <- 0.92 # Juveniles (Ages 2-5)
+phi_J <- 0.90 # 
 phi_A <- 0.85 # Adults (Ages 6-13)
 phi_AA <- 0.75
 phi_AM <- 0.8
@@ -485,10 +548,8 @@ N_m_init <- N_m_track
 N_f_init[1, ] <- NA
 N_m_init[1, ] <- NA
 
-# use year 1 for for dpois() priors
 init_pop_f <- N_f_track[, 1]
 init_pop_m <- N_m_track[, 1]
-
 
 ##calculate MNPL and OSP
 
@@ -496,7 +557,6 @@ init_pop_m <- N_m_track[, 1]
 # MNPL_estimates <- K_estimates * 0.60
 
 #use vital rates from IPM
-# extract MCMC matrix 
 outmat <- as.matrix(out)
 
 pup_counts <- pup_cnt_filled$US_PupCnt
@@ -602,7 +662,7 @@ fit_theta_logistic <- function(N_series) {
 
 # loop across CJS posterior draws)
 
-out <- readRDS(here::here('results', 'out_sst_probs.RDS'))
+out <- readRDS(here::here('results', 'out_sst_probs_v2.RDS'))
 outmat <- as.matrix(out)
 
 nsim <- 500
@@ -688,37 +748,54 @@ summary_table <- post %>%
 
 # calculate the implied fecundity
 # How many pups were born per adult female (assuming ages 4-24 are adults)?
-# adult_females <- colSums(recon$N_f[4:24, ])
-# implied_fecundity_low <- pup_counts / adult_females
+adult_females <- colSums(recon$N_f[5:24, ]) #this should just be [6+,] but fec > 1.0
+implied_fec_all <- pup_counts/adult_females
 
-fem_5.7 <- colSums(recon$N_f[6:8, ])
-fem_8.17 <- colSums(recon$N_f[9:18, ])
-fem_18 <- colSums(recon$N_f[19:24, ])
-
-implied_fec_5.7 <- pup_counts/fem_5.7
-implied_fec_8.17 <- pup_counts/fem_8.17
-implied_fec_18 <- pup_counts/fem_18
-
-fec_long <- data.frame(fec5.7 = implied_fec_5.7,
-                       fec8.17 = implied_fec_8.17,
-                       fec18 = implied_fec_18,
-                       yr = 1990:2024)
-
-# Ntot_recon_plot <- plot(x = 1990:2024, y = recon$Ntot, type = "l", col = "darkblue", lwd = 2, 
-#      main = "Reconstructed population trajectory",
-#      ylab = "Total abundance", xlab = "")
-# 
-# fec_calc_plot <- plot(x = 1990:2024, y = implied_fecundity, type = "b", col = "darkred", pch = 16,
+# fec_calc_plot <- plot(x = 1990:2024, y = implied_fec_all, type = "b", col = "darkred", pch = 16,
 #      # main = "Implied birth rate",
 #      ylab = "Fecundity (pups per adult female)", xlab = "")
+
+# fem_5.7 <- colSums(recon$N_f[6:8, ])
+# fem_8.17 <- colSums(recon$N_f[9:18, ])
+# fem_18 <- colSums(recon$N_f[19:24, ])
+# 
+# prop5.7 <- fem_5.7/adult_females
+# prop8.17 <- fem_8.17/adult_females
+# prop18 <- fem_18/adult_females
+# 
+# implied_fec_5.7 <- (pup_counts*prop5.7)/(adult_females)
+# implied_fec_8.17 <- (pup_counts*prop8.17)/adult_females
+# implied_fec_18 <- (pup_counts*prop18)/adult_females
+# 
+# fec_long <- data.frame(fec5.7 = implied_fec_5.7,
+#                        fec8.17 = implied_fec_8.17,
+#                        fec18 = implied_fec_18,
+#                        fec_all = implied_fec_all,
+#                        yr = 1990:2024) %>%
+#   reshape2::melt(id.vars = 'yr') %>%
+#   transform(variable = factor(variable, levels = c('fec5.7', 'fec8.17', 'fec18', 'fec_all'),
+#                               labels = c('Age 5-7', 'Age 8-17', 'Age 18+', 'All')))
+
+# Ntot_recon_plot <- plot(x = 1990:2024, y = recon$Ntot, type = "l", col = "darkblue", lwd = 2,
+#      main = "Reconstructed population trajectory",
+#      ylab = "Total abundance", xlab = "")
+
+# implied_fec <- ggplot(fec_long %>% filter(variable != 'All'), aes(yr, value, color = variable)) +
+#   geom_point() +
+#   geom_line() +
+#   geom_line(data = fec_long %>% filter(variable == 'All'), aes(yr, value, color = 'All ages'),
+#             linetype = 'dotted') +
+#   theme_bw() +
+#   theme(legend.position = 'top') +
+#   scale_color_manual(values = c(rainbow2[c(2,4,6)], 'darkgrey'), name = '')
 
 
 ```
 
 ```{r calculate metrics from IPM fit and post pred checks, eval = T, results = 'keep'}
 
-out_IPM <- readRDS(file = here('results', 'out_IPM_sst_DD_slice2.RDS'))
-outmat <- do.call(rbind, out_IPM)
+out_IPM <- readRDS(file = here('results', 'out_IPM_sst_DD_slice120.RDS'))
+# outmat <- do.call(rbind, out_IPM)
 
 outmat <- as.matrix(out_IPM)
 
@@ -759,10 +836,10 @@ phi_plot_compare <- ggplot(plot_dat, aes(age, med, color = mod)) +
 
 #fecundity
 fec_dat <- data.frame(outmat) %>% dplyr::select(contains('int.fec'))
-colnames(fec_dat) <- c('Age 10+', 'Age 4-9')
+colnames(fec_dat) <- c('Age 18+', 'Age 5-7', 'Age 8-17')
 
 fec_plot <- ggplot(fec_dat %>% reshape2::melt() %>%
-                     transform(variable = factor(variable, levels = c('Age 4-9', 'Age 10+'))), 
+                     transform(variable = factor(variable, levels = c('Age 5-7', 'Age 8-17', 'Age 18+'))), 
                    aes(x = variable, y = value)) +
   geom_violin() +
   ylab('Fecundity') + xlab('') +
@@ -836,6 +913,7 @@ for (i in 1:n_draws) {
   int_phi13.16   <- outmat[row_idx, "int.phi13.16"]
   int_phiA   <- outmat[row_idx, "int.phiA"]
   fec_low  <- outmat[row_idx, "int.fec_low"]
+    fec_med  <- outmat[row_idx, "int.fec_med"]
   fec_high <- outmat[row_idx, "int.fec_high"]
 
   int_phiPM   <- outmat[row_idx, "int.phiPM"]
@@ -880,15 +958,17 @@ for (i in 1:n_draws) {
     # calculate density-dependent pup survival for THIS year
     # scale N as in the model
     #average SST always
-    phiP_current <- plogis(mu_P-beta_DD*((N_tot)/100000))
-    phiPM_current <- plogis(mu_PM-beta_DD*((N_tot)/100000))
+    phiP_current <- as.numeric(plogis(mu_P-beta_DD*((N_tot)/100000)))
+    phiPM_current <- as.numeric(plogis(mu_PM-beta_DD*((N_tot)/100000)))
 
     # #heatwaves
     # phiP_current <- plogis(mu_P + (b_sst_P*1.5) - beta_DD*((N_tot)/100000))
     # phiPM_current <- plogis(mu_PM + (b_sst_P*1.5) - beta_DD*((N_tot)/100000))
 
     # calculate total pups born
-    pups_born <- (sum(Nf_vec[5:10])*fec_low) + (sum(Nf_vec[11:23])*fec_high)
+    # pups_born <- (sum(N_vec[5:10])*fec_low*0.5) + (sum(N_vec[11:23])*fec_high*0.5)
+    pups_born <- (sum(Nf_vec[6:8])*fec_low*0.5) + 
+                (sum(Nf_vec[9:18])*fec_med*0.5) + (sum(Nf_vec[19:23])*fec_high*0.5)
 
     # Create the next year's population vector
     Nm_vec_next <- numeric(20)
@@ -957,7 +1037,7 @@ for (i in 1:n_draws) {
 
 # mean
 theo_K <- mean(theo_K_estimates)
-theo_K_CI <- quantile(theo_K_estimates, probs = c(0.025, 0.975), names = F)
+theo_K_CI <- quantile(theo_K_estimates, probs = c(0.025, 0.975), names = F, na.rm = F)
 
 # print(paste("Estimated theoretical K:", round(mean_K), "95% CI:", round(K_CI[1]), "-", round(K_CI[2])))
 
@@ -1212,7 +1292,8 @@ for (i in 1:n_draws) {
     phiA_current  <- plogis(mu_A  + (b_sst_A * current_sst))
     phiAM_current  <- plogis(mu_AM  + (b_sst_AM * current_sst))
 
-    pups_born <- (sum(Nf_vec[5:10])*fec_low) + (sum(Nf_vec[11:23])*fec_high)
+     pups_born <- (sum(Nf_vec[6:8])*fec_low*0.5) + 
+                (sum(Nf_vec[9:18])*fec_med*0.5) + (sum(Nf_vec[19:23])*fec_high*0.5)
     
     Nm_vec_next <- numeric(25)
     Nf_vec_next <- numeric(20)
@@ -1653,15 +1734,18 @@ Fecundity estimates for younger and older adult females based on the integrated 
 
 sst_eff_plot
 sst_preds_plot
+sst_preds_hilo_plot
 enso_eff_plot
 
 ```
 
-Figure (A): logit-scale (positive versus negative) effect of SST for each age shows that pups and yearlings are largely affected similarly and that there are negative effects estimated for all age classes except 4-6yo's. Plain language interpretation: survival is lower for all age classes (except 4-6) in years when SST is high and the effect is strongest for pups and yearlings. *Note to self - recheck whether these are sex-specific effects?*
+Figure (A): logit-scale (positive versus negative) effect of SST for each age shows that pups and yearlings are largely affected similarly and that there are negative effects estimated for all age classes except 4-6yo's. Plain language interpretation: survival is lower for all age classes (except 4-6) in years when SST is high and the effect is strongest for pups and yearlings. The effects of SST appear to largely be specific to females.
 
 Figure (B): probability-scale effects of the SST covariate effect for each age: survival goes from approximately 75% in years with lower SST to approximately 30% for pups and yearlings when SST is high. 
 
-Figure (C): I'm calling this the "ENSO memory" effect: whether individuals are affected in subsequent years if born in an ENSO year. This shows that (for example) survival is high at ages 2-6 for individuals born in ENSO years and lower for adults that were born in ENSO years. We should talk through this a bit more, but my guess is that this is more showing us a cyclic effect rather than some sort of lasting ENSO effect that pups carry with them as they age. Once pups that were born in an ENSO event have reached ages 2-6, those years are probably cold, and once those same pups that were born in an ENSO event have reached 7+ survival is maybe lower again because they're back into an ENSO event. 
+Figure (C): probability-scale effects of high versus low SST for each age group (females only). 
+
+Figure (D): I'm calling this the "ENSO memory" effect: whether individuals are affected in subsequent years if born in an ENSO year. This shows that (for example) survival is high at ages 2-6 for individuals born in ENSO years and lower for adults that were born in ENSO years. We should talk through this a bit more, but my guess is that this is more showing us a cyclic effect rather than some sort of lasting ENSO effect that pups carry with them as they age. Once pups that were born in an ENSO event have reached ages 2-6, those years are probably cold, and once those same pups that were born in an ENSO event have reached 7+ survival is maybe lower again because they're back into an ENSO event. 
 
 ##### Management metrics: *K* and MNPL 
 
@@ -1690,7 +1774,7 @@ Reconstructed population trajectory based on mark-recapture estimates (does this
 
 # print(round(summary_table))
 
-plot(x = 1990:2024, y = implied_fecundity, type = "b", col = "darkred", pch = 16,
+plot(x = 1990:2024, y = implied_fec_all, type = "b", col = "darkred", pch = 16,
      # main = "Implied birth rate",
      ylab = "Fecundity (pups per adult female)", xlab = "")
 
