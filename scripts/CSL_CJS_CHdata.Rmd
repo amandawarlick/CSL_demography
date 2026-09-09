@@ -148,8 +148,26 @@ library(stringr)
 library(readr)
 library(ggplot2)
 library(reshape2)
+library(readxl)
 
 strand_dat <- read.csv(here('data', 'CSL Strandings 2014-2025.csv'))
+
+strand_dat_06_13 <- read_excel(here('data', 'WCR_Zc-Cu_1982-2013.xlsx'), sheet = 'CA_Zc-Cu_2006-2013')
+strand_dat_82_05 <- read_excel(here('data', 'WCR_Zc-Cu_1982-2013.xlsx'), sheet = 'CA_Zc-Cu_1982-2005')
+
+strand_0613 <- strand_dat_06_13 %>%
+  transform(year = year(`Observation Date`)) %>%
+  group_by(year) %>%
+  dplyr::summarize(tot = n())  %>%
+  filter(year > 1989)
+
+strand_8205 <- strand_dat_82_05 %>%
+  transform(year = year(`Date of Occurance`)) %>%
+  group_by(year) %>%
+  dplyr::summarize(tot = n()) %>%
+  filter(year > 1989)
+
+strand <- bind_rows(strand_0613, strand_8205)
 
 dat <- strand_dat %>%
   transform(Date.of.Examination = ifelse(Date.of.Examination == '', 
@@ -172,19 +190,29 @@ dat_yr <- dat %>%
   filter(!is.na(year)) %>%
   filter(year > 2013) %>%
   group_by(year) %>%
-  dplyr::summarize(lep = mean(lep_yes),
-                   DA = mean(DA_yes))
+  dplyr::summarize(lep.prop = mean(lep_yes),
+                   DA.prop = mean(DA_yes))
 
-da_early <- read_tsv(here('data', 'DA.txt'))
+da_early <- read_tsv(here('data', 'DA.txt')) %>% rename(year = time) %>% filter(year > 1989)
 
-lep_early <- read_tsv(here('data', 'lepto.txt'))
+lep_early <- read_tsv(here('data', 'lepto.txt'))  %>% rename(year = time) %>% filter(year > 1989) %>%
+  transform(lep = leptof + leptom)
 
-all_yrs <- dat_yr %>%
+
+disease_early <- da_early %>% merge(lep_early, by = 'year') %>%
+  merge(strand, by = 'year') %>%
+  transform(lep.prop = lep/tot,
+            DA.prop = DA/tot) %>%
+  dplyr::select(year, lep.prop, DA.prop)
+
+
+disease_all_yrs <- dat_yr %>%
+  bind_rows(disease_early) %>%
   melt(id.vars = 'year') %>%
-  transform(variable = factor(variable, levels = c('lep', 'DA'),
+  transform(variable = factor(variable, levels = c('lep.prop', 'DA.prop'),
                               labels = c('Lepto', 'DA')))
 
-ggplot(all_yrs, aes(x = year, y = value, color = variable)) +
+ggplot(disease_all_yrs, aes(x = year, y = value, color = variable)) +
   geom_point() +
   geom_line() +
   xlab('') + ylab('Proportion of stranding cases') +
