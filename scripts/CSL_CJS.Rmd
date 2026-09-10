@@ -2274,7 +2274,7 @@ for (t in (fc_m[i] + 1):n_occasions) {
     # int.fec_low ~ dunif(0.05,0.7)
     # int.fec_high ~ dunif(0.2,0.95)
   
-  int.fec_low ~ dunif(0.05,0.6)
+  int.fec_low ~ dunif(0.05,0.75)
   int.fec_med ~ dunif(0.2,0.95)
   int.fec_high ~ dunif(0.2,0.8)
   
@@ -2380,13 +2380,13 @@ for (t in (fc_m[i] + 1):n_occasions) {
     # expected_pups_tot[t+1] <- (sum(N_f[5:10, t+1]) * int.fec_low) + 
     #                           (sum(N_f[11:23, t+1]) * int.fec_high) + 0.1 #0.1 to prevent logProb
     
-    # expected_pups_tot[t+1] <- (sum(N_f[6:8, t+1]) * int.fec_low) + #5-7yos
-    #                           (sum(N_f[9:18, t+1]) * int.fec_med) + #8-17yos
-    #                           (sum(N_f[19:23, t+1]) * int.fec_high) + 0.1 #0.1 to prevent logProb
-    
     expected_pups_tot[t+1] <- (sum(N_f[6:8, t+1]) * int.fec_low) + #5-7yos
-                              (sum(N_f[9:18, t+1]) * int.fec_high) + #8-17yos
-                              (sum(N_f[19:23, t+1]) * int.fec_low) + 0.1 #0.1 to prevent logProb
+                              (sum(N_f[9:18, t+1]) * int.fec_med) + #8-17yos
+                              (sum(N_f[19:23, t+1]) * int.fec_high) + 0.1 #0.1 to prevent logProb
+    
+    # expected_pups_tot[t+1] <- (sum(N_f[6:8, t+1]) * int.fec_low) + #5-7yos
+    #                           (sum(N_f[9:18, t+1]) * int.fec_high) + #8-17yos
+    #                           (sum(N_f[19:23, t+1]) * int.fec_low) + 0.1 #0.1 to prevent logProb
     
     #warm year penality approach
     # logit(int.fec_low[t]) <- mu.fec_low + b.warm.fec*(EN_fec_vec[t]-1)
@@ -2444,7 +2444,7 @@ params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA',
             # 'b.sst.PM', 'b.sst.1M',
             'b.sst.2.3M', 'b.sst.4.6M', 'b.sst.7.9M', 
             'b.sst.10.12M', 'b.sst.13.16M', 'b.sst.AM',
-            'int.fec_low', 'int.fec_high', #'int.fec_med', 
+            'int.fec_low', 'int.fec_high', 'int.fec_med', 
             'phiP.prob', 'phi1.prob', 'phi2.3.prob', 'phi4.6.prob', 'phi7.9.prob', 'phi10.12.prob',
             'phi13.16.prob', 'phiA.prob',
             'phiPM.prob', 'phi1M.prob', 'phi2.3M.prob', 'phi4.6M.prob', 'phi7.9M.prob',
