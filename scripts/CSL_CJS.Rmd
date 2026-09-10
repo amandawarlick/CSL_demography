@@ -105,15 +105,15 @@ ch_dat_f <- read.csv(here::here('data', 'res_dat_f_20260623.csv'),
                    header = T, stringsAsFactors = F) %>% 
   transform(adjsex == 'Fem') %>%
   dplyr::select(-adjsex) %>%
-  group_by(cohort) %>%
-  slice_sample(n = 150, replace = F) %>%
+  # group_by(cohort) %>%
+  # slice_sample(n = 150, replace = F) %>%
   arrange(brand)
 
 ch_dat_m <- read.csv(here::here('data', 'res_dat_m_20260623.csv'),
                    header = T, stringsAsFactors = F) %>%
   dplyr::select(-adjsex) %>%
-  group_by(cohort) %>%
-  slice_sample(n = 100, replace = F) %>%
+  # group_by(cohort) %>%
+  # slice_sample(n = 100, replace = F) %>%
   arrange(brand)
 
 EN_phi <- c(1991, 1992, 1996, 1997, 2002, 2009, 2010, 2012, 2013, 2014, 2015, 
@@ -1964,7 +1964,7 @@ CSL_IPM <- nimbleCode({
   
     for (i in 1:n_f) { 
     for (t in 1:(n_occasions - 1)) {
-      logit(phiP[i,t]) <- mu.P  + b.sst.P*sst_pupForage[t] 
+      logit(phiP[i,t]) <- mu.P  + b.sst.P*sst_pupForage[t] - beta.DD*N_scaled[t]
       logit(p1[i,t]) <- mu.p1 #+ eps.p[t]
       logit(phi1[i,t]) <- mu.1  + b.sst.1*sst_np[t] 
       logit(p2[i,t]) <- mu.p2.3  #+ eps.p[t]
@@ -2005,7 +2005,7 @@ CSL_IPM <- nimbleCode({
   #males
     for (i in 1:n_m) { 
     for (t in 1:(n_occasions - 1)) {
-      logit(phiPM[i,t]) <- mu.PM + b.sst.P*sst_pupForage[t] #+ epsP[t]
+      logit(phiPM[i,t]) <- mu.PM + b.sst.P*sst_pupForage[t] - beta.DD*N_scaled[t]
       logit(p1M[i,t]) <- mu.p1M #+ eps.p1[t]
     } #t 
     
@@ -2189,7 +2189,7 @@ CSL_IPM <- nimbleCode({
     s.sst.AM ~ dexp(1)
     
      for (t in 1:(n_occasions-1)){
-        phiP.prob[t] <- ilogit(mu.P + b.sst.P*sst_pupForage[t])
+        phiP.prob[t] <- ilogit(mu.P + b.sst.P*sst_pupForage[t] - beta.DD*N_scaled[t])
         phi1.prob[t] <- ilogit(mu.1  + b.sst.1*sst_np[t])
         phi2.3.prob[t] <- ilogit(mu.2.3  + b.sst.2.3*sst_np[t])
         phi4.6.prob[t] <- ilogit(mu.4.6  + b.sst.4.6*sst_np[t])
@@ -2198,7 +2198,7 @@ CSL_IPM <- nimbleCode({
         phi13.16.prob[t] <- ilogit(mu.13.16 + b.sst.13.16*sst_np[t])
         phiA.prob[t] <- ilogit(mu.A + b.sst.A*sst_np[t])
         
-        phiPM.prob[t] <- ilogit(mu.PM + b.sst.P*sst_pupForage[t])
+        phiPM.prob[t] <- ilogit(mu.PM + b.sst.P*sst_pupForage[t] - beta.DD*N_scaled[t])
         phi1M.prob[t] <- ilogit(mu.1M + b.sst.1*sst_np[t])
         phi2.3M.prob[t] <- ilogit(mu.2.3M + b.sst.2.3M*sst_np[t])
         phi4.6M.prob[t] <- ilogit(mu.4.6M + b.sst.4.6M*sst_np[t])

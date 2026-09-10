@@ -837,10 +837,10 @@ phi_plot_compare <- ggplot(plot_dat, aes(age, med, color = mod)) +
 
 #fecundity
 fec_dat <- data.frame(outmat) %>% dplyr::select(contains('int.fec'))
-colnames(fec_dat) <- c('Age 18+', 'Age 5-7', 'Age 8-17')
+# colnames(fec_dat) <- c('Age 18+', 'Age 5-7', 'Age 8-17')
+colnames(fec_dat) <- c('High', 'Low')
 
-fec_plot <- ggplot(fec_dat %>% reshape2::melt() %>%
-                     transform(variable = factor(variable, levels = c('Age 5-7', 'Age 8-17', 'Age 18+'))), 
+fec_plot <- ggplot(fec_dat %>% reshape2::melt(), 
                    aes(x = variable, y = value)) +
   geom_violin() +
   ylab('Fecundity') + xlab('') +
@@ -856,7 +856,7 @@ DD_plot <- ggplot(DD_sum, aes(y = med, x = variable)) +
 
 ##PPC
 # expected pups columns chronologically
-pup_cols <- paste0("expected_pups_tot[", 2:n_occasions, "]") # Starts at 2 because t+1 in the loop
+pup_cols <- paste0("expected_pups_tot[", 2:(n_occasions), "]") # Starts at 2 because t+1 in the loop
 pup_post <- outmat[, pup_cols]
 
 # calculate the median and 95% CI for each year and append census data 
@@ -886,6 +886,29 @@ pups_ppc_plot <- ggplot(pup_summary, aes(x = year)) +
 
 #### also plot scatterplot of int.phiP and beta.DD?
 
+#abundance
+Ntot_post_sum <- post_sum %>% filter(grepl('N_total', variable)) %>%
+  # filter(!grepl('_f', variable) & !grepl('_m', variable)) %>%
+  transform(year = parse_number(variable)) 
+
+#total abundance; pup data divided by stableAge[1], here 0.18*2 (better); or multiply by 4.2 (what's this?)
+Ntot_plot <- ggplot(Ntot_post_sum, aes(year, med)) +
+  geom_errorbar(aes(x = year, ymin=lower, ymax=upper), position = position_dodge(0.5), 
+                width = 0.5, show.legend = F) +
+  geom_point(size = 0.8, position = position_dodge(0.5)) + 
+  geom_line(linewidth = 0.7, position = position_dodge(0.5)) +
+  # geom_point(data = pup_cnt_plot, aes(year, pups*4.47, group = region), col = 'darkgrey') +
+  # geom_point(data = pup_cnts %>%
+  #              transform(region = factor(region, labels = c('St. George', 'St. Paul'))), 
+  #               # aes(year, pups/pup_prop, group = region), col = 'darkgrey') +
+  #                 aes(year, pups/mean, group = region), col = 'darkgrey') +
+  xlab('') + ylab(expression(paste('Total abundance'))) +
+  ggtitle('') +
+    # facet_wrap(~region, scales = 'free_y') +
+  plot_theme(legend.position = 'none', panel.border = element_rect(fill = NA),
+             plot.title = element_text(hjust = 0.5)) +
+  guides(color = guide_legend("", nrow = 1)) +
+  scale_x_continuous(breaks = c(seq(1, 35, by = 5)), labels = c(seq(1990, 2024, by = 5)))
 
 
 
@@ -913,9 +936,10 @@ for (i in 1:n_draws) {
   int_phi10.12   <- outmat[row_idx, "int.phi10.12"]
   int_phi13.16   <- outmat[row_idx, "int.phi13.16"]
   int_phiA   <- outmat[row_idx, "int.phiA"]
+  ##FIX THESE
   fec_low  <- outmat[row_idx, "int.fec_low"]
-    fec_med  <- outmat[row_idx, "int.fec_med"]
-  fec_high <- outmat[row_idx, "int.fec_high"]
+    fec_med  <- outmat[row_idx, "int.fec_high"]
+  fec_high <- outmat[row_idx, "int.fec_low"]
 
   int_phiPM   <- outmat[row_idx, "int.phiPM"]
   int_phi1M     <- outmat[row_idx, "int.phi1M"]
