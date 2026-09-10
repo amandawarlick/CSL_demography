@@ -105,15 +105,15 @@ ch_dat_f <- read.csv(here::here('data', 'res_dat_f_20260623.csv'),
                    header = T, stringsAsFactors = F) %>% 
   transform(adjsex == 'Fem') %>%
   dplyr::select(-adjsex) %>%
-  group_by(cohort) %>%
-  slice_sample(n = 150, replace = F) %>%
+  # group_by(cohort) %>%
+  # slice_sample(n = 150, replace = F) %>%
   arrange(brand)
 
 ch_dat_m <- read.csv(here::here('data', 'res_dat_m_20260623.csv'),
                    header = T, stringsAsFactors = F) %>%
   dplyr::select(-adjsex) %>%
-  group_by(cohort) %>%
-  slice_sample(n = 100, replace = F) %>%
+  # group_by(cohort) %>%
+  # slice_sample(n = 100, replace = F) %>%
   arrange(brand)
 
 EN_phi <- c(1991, 1992, 1996, 1997, 2002, 2009, 2010, 2012, 2013, 2014, 2015, 
@@ -130,14 +130,15 @@ EN_fec_vec <- as.numeric(all_yrs %in% EN_fec)+1
 ## occasions
 EN_phi_occ <- which(EN_phi_vec > 1)
 
+#2 = warm, 1 = cold
 EN_f <- ch_dat_f %>%
   dplyr::select(brand, cohort) %>%
-  transform(EN = ifelse(cohort %in% EN_phi, 1, 2)) %>%
+  transform(EN = ifelse(cohort %in% EN_phi, 2, 1)) %>%
   arrange(brand)
 
 EN_m <- ch_dat_m %>%
   dplyr::select(brand, cohort) %>%
-  transform(EN = ifelse(cohort %in% EN_phi, 1, 2)) %>%
+  transform(EN = ifelse(cohort %in% EN_phi, 2, 1)) %>%
   arrange(brand)
 
 ## variables and dimensions
@@ -1512,25 +1513,25 @@ CSL_CJS <- nimbleCode({
       logit(p6[i,t]) <- mu.p4.6 #+ eps.pA[t]
       logit(phi6[i,t]) <- mu.4.6 + b.enso.4.6[EN_f[i]] 
       logit(p7[i,t]) <- mu.p7.12 #+ eps.pA[t]
-      logit(phi7[i,t]) <- mu.7.9 + b.enso.A[EN_f[i]]
+      logit(phi7[i,t]) <- mu.7.9 + b.enso.7.9[EN_f[i]]
       logit(p8[i,t]) <- mu.p7.12 #+ eps.pA[t]
-      logit(phi8[i,t]) <- mu.7.9 + b.enso.A[EN_f[i]] 
+      logit(phi8[i,t]) <- mu.7.9 + b.enso.7.9[EN_f[i]] 
       logit(p9[i,t]) <- mu.p7.12 #+ eps.pA[t]
-      logit(phi9[i,t]) <- mu.7.9 + b.enso.A[EN_f[i]]
+      logit(phi9[i,t]) <- mu.7.9 + b.enso.7.9[EN_f[i]]
       logit(p10[i,t]) <- mu.p7.12 #+ eps.pA[t]
-      logit(phi10[i,t]) <- mu.10.12 #3+ b.sst.A*sst_np[t]# + epsA[t] 
+      logit(phi10[i,t]) <- mu.10.12 + b.enso.A[EN_f[i]] 
       logit(p11[i,t]) <- mu.p7.12 #+ eps.pA[t]
-      logit(phi11[i,t]) <- mu.10.12 #+ b.sst.A*sst_np[t]# + epsA[t] 
+      logit(phi11[i,t]) <- mu.10.12 + b.enso.A[EN_f[i]] 
       logit(p12[i,t]) <- mu.p7.12 #+ eps.pA[t]
-      logit(phi12[i,t]) <- mu.10.12 #+ b.sst.A*sst_np[t]# + epsA[t] 
+      logit(phi12[i,t]) <- mu.10.12 + b.enso.A[EN_f[i]] 
       logit(p13[i,t]) <- mu.pA #+ eps.pA[t]
-      logit(phi13[i,t]) <- mu.13.16 #+ b.sst.A*sst_np[t]# + epsA[t] 
+      logit(phi13[i,t]) <- mu.13.16 + b.enso.A[EN_f[i]]  
       logit(p14[i,t]) <- mu.pA
-      logit(phi14[i,t]) <- mu.13.16 #+ b.sst.A*sst_np[t]# + epsA[t] 
+      logit(phi14[i,t]) <- mu.13.16 + b.enso.A[EN_f[i]] 
       logit(p15[i,t]) <- mu.pA
-      logit(phi15[i,t]) <- mu.13.16 #+ b.sst.A*sst_np[t]# + epsA[t] 
+      logit(phi15[i,t]) <- mu.13.16 + b.enso.A[EN_f[i]] 
       logit(p16[i,t]) <- mu.pA
-      logit(phi16[i,t]) <- mu.13.16 #+ b.sst.A*sst_np[t]# + epsA[t] 
+      logit(phi16[i,t]) <- mu.13.16 + b.enso.A[EN_f[i]] 
       logit(pA[i,t]) <- mu.pA
       logit(phiA[i,t]) <- mu.A #+ b.sst.A*sst_np[t]# + epsA[t] 
     } #t  
@@ -1549,27 +1550,27 @@ CSL_CJS <- nimbleCode({
     }
     
     for (t in 3:(n_occasions-1)) {
-      logit(phi2M[i,t]) <- mu.2.3M + b.enso.2.3[EN_m[i]]
+      logit(phi2M[i,t]) <- mu.2.3M + b.enso.2.3M[EN_m[i]]
       logit(p3M[i,t]) <- mu.p2.3 #+ eps.p2.3[t]
     }
     
     for (t in 4:(n_occasions-1)) { 
-      logit(phi3M[i,t]) <- mu.2.3M + b.enso.2.3[EN_m[i]]
+      logit(phi3M[i,t]) <- mu.2.3M + b.enso.2.3M[EN_m[i]]
       logit(p4M[i,t]) <- mu.p4.6M #+ eps.p4.6[t]
     } #t psi
     
     for (t in 5:(n_occasions-1)) {
-      logit(phi4M[i,t]) <- mu.4.6M #+ b.sst.4.6*sst_np[t]#+ eps4.6[t] 
+      logit(phi4M[i,t]) <- mu.4.6M + b.enso.4.6M[EN_m[i]] 
       logit(p5M[i,t]) <- mu.p4.6M #+ eps.p4.6[t]
     } #t 
     
     for (t in 6:(n_occasions-1)) {  
-      logit(phi5M[i,t]) <- mu.4.6M #+ b.sst.4.6*sst_np[t] #+ eps4.6[t] 
+      logit(phi5M[i,t]) <- mu.4.6M + b.enso.4.6M[EN_m[i]] 
       logit(p6M[i,t]) <- mu.p4.6M #+ eps.p4.6[t]
     } #t 
     
     for (t in 7:(n_occasions-1)) {  
-      logit(phi6M[i,t]) <- mu.4.6M #+ b.sst.4.6*sst_np[t]#+ eps4.6[t] 
+      logit(phi6M[i,t]) <- mu.4.6M + b.enso.4.6M[EN_m[i]]
       logit(p7M[i,t]) <- mu.p7.12M #+ eps.pAM[t]
     } #t 
     
@@ -1698,18 +1699,24 @@ CSL_CJS <- nimbleCode({
     b.sst.P ~ dnorm(0, sd = s.sstP)
     s.sstP ~ dexp(1)
     
-    b.enso.1[2] <- 0
-    b.enso.2.3[2] <- 0
-    b.enso.4.6[2] <- 0
-    b.enso.A[2] <- 0
+    b.enso.1[1] <- 0
+    b.enso.2.3[1] <- 0
+    b.enso.4.6[1] <- 0
+    b.enso.2.3M[1] <- 0
+    b.enso.4.6M[1] <- 0
+    b.enso.7.9[1] <- 0
+    b.enso.A[1] <- 0
     
-    b.enso.1[1] ~ dnorm(0, sd = s.enso1)
-    b.enso.2.3[1] ~ dnorm(0,sd = s.ensoJ)
-    b.enso.4.6[1] ~ dnorm(0,sd = s.ensoA)
-    b.enso.A[1] ~ dnorm(0,sd = s.ensoA)
-    s.enso1 ~ dexp(1)
-    s.ensoJ ~ dexp(1)
-    s.ensoA ~ dexp(1)
+    b.enso.1[2] ~ dnorm(0, sd = 1)
+    b.enso.2.3[2] ~ dnorm(0,sd = 1)
+    b.enso.4.6[2] ~ dnorm(0,sd = 1)
+    b.enso.2.3M[2] ~ dnorm(0,sd = 1)
+    b.enso.4.6M[2] ~ dnorm(0,sd = 1)
+    b.enso.A[2] ~ dnorm(0,sd = 1)
+    
+    # s.enso1 ~ dexp(1)
+    # s.ensoJ ~ dexp(1)
+    # s.ensoA ~ dexp(1)
   
     #likelihood
 for (i in 1:n_f) { #females
@@ -1798,8 +1805,8 @@ params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA', 'int.p4.6M'
             'int.p7.12M', 'int.pAM',
             # 'b.massP', 'b.mass1', 'b.massPM', 'b.mass1M',
             'b.sst.P',
-            #'b.sst.1', 'b.sst.2.3', 'b.sst.4.6', 'b.sst.7.9', 'b.sst.A',
-            'b.enso.1', 'b.enso.2.3', 'b.enso.4.6', 'b.enso.A',
+            'b.enso.1', 'b.enso.2.3', 'b.enso.4.6', 'b.enso.7.9', 'b.enso.A',
+            'b.enso.2.3M', 'b.enso.4.6M', 
             'int.phiP', 'int.phi1', 'int.phi2.3', 'int.phi4.6', 'int.phi7.9',
             'int.phi10.12', 'int.phi13.16', 'int.phiA',
             'int.phiPM', 'int.phi1M', 'int.phi2.3M', 'int.phi4.6M', 'int.phi7.9M',
@@ -1807,7 +1814,7 @@ params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA', 'int.p4.6M'
 
 ### run model
 # n.iter = 3500; n.chains = 3; n.burnin = 2000; nthin = 3; nAdapt = 20
-n.iter = 25000; n.chains = 3; n.burnin = 15000; nthin = 2; nAdapt = 20
+n.iter = 25000; n.chains = 1; n.burnin = 15000; nthin = 2; nAdapt = 20
 # n.iter = 200; n.chains = 1; n.burnin = 50; nthin = 2; nAdapt = 20
 
 
@@ -1818,7 +1825,7 @@ n.iter = 25000; n.chains = 3; n.burnin = 15000; nthin = 2; nAdapt = 20
 # cl <- makeCluster(n.chains, setup_strategy = "sequential") 
 # registerDoParallel(cl) 
 
-# foreach(i = 1:n.chains) %dopar% {
+foreach(i = 1:n.chains) %dopar% {
   library(nimble)
   library(here)
   source(here("scripts", "nimbleFunctions.R"))
@@ -1837,25 +1844,25 @@ Cmcmc <- compileNimble(Rmcmc, project = Rmodel)
 sink(here('results', 'errors_ENSO_mem.txt'))
 
 out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin, 
-               nchains = n.chains,
-               # nchains = 1,
+               # nchains = n.chains,
+               nchains = 1,
                inits = inits,
                  setSeed = FALSE, progressBar = TRUE,
                samplesAsCodaMCMC = TRUE)
 
 
-  # saveRDS(out, here('results', paste("out.parallel_sst_", i, ".RDS", sep = "")))
+  saveRDS(out, here('results', paste("out.parallel_enso_", i, ".RDS", sep = "")))
 
-# } # closes parallel loop
+ } # closes parallel loop
 
-# out_1 <- readRDS(here::here('results', paste("out.parallel_sst_", "1.RDS", sep = "")))
-# out_2 <- readRDS(here::here('results', paste("out.parallel_sst_", "2.RDS", sep = "")))
-# out_3 <- readRDS(here::here('results', paste("out.parallel_sst_", "3.RDS", sep = "")))
+out_1 <- readRDS(here::here('results', paste("out.parallel_enso_", "1.RDS", sep = "")))
+out_2 <- readRDS(here::here('results', paste("out.parallel_enso_", "2.RDS", sep = "")))
+out_3 <- readRDS(here::here('results', paste("out.parallel_enso_", "3.RDS", sep = "")))
 # 
 # library(coda)
 # out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
 
-# saveRDS(out, here::here('results', 'out_ENSO_memory.RDS'))
+saveRDS(out, here::here('results', 'out_ENSO_memory.RDS'))
 
 ```
 
