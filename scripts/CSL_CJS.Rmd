@@ -2271,12 +2271,12 @@ for (t in (fc_m[i] + 1):n_occasions) {
 # fecundity 
   # int.fec_low ~ dunif(0,1)
   # int.fec_high ~ dunif(0,1)
-    int.fec_low ~ dunif(0.05,0.7)
-    int.fec_high ~ dunif(0.2,0.95)
+    # int.fec_low ~ dunif(0.05,0.7)
+    # int.fec_high ~ dunif(0.2,0.95)
   
-  # int.fec_low ~ dunif(0.05,0.6)  
-  # int.fec_med ~ dunif(0.2,0.95)
-  # int.fec_high ~ dunif(0.2,0.8)
+  int.fec_low ~ dunif(0.05,0.6)
+  int.fec_med ~ dunif(0.2,0.95)
+  int.fec_high ~ dunif(0.2,0.8)
   
   #warm year penalties, but probably not identifiable with b.sst
   # mu.fec_low ~ dlogis(0.1,0.8)
@@ -2467,7 +2467,7 @@ used.cores = min(n.chains, cores)
 cl <- makeCluster(n.chains, setup_strategy = "sequential")
 registerDoParallel(cl)
 
-foreach(i = 1:n.chains) %dopar% {
+foreach(i = n.chains:n.chains) %dopar% {
   library(nimble)
   library(here)
   source(here("scripts", "nimbleFunctions.R"))
@@ -2493,21 +2493,23 @@ out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin,
                samplesAsCodaMCMC = TRUE)
 
 
-  saveRDS(out, here('results', paste("out_IPM_sst_DD_slice150_", i, ".RDS", sep = "")))
+  saveRDS(out, here('results', paste("out_IPM_sst_DD_", i, ".RDS", sep = "")))
 # saveRDS(out, here('results', paste("out_IPM_sst_DD.RDS", sep = "")))
 
 } # closes parallel loop
 
-out_1 <- readRDS(here::here('results', "out_IPM_sst_DD_slice150_1.RDS", sep = ""))
-out_2 <- readRDS(here::here('results', "out_IPM_sst_DD_slice150_2.RDS", sep = ""))
-out_3 <- readRDS(here::here('results', "out_IPM_sst_DD_slice150_3.RDS", sep = ""))
+# out_1 <- readRDS(here::here('results', "out_IPM_sst_DD_slice150_1.RDS"))
+# out_2 <- readRDS(here::here('results', "out_IPM_sst_DD_slice150_2.RDS"))
+# out_3 <- readRDS(here::here('results', "out_IPM_sst_DD_slice150_3.RDS"))
+out_1 <- readRDS(here::here('results', paste("out_IPM_sst_DD_", n.chains, ".RDS", sep = "")))
 
 # combine them and make an mcmc object
 library(coda)
 # out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
 out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
 
-saveRDS(out, file = here('results', 'out_IPM_sst_DD_slice150.rds'))
+# saveRDS(out, file = here('results', 'out_IPM_sst_DD_slice150.rds'))
+# saveRDS(out, file = here('results', 'out_IPM_sst_DD.rds'))
 
 ##k and osp
 ## Extract your MCMC matrix
