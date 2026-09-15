@@ -220,6 +220,8 @@ ggplot(disease_all_yrs, aes(x = year, y = value, color = variable)) +
   theme(legend.position = 'top') +
   scale_color_manual(values = c('dodgerblue3', 'goldenrod'), name = '')
 
+write.csv(disease_all_yrs, here('data', 'leptoDA_proc.csv'), row.names = F)
+
 
 ```
 
