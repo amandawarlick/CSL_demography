@@ -165,6 +165,12 @@ lep <- lepDA %>% filter(variable == 'Lepto') %>%
 lep_dat <- as.numeric(lep$value)
 lep_cat <- lep$lep_cat #1 = low lep, 2 is higher than 10% of stranding cases
 
+DA <- lepDA %>% filter(variable == 'DA') %>%
+  arrange(year) %>% dplyr::select(value) %>%
+  transform(DA_cat = ifelse(value < 0.1, 1, 2))
+
+DA_dat <- as.numeric(DA$value)
+DA_cat <- DA$DA_cat
 
 ```
 
@@ -1503,7 +1509,7 @@ saveRDS(out, here::here('results', 'out_sst_probs_v2.RDS'))
 ```
 
 
-```{r lepto model}
+```{r lepto DA model}
 
 #has unique young male detection probabilities and b.sst coefficients
 
@@ -1520,33 +1526,33 @@ CSL_CJS <- nimbleCode({
       logit(p3[i,t]) <- mu.p2.3 #+ eps.p[t]
       logit(phi3[i,t]) <- mu.2.3 #+ b.sst.2.3*sst_np[t] #+ epsJ[t] 
       logit(p4[i,t]) <- mu.p4.6 #+ eps.p[t]
-      logit(phi4[i,t]) <- mu.4.6 #+ b.sst.4.6*sst_np[t]#+ epsJ[t] 
+      logit(phi4[i,t]) <- mu.4.6 + b.DA.4.6[DA_cat[t]] 
       logit(p5[i,t]) <- mu.p4.6 #+ eps.p[t]
-      logit(phi5[i,t]) <- mu.4.6 #+ b.sst.4.6*sst_np[t]#+ epsA[t] 
+      logit(phi5[i,t]) <- mu.4.6 + b.DA.4.6[DA_cat[t]]
       logit(p6[i,t]) <- mu.p4.6 #+ eps.p[t]
-      logit(phi6[i,t]) <- mu.4.6 #+ b.sst.4.6*sst_np[t] #+ epsA[t] 
+      logit(phi6[i,t]) <- mu.4.6 + b.DA.4.6[DA_cat[t]]
       logit(p7[i,t]) <- mu.p7.12 #+ eps.p[t]
-      logit(phi7[i,t]) <- mu.7.9 #+ b.sst.7.9*sst_np[t]#+ epsA[t] 
+      logit(phi7[i,t]) <- mu.7.9 + b.DA.7.9[DA_cat[t]] 
       logit(p8[i,t]) <- mu.p7.12 #+ eps.p[t]
-      logit(phi8[i,t]) <- mu.7.9 #+ b.sst.7.9*sst_np[t]#+ epsA[t] 
+      logit(phi8[i,t]) <- mu.7.9 + b.DA.7.9[DA_cat[t]]  
       logit(p9[i,t]) <- mu.p7.12 #+ eps.p[t]
-      logit(phi9[i,t]) <- mu.7.9 #+ b.sst.7.9*sst_np[t]#+ epsA[t] 
+      logit(phi9[i,t]) <- mu.7.9 + b.DA.7.9[DA_cat[t]]  
       logit(p10[i,t]) <- mu.p7.12 #+ eps.p[t]
-      logit(phi10[i,t]) <- mu.10.12 #+ b.sst.10.12*sst_np[t]# + epsA[t] 
+      logit(phi10[i,t]) <- mu.10.12 + b.DA.10.12[DA_cat[t]]  
       logit(p11[i,t]) <- mu.p7.12 #+ eps.p[t]
-      logit(phi11[i,t]) <- mu.10.12 #+ b.sst.10.12*sst_np[t]# + epsA[t] 
+      logit(phi11[i,t]) <- mu.10.12 + b.DA.10.12[DA_cat[t]] 
       logit(p12[i,t]) <- mu.p7.12 #+ eps.p[t]
-      logit(phi12[i,t]) <- mu.10.12 #+ b.sst.10.12*sst_np[t]# + epsA[t] 
+      logit(phi12[i,t]) <- mu.10.12 + b.DA.10.12[DA_cat[t]]  
       logit(p13[i,t]) <- mu.pA #+ eps.p[t]
-      logit(phi13[i,t]) <- mu.13.16 #+ b.sst.13.16*sst_np[t]# + epsA[t] 
+      logit(phi13[i,t]) <- mu.13.16 + b.DA.13.16[DA_cat[t]]  
       logit(p14[i,t]) <- mu.pA
-      logit(phi14[i,t]) <- mu.13.16 #+ b.sst.13.16*sst_np[t]# + epsA[t] 
+      logit(phi14[i,t]) <- mu.13.16 + b.DA.13.16[DA_cat[t]]  
       logit(p15[i,t]) <- mu.pA
-      logit(phi15[i,t]) <- mu.13.16 #+ b.sst.13.16*sst_np[t]# + epsA[t] 
+      logit(phi15[i,t]) <- mu.13.16 + b.DA.13.16[DA_cat[t]]  
       logit(p16[i,t]) <- mu.pA
-      logit(phi16[i,t]) <- mu.13.16 #+ b.sst.13.16*sst_np[t]# + epsA[t] 
+      logit(phi16[i,t]) <- mu.13.16 + b.DA.13.16[DA_cat[t]] 
       logit(pA[i,t]) <- mu.pA
-      logit(phiA[i,t]) <- mu.A #+ b.sst.A*sst_np[t]# + epsA[t] 
+      logit(phiA[i,t]) <- mu.A + b.DA.A[DA_cat[t]]  
     } #t  
   } #females
   
@@ -1729,17 +1735,34 @@ CSL_CJS <- nimbleCode({
     s.lep13.16 ~ dexp(1)
     s.lepA ~ dexp(1)
     
+    b.DA.4.6[1] <- 0
+    b.DA.7.9[1] <- 0
+    b.DA.10.12[1] <- 0
+    b.DA.13.16[1] <- 0
+    b.DA.A[1] <- 0
+    
+    b.DA.4.6[2] ~ dnorm(0,sd = s.DA4.6)
+    b.DA.7.9[2] ~ dnorm(0,sd = s.DA7.9)
+    b.DA.10.12[2] ~ dnorm(0,sd = s.DA10.12)
+    b.DA.13.16[2] ~ dnorm(0,sd = s.DA13.16)
+    b.DA.A[2] ~ dnorm(0,sd = s.DAA)
+    s.DA4.6 ~ dexp(1)
+    s.DA7.9 ~ dexp(1)
+    s.DA10.12 ~ dexp(1)
+    s.DA13.16 ~ dexp(1)
+    s.DAA ~ dexp(1)
+    
      for (t in 1:(n_occasions-1)){
         phiP.prob[t] <- ilogit(mu.P)
         phi1.prob[t] <- ilogit(mu.1)
         phi2.3.prob[t] <- ilogit(mu.2.3)
-        phi4.6.prob[t] <- ilogit(mu.4.6)
-        phi7.9.prob[t] <- ilogit(mu.7.9)
-        phi10.12.prob[t] <- ilogit(mu.10.12)
-        phi13.16.prob[t] <- ilogit(mu.13.16)
-        phiA.prob[t] <- ilogit(mu.A)
+        phi4.6.prob[t] <- ilogit(mu.4.6 + b.DA.4.6[DA_cat[t]])
+        phi7.9.prob[t] <- ilogit(mu.7.9 + b.DA.7.9[DA_cat[t]])
+        phi10.12.prob[t] <- ilogit(mu.10.12 + b.DA.10.12[DA_cat[t]])
+        phi13.16.prob[t] <- ilogit(mu.13.16 + b.DA.13.16[DA_cat[t]])
+        phiA.prob[t] <- ilogit(mu.A + b.DA.A[DA_cat[t]])
         
-        phiPM.prob[t] <- ilogit(mu.PM )
+        phiPM.prob[t] <- ilogit(mu.PM)
         phi1M.prob[t] <- ilogit(mu.1M)
         phi2.3M.prob[t] <- ilogit(mu.2.3M)
         phi4.6M.prob[t] <- ilogit(mu.4.6M + b.lep.4.6M[lep_cat[t]])
@@ -1817,6 +1840,7 @@ nim.constants <- list(n_f = dim(y)[1], n_m = dim(ym)[1],
                       # sst_pupForage = sst_dat[,2],
                       # sst_np = sst_dat[,4],
                       lep_cat = lep_cat,
+                      DA_cat = DA_cat,
                       # mass_f = mass_f, mass_m = mass_m, #site = rook, sex = sex,
                       fc = fc, fc_m = fc_m)
 
@@ -1844,6 +1868,8 @@ params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA',
             'phi10.12M.prob', 'phi13.16M.prob', 'phiAM.prob',
             'b.lep.4.6M', 'b.lep.7.9M', 'b.lep.10.12M',
             'b.lep.13.16M','b.lep.AM',
+            'b.DA.4.6', 'b.DA.7.9', 'b.DA.10.12',
+            'b.DA.13.16','b.DA.A',
             'int.phiP', 'int.phi1', 'int.phi2.3', 'int.phi4.6', 'int.phi7.9',
             'int.phi10.12', 'int.phi13.16', 'int.phiA',
             'int.phiPM', 'int.phi1M', 'int.phi2.3M', 'int.phi4.6M', 'int.phi7.9M',
@@ -1887,17 +1913,17 @@ out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin,
                  setSeed = FALSE, progressBar = TRUE,
                samplesAsCodaMCMC = TRUE)
 
-saveRDS(out, here::here('results', paste0('out_lepto_', i,'.RDS', sep = '')))
+saveRDS(out, here::here('results', paste0('out_leptoDA_', i,'.RDS', sep = '')))
 }
 
-out_1 <- readRDS(here::here('results', paste("out_lepto_", "1.RDS", sep = "")))
-out_2 <- readRDS(here::here('results', paste("out_lepto_", "2.RDS", sep = "")))
-out_3 <- readRDS(here::here('results', paste("out_lepto_", "3.RDS", sep = "")))
+out_1 <- readRDS(here::here('results', paste("out_leptoDA_", "1.RDS", sep = "")))
+out_2 <- readRDS(here::here('results', paste("out_leptoDA_", "2.RDS", sep = "")))
+out_3 <- readRDS(here::here('results', paste("out_leptoDA_", "3.RDS", sep = "")))
 
 library(coda)
 out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
 
-saveRDS(out, here::here('results', 'out_lepto.RDS'))
+saveRDS(out, here::here('results', 'out_leptoDA.RDS'))
 
 
 ```
