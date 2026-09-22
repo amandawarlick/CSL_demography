@@ -1888,7 +1888,7 @@ used.cores = min(n.chains, cores)
 cl <- makeCluster(n.chains, setup_strategy = "sequential")
 registerDoParallel(cl)
 
-foreach(i = 1:n.chains) %dopar% {
+# foreach(i = 1:n.chains) %dopar% {
   library(nimble)
   library(here)
   source(here("scripts", "nimbleFunctions.R"))
@@ -1907,21 +1907,21 @@ Cmcmc <- compileNimble(Rmcmc, project = Rmodel)
 # sink(here('results', 'errors_CJS_sst.txt'))
 
 out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin, 
-               # nchains = n.chains,
-               nchains = 1,
+               nchains = n.chains,
+               # nchains = 1,
                inits = inits,
                  setSeed = FALSE, progressBar = TRUE,
                samplesAsCodaMCMC = TRUE)
 
-saveRDS(out, here::here('results', paste0('out_leptoDA_', i,'.RDS', sep = '')))
-}
+# saveRDS(out, here::here('results', paste0('out_leptoDA_', i,'.RDS', sep = '')))
+# }
 
-out_1 <- readRDS(here::here('results', paste("out_leptoDA_", "1.RDS", sep = "")))
-out_2 <- readRDS(here::here('results', paste("out_leptoDA_", "2.RDS", sep = "")))
-out_3 <- readRDS(here::here('results', paste("out_leptoDA_", "3.RDS", sep = "")))
+# out_1 <- readRDS(here::here('results', paste("out_leptoDA_", "1.RDS", sep = "")))
+# out_2 <- readRDS(here::here('results', paste("out_leptoDA_", "2.RDS", sep = "")))
+# out_3 <- readRDS(here::here('results', paste("out_leptoDA_", "3.RDS", sep = "")))
 
-library(coda)
-out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
+# library(coda)
+# out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
 
 saveRDS(out, here::here('results', 'out_leptoDA.RDS'))
 
@@ -3578,7 +3578,7 @@ used.cores = min(n.chains, cores)
 cl <- makeCluster(n.chains, setup_strategy = "sequential")
 registerDoParallel(cl)
 
-foreach(i = n.chains:n.chains) %dopar% {
+# foreach(i = n.chains:n.chains) %dopar% {
   library(nimble)
   library(here)
   source(here("scripts", "nimbleFunctions.R"))
@@ -3597,8 +3597,8 @@ Cmcmc <- compileNimble(Rmcmc, project = Rmodel)
 # sink(here('results', 'IPM_errors_DD_slice80.txt'))
 
 out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin, 
-               # nchains = n.chains,
-               nchains = 1,
+               nchains = n.chains,
+               # nchains = 1,
                inits = inits,
                  setSeed = FALSE, progressBar = TRUE,
                samplesAsCodaMCMC = TRUE)
@@ -3607,17 +3607,17 @@ out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin,
   saveRDS(out, here('results', paste("out_IPM_sst_DD_fec_warm", i, ".RDS", sep = "")))
 # saveRDS(out, here('results', paste("out_IPM_sst_DD.RDS", sep = "")))
 
-} # closes parallel loop
+# } # closes parallel loop
 
 # out_1 <- readRDS(here::here('results', "out_IPM_sst_DD_slice150_1.RDS"))
 # out_2 <- readRDS(here::here('results', "out_IPM_sst_DD_slice150_2.RDS"))
 # out_3 <- readRDS(here::here('results', "out_IPM_sst_DD_slice150_3.RDS"))
-out_1 <- readRDS(here::here('results', paste("out_IPM_sst_DD_fec_warm", n.chains, ".RDS", sep = "")))
-
-# combine them and make an mcmc object
-library(coda)
+# out_1 <- readRDS(here::here('results', paste("out_IPM_sst_DD_fec_warm", n.chains, ".RDS", sep = "")))
+# 
+# # combine them and make an mcmc object
+# library(coda)
+# # out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
 # out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
-out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
 
 # saveRDS(out, file = here('results', 'out_IPM_sst_DD_slice150.rds'))
 # saveRDS(out, file = here('results', 'out_IPM_sst_DD.rds'))
