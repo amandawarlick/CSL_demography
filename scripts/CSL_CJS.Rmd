@@ -563,7 +563,7 @@ CSL_CJS <- nimbleCode({
     mu.4.6M <- log(int.phi4.6M/(1 - int.phi4.6M))
     mu.7.9M <- log(int.phi7.9M/(1 - int.phi7.9M))
     mu.10.12M <- log(int.phi10.12M/(1 - int.phi10.12M))
-    mu.13.16M <- log(int.phi10.12M/(1 - int.phi13.16M))
+    mu.13.16M <- log(int.phi13.16M/(1 - int.phi13.16M))
     mu.AM <- log(int.phiAM/(1 - int.phiAM))
     
     int.phiPM ~ dunif(0,1)
@@ -907,7 +907,7 @@ CSL_CJS <- nimbleCode({
     mu.4.6M <- log(int.phi4.6M/(1 - int.phi4.6M))
     mu.7.9M <- log(int.phi7.9M/(1 - int.phi7.9M))
     mu.10.12M <- log(int.phi10.12M/(1 - int.phi10.12M))
-    mu.13.16M <- log(int.phi10.12M/(1 - int.phi13.16M))
+    mu.13.16M <- log(int.phi13.16M/(1 - int.phi13.16M))
     mu.AM <- log(int.phiAM/(1 - int.phiAM))
     
     int.phiPM ~ dunif(0,1)
@@ -1293,7 +1293,7 @@ CSL_CJS <- nimbleCode({
     mu.4.6M <- log(int.phi4.6M/(1 - int.phi4.6M))
     mu.7.9M <- log(int.phi7.9M/(1 - int.phi7.9M))
     mu.10.12M <- log(int.phi10.12M/(1 - int.phi10.12M))
-    mu.13.16M <- log(int.phi10.12M/(1 - int.phi13.16M))
+    mu.13.16M <- log(int.phi13.16M/(1 - int.phi13.16M))
     mu.AM <- log(int.phiAM/(1 - int.phiAM))
     
     int.phiPM ~ dunif(0,1)
@@ -1700,7 +1700,7 @@ CSL_CJS <- nimbleCode({
     mu.4.6M <- log(int.phi4.6M/(1 - int.phi4.6M))
     mu.7.9M <- log(int.phi7.9M/(1 - int.phi7.9M))
     mu.10.12M <- log(int.phi10.12M/(1 - int.phi10.12M))
-    mu.13.16M <- log(int.phi10.12M/(1 - int.phi13.16M))
+    mu.13.16M <- log(int.phi13.16M/(1 - int.phi13.16M))
     mu.AM <- log(int.phiAM/(1 - int.phiAM))
     
     int.phiPM ~ dunif(0,1)
@@ -2115,7 +2115,7 @@ CSL_CJS <- nimbleCode({
     mu.4.6M <- log(int.phi4.6M/(1 - int.phi4.6M))
     mu.7.9M <- log(int.phi7.9M/(1 - int.phi7.9M))
     mu.10.12M <- log(int.phi10.12M/(1 - int.phi10.12M))
-    mu.13.16M <- log(int.phi10.12M/(1 - int.phi13.16M))
+    mu.13.16M <- log(int.phi13.16M/(1 - int.phi13.16M))
     mu.AM <- log(int.phiAM/(1 - int.phiAM))
     
     int.phiPM ~ dunif(0,1)
@@ -2145,11 +2145,12 @@ CSL_CJS <- nimbleCode({
     b.enso.A[1] <- 0
     
     b.enso.1[2] ~ dnorm(0, sd = 1)
-    b.enso.2.3[2] ~ dnorm(0,sd = 1)
-    b.enso.4.6[2] ~ dnorm(0,sd = 1)
-    b.enso.2.3M[2] ~ dnorm(0,sd = 1)
-    b.enso.4.6M[2] ~ dnorm(0,sd = 1)
-    b.enso.A[2] ~ dnorm(0,sd = 1)
+    b.enso.2.3[2] ~ dnorm(0, sd = 1)
+    b.enso.4.6[2] ~ dnorm(0, sd = 1)
+    b.enso.7.9[2] ~ dnorm(0, sd = 1)
+    b.enso.2.3M[2] ~ dnorm(0, sd = 1)
+    b.enso.4.6M[2] ~ dnorm(0, sd = 1)
+    b.enso.A[2] ~ dnorm(0, sd = 1)
     
     # s.enso1 ~ dexp(1)
     # s.ensoJ ~ dexp(1)
@@ -2234,7 +2235,9 @@ inits <- list(int.phiP = 0.9, int.phi1 = 0.9, int.phi2.3 = 0.9, int.phi4.6 = 0.9
               int.p4.6M = 0.5, int.p7.12M = 0.7, int.pAM = 0.8,
               b.massP = 0, b.mass1 = 0, b.massPM = 0, b.mass1M = 0, 
               b.sst.P = 0, #b.sst.1 = 0,
-              b.enso.1 = c(0,0), b.enso.2.3 = c(0,0), b.enso.4.6 = c(0,0), b.enso.A = c(0,0),
+              b.enso.1 = c(0,0), b.enso.2.3 = c(0,0), b.enso.4.6 = c(0,0), 
+              b.enso.7.9 = c(0,0), b.enso.A = c(0,0), 
+              b.enso.2.3M = c(0,0), b.enso.4.6M = c(0,0),
               z = z.init, zm = z.init.m)
 
 ### parameters
@@ -2588,7 +2591,7 @@ CSL_IPM <- nimbleCode({
     mu.4.6M <- log(int.phi4.6M/(1 - int.phi4.6M))
     mu.7.9M <- log(int.phi7.9M/(1 - int.phi7.9M))
     mu.10.12M <- log(int.phi10.12M/(1 - int.phi10.12M))
-    mu.13.16M <- log(int.phi10.12M/(1 - int.phi13.16M))
+    mu.13.16M <- log(int.phi13.16M/(1 - int.phi13.16M))
     mu.AM <- log(int.phiAM/(1 - int.phiAM))
     
     int.phiPM ~ dunif(0,1)
@@ -3254,7 +3257,7 @@ CSL_IPM <- nimbleCode({
     mu.4.6M <- log(int.phi4.6M/(1 - int.phi4.6M))
     mu.7.9M <- log(int.phi7.9M/(1 - int.phi7.9M))
     mu.10.12M <- log(int.phi10.12M/(1 - int.phi10.12M))
-    mu.13.16M <- log(int.phi10.12M/(1 - int.phi13.16M))
+    mu.13.16M <- log(int.phi13.16M/(1 - int.phi13.16M))
     mu.AM <- log(int.phiAM/(1 - int.phiAM))
     
     int.phiPM ~ dunif(0,1)
@@ -3927,7 +3930,7 @@ CSL_IPM <- nimbleCode({
     mu.4.6M <- log(int.phi4.6M/(1 - int.phi4.6M))
     mu.7.9M <- log(int.phi7.9M/(1 - int.phi7.9M))
     mu.10.12M <- log(int.phi10.12M/(1 - int.phi10.12M))
-    mu.13.16M <- log(int.phi10.12M/(1 - int.phi13.16M))
+    mu.13.16M <- log(int.phi13.16M/(1 - int.phi13.16M))
     mu.AM <- log(int.phiAM/(1 - int.phiAM))
     
     int.phiPM ~ dunif(0,1)
@@ -4802,7 +4805,7 @@ CSL_CJS <- nimbleCode({
     mu.4.6M <- log(int.phi4.6M/(1 - int.phi4.6M))
     mu.7.9M <- log(int.phi7.9M/(1 - int.phi7.9M))
     mu.10.12M <- log(int.phi10.12M/(1 - int.phi10.12M))
-    mu.13.16M <- log(int.phi10.12M/(1 - int.phi13.16M))
+    mu.13.16M <- log(int.phi13.16M/(1 - int.phi13.16M))
     mu.AM <- log(int.phiAM/(1 - int.phiAM))
     
     int.phiPM ~ dunif(0,1)
@@ -5321,7 +5324,7 @@ CSL_CJS <- nimbleCode({
     mu.4.6M <- log(int.phi4.6M/(1 - int.phi4.6M))
     mu.7.9M <- log(int.phi7.9M/(1 - int.phi7.9M))
     mu.10.12M <- log(int.phi10.12M/(1 - int.phi10.12M))
-    mu.13.16M <- log(int.phi10.12M/(1 - int.phi13.16M))
+    mu.13.16M <- log(int.phi13.16M/(1 - int.phi13.16M))
     mu.AM <- log(int.phiAM/(1 - int.phiAM))
     
     int.phiPM ~ dunif(0,1)
