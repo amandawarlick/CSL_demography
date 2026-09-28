@@ -441,8 +441,9 @@ b.enso <- post_sum_ENSO %>%
   filter(grepl('b.enso', variable)) %>%
   transform(var_name = gsub('b.enso.', '', variable)) %>%
   filter(med != 0) %>%
-  transform(var_name = factor(var_name, levels = c('1[1]', '2.3[1]', '4.6[1]', 'A[1]'), 
-                              labels = c('1', '2.3', '4.6', '7+')))
+  transform(var_name = factor(var_name, levels = c('1[2]', '2.3[2]', '2.3M[2]', '4.6[2]', '4.6M[2]', 
+                                                   '7.9[2]', 'A[2]'), 
+                              labels = c('1', '2.3', '2.3M', '4.6', '4.6M', '7.9', 'A')))
 
 enso_eff_plot <- ggplot(b.enso, aes(x = var_name, y = med)) +
   geom_errorbar(aes(x = var_name, ymin=lower, ymax=upper),

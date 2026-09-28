@@ -2254,7 +2254,7 @@ params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA', 'int.p4.6M'
 
 ### run model
 # n.iter = 3500; n.chains = 3; n.burnin = 2000; nthin = 3; nAdapt = 20
-n.iter = 25000; n.chains = 1; n.burnin = 15000; nthin = 2; nAdapt = 20
+n.iter = 25000; n.chains = 2; n.burnin = 15000; nthin = 2; nAdapt = 20
 # n.iter = 200; n.chains = 1; n.burnin = 50; nthin = 2; nAdapt = 20
 
 
@@ -2265,7 +2265,7 @@ n.iter = 25000; n.chains = 1; n.burnin = 15000; nthin = 2; nAdapt = 20
 # cl <- makeCluster(n.chains, setup_strategy = "sequential") 
 # registerDoParallel(cl) 
 
-foreach(i = 1:n.chains) %dopar% {
+foreach(i = n.chains:n.chains) %dopar% {
   library(nimble)
   library(here)
   source(here("scripts", "nimbleFunctions.R"))
