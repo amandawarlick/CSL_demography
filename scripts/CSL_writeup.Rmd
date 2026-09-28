@@ -441,8 +441,9 @@ b.enso <- post_sum_ENSO %>%
   filter(grepl('b.enso', variable)) %>%
   transform(var_name = gsub('b.enso.', '', variable)) %>%
   filter(med != 0) %>%
-  transform(var_name = factor(var_name, levels = c('1[1]', '2.3[1]', '4.6[1]', 'A[1]'), 
-                              labels = c('1', '2.3', '4.6', '7+')))
+  transform(var_name = factor(var_name, levels = c('1[2]', '2.3[2]', '2.3M[2]', '4.6[2]', '4.6M[2]', 
+                                                   '7.9[2]', 'A[2]'), 
+                              labels = c('1', '2.3', '2.3M', '4.6', '4.6M', '7.9', 'A')))
 
 enso_eff_plot <- ggplot(b.enso, aes(x = var_name, y = med)) +
   geom_errorbar(aes(x = var_name, ymin=lower, ymax=upper),
@@ -454,6 +455,44 @@ enso_eff_plot <- ggplot(b.enso, aes(x = var_name, y = med)) +
   ggtitle('') +
   pres_theme(legend.position = 'top', #panel.border = element_rect(fill = NA),
              plot.title = element_text(hjust = 0.5))
+
+#lepto/DA
+#ENSO "memory" effects
+out_lep <- readRDS(file = here('results', 'out_leptoDA.RDS'))
+
+# all_pars <- colnames(out_ENSO[[1]])
+outmat_lep <- as.matrix(out_lep)
+
+post_sum_lep <- data.frame(
+  med = apply(outmat_lep, 2, function(x) quantile(x, probs = 0.5, na.rm = T, names = F)),
+  lower = apply(outmat_lep, 2, function(x) quantile(x, probs = 0.025, na.rm = T, names = F)),
+  upper = apply(outmat_lep, 2, function(x) quantile(x, probs = 0.975, na.rm = T, names = F)))
+post_sum_lep$variable <- row.names(post_sum_lep)
+
+
+b.lepDA <- post_sum_lep %>% 
+  filter(grepl('b.lep', variable) | grepl('b.DA', variable)) %>%
+  transform(rate = ifelse(grepl('b.lep', variable), 'Leptospirosis', 'DA')) %>%
+  transform(var_name = gsub('b.lep.', '', variable)) %>%
+  transform(var_name = gsub('b.DA.', '', var_name)) %>%
+  filter(med != 0) %>%
+  transform(var_name = gsub('M', '', var_name)) %>%
+  transform(var_name = factor(var_name, 
+            levels = c('4.6[2]', '7.9[2]', '10.12[2]',
+                       '13.16[2]', 'A[2]'), 
+            labels = c('4.6', '7.9', '10.12', '13.16', '17+')))
+
+lepDA_eff_plot <- ggplot(b.lepDA, aes(x = var_name, y = med, col = rate)) +
+  geom_errorbar(aes(x = var_name, ymin=lower, ymax=upper),
+                position = position_dodge(0.5),
+                width = 0.25, show.legend = F) +
+  geom_point(size = 0.8, position = position_dodge(0.5)) +
+  geom_hline(aes(yintercept = 0), linetype = 'dashed') +
+  xlab('Age class') + ylab(expression(paste('Logit-scale effect of leptospirosis & DA stranding cases'))) +
+  ggtitle('') +
+  plot_theme(legend.position = 'top', #panel.border = element_rect(fill = NA),
+             plot.title = element_text(hjust = 0.5)) +
+  scale_color_manual(values = c('black', 'darkgrey'), name = 'Stranding notes')
 
 ```
 
