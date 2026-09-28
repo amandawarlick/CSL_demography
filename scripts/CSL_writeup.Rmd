@@ -375,7 +375,7 @@ sst_preds_plot <- ggplot(preds_all %>% filter(sex != 'M'), aes(x = sst_val, y = 
 
 #discrete prediction values
 
-seq(min(sst_dat[,2]), max(sst_dat[,2]), length.out = 100)
+# seq(min(sst_dat[,2]), max(sst_dat[,2]), length.out = 100)
 preds_all <- data.frame()
 sst_pup_vals <- list(min(sst_dat[,2]), max(sst_dat[,2]))
 sst_np_vals <- list(min(sst_dat[,4]), max(sst_dat[,4]))
@@ -437,9 +437,9 @@ sst_preds_hilo_plot <- ggplot(preds, aes(x = cov, y = med)) +
 
 
 #ENSO "memory" effects
-out_ENSO <- readRDS(file = here('results', 'out_ENSO_memory.RDS'))
+out_ENSO <- readRDS(file = here('results', 'out.parallel_enso_1.RDS'))
+# out_ENSO <- readRDS(file = here('results', 'out_ENSO_memory.RDS'))
 
-# all_pars <- colnames(out_ENSO[[1]])
 outmat_ENSO <- as.matrix(out_ENSO)
 
 post_sum_ENSO <- data.frame(
@@ -447,7 +447,6 @@ post_sum_ENSO <- data.frame(
   lower = apply(outmat_ENSO, 2, function(x) quantile(x, probs = 0.025, na.rm = T, names = F)),
   upper = apply(outmat_ENSO, 2, function(x) quantile(x, probs = 0.975, na.rm = T, names = F)))
 post_sum_ENSO$variable <- row.names(post_sum_ENSO)
-
 
 b.enso <- post_sum_ENSO %>% 
   filter(grepl('b.enso', variable)) %>%
@@ -469,10 +468,8 @@ enso_eff_plot <- ggplot(b.enso, aes(x = var_name, y = med)) +
              plot.title = element_text(hjust = 0.5))
 
 #lepto/DA
-#ENSO "memory" effects
 out_lep <- readRDS(file = here('results', 'out_leptoDA.RDS'))
 
-# all_pars <- colnames(out_ENSO[[1]])
 outmat_lep <- as.matrix(out_lep)
 
 post_sum_lep <- data.frame(
@@ -480,7 +477,6 @@ post_sum_lep <- data.frame(
   lower = apply(outmat_lep, 2, function(x) quantile(x, probs = 0.025, na.rm = T, names = F)),
   upper = apply(outmat_lep, 2, function(x) quantile(x, probs = 0.975, na.rm = T, names = F)))
 post_sum_lep$variable <- row.names(post_sum_lep)
-
 
 b.lepDA <- post_sum_lep %>% 
   filter(grepl('b.lep', variable) | grepl('b.DA', variable)) %>%
@@ -797,13 +793,13 @@ summary_table <- post %>%
 
 
 # calculate the implied fecundity
-# How many pups were born per adult female (assuming ages 4-24 are adults)?
-adult_females <- colSums(recon$N_f[5:24, ]) #this should just be [6+,] but fec > 1.0
+# How many pups were born per adult female (assuming ages 5-23 are adults)
+adult_females <- colSums(recon$N_f[5:23, ]) #this should just be [6:23,] 
 implied_fec_all <- pup_counts/adult_females
-
-fec_calc_plot <- plot(x = 1990:2024, y = implied_fec_all, type = "b", col = "darkred", pch = 16,
-     # main = "Implied birth rate",
-     ylab = "Fecundity (pups per adult female)", xlab = "")
+ 
+# plot(x = 1990:2024, y = implied_fec_all, type = "b", col = "darkred", pch = 16,
+#      # main = "Implied birth rate",
+#      ylab = "Fecundity (pups per adult female)", xlab = "")
 
 # fem_5.7 <- colSums(recon$N_f[6:8, ])
 # fem_8.17 <- colSums(recon$N_f[9:18, ])
@@ -1826,6 +1822,7 @@ sst_eff_plot
 sst_preds_plot
 sst_preds_hilo_plot
 enso_eff_plot
+lepDA_eff_plot
 
 ```
 
@@ -1835,7 +1832,9 @@ Figure (B): probability-scale effects of the SST covariate effect for each age: 
 
 Figure (C): probability-scale effects of high versus low SST for each age group (females only). 
 
-Figure (D): I'm calling this the "ENSO memory" effect: whether individuals are affected in subsequent years if born in an ENSO year. This shows that (for example) survival is high at ages 2-6 for individuals born in ENSO years and lower for adults that were born in ENSO years. We should talk through this a bit more, but my guess is that this is more showing us a cyclic effect rather than some sort of lasting ENSO effect that pups carry with them as they age. Once pups that were born in an ENSO event have reached ages 2-6, those years are probably cold, and once those same pups that were born in an ENSO event have reached 7+ survival is maybe lower again because they're back into an ENSO event. 
+Figure (D): I'm calling this the "ENSO memory" effect: whether individuals are affected in subsequent years if born in an ENSO year. This shows that (for example) survival is low for yearlings and 7-9yo adults and average for the other ages. My guess is that this pattern is more showing us a cyclic effect rather than some sort of lasting ENSO effect that pups carry with them as they age. Once pups that were born in an ENSO event have reached ages 7-9, those years are probably warm again and therefore survival is low again.  
+
+Figure (E): This plot shows the logit-scale effect of the proportion of strandings that note DA (for females) and leptospirosis (males) cases on each age-specific survival. This shows, for example, that when the proportion of strandings composed of DA cases is higher, female survival for ages 4-16 is lower. No effect found here for the effect of lepto cases on male survival. 
 
 ##### Management metrics: *K* and MNPL 
 
