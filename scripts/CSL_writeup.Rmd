@@ -2,6 +2,18 @@
 title: ""
 output: html_document
 date: ""
+knit: |
+  (function(inputFile, encoding) {
+    base_name <- tools::file_path_sans_ext(inputFile)
+    date_str  <- Sys.Date()
+    out_name  <- paste0(base_name, "_", date_str, ".html")
+    
+    rmarkdown::render(
+      input = inputFile,
+      encoding = encoding,
+      output_file = out_name
+    )
+  })
 ---
 
 ```{r setup, include=FALSE}
@@ -788,9 +800,9 @@ summary_table <- post %>%
 adult_females <- colSums(recon$N_f[5:24, ]) #this should just be [6+,] but fec > 1.0
 implied_fec_all <- pup_counts/adult_females
 
-# fec_calc_plot <- plot(x = 1990:2024, y = implied_fec_all, type = "b", col = "darkred", pch = 16,
-#      # main = "Implied birth rate",
-#      ylab = "Fecundity (pups per adult female)", xlab = "")
+fec_calc_plot <- plot(x = 1990:2024, y = implied_fec_all, type = "b", col = "darkred", pch = 16,
+     # main = "Implied birth rate",
+     ylab = "Fecundity (pups per adult female)", xlab = "")
 
 # fem_5.7 <- colSums(recon$N_f[6:8, ])
 # fem_8.17 <- colSums(recon$N_f[9:18, ])
@@ -832,7 +844,7 @@ implied_fec_all <- pup_counts/adult_females
 ```{r calculate metrics from IPM fit and post pred checks, eval = T, results = 'keep'}
 
 # out_IPM <- readRDS(file = here('results', 'out_IPM_sst_DD_slice120.RDS'))
-out_IPM <- readRDS(file = here('results', 'out_IPM_sst_DD_slice2.RDS'))
+out_IPM <- readRDS(file = here('results', 'out_IPM_sst_DD.RDS'))
 
 # outmat <- do.call(rbind, out_IPM)
 
@@ -894,17 +906,18 @@ DD_plot <- ggplot(DD_sum, aes(y = med, x = variable)) +
 
 ##PPC
 # expected pups columns chronologically
-pup_cols <- paste0("expected_pups_tot[", 2:(n_occasions), "]") # Starts at 2 because t+1 in the loop
+pup_cols <- paste0("expected_pups_tot[", 2:(n_occasions-1), "]") # Starts at 2 because t+1 in the loop
 pup_post <- outmat[, pup_cols]
 
 # calculate the median and 95% CI for each year and append census data 
+#need to extend expected_pups_tot to n_occ instead of n_occ-1 in the model
 pup_summary <- data.frame(
-  TimeStep = 2:n_occasions, 
-  year = 1991:2024,
-  Expected_Median = apply(pup_post, 2, median),
-  Expected_LCI = apply(pup_post, 2, quantile, probs = 0.025),
-  Expected_UCI = apply(pup_post, 2, quantile, probs = 0.975),
-  Observed = pup_cnt_filled$US_PupCnt[2:n_occasions]
+  TimeStep = 2:(n_occasions-1), 
+  year = 1991:2023,
+  Expected_Median = apply(pup_post, 2, median)[1:33],
+  Expected_LCI = apply(pup_post, 2, quantile, probs = 0.025)[1:33],
+  Expected_UCI = apply(pup_post, 2, quantile, probs = 0.975)[1:33],
+  Observed = pup_cnt_filled$US_PupCnt[2:(n_occasions-1)]
 )
 
 pups_ppc_plot <- ggplot(pup_summary, aes(x = year)) +
@@ -925,7 +938,7 @@ pups_ppc_plot <- ggplot(pup_summary, aes(x = year)) +
 #### also plot scatterplot of int.phiP and beta.DD?
 
 #abundance
-Ntot_post_sum <- post_sum %>% filter(grepl('N_total', variable)) %>%
+Ntot_post_sum <- post_sumIPM %>% filter(grepl('N_total', variable)) %>%
   # filter(!grepl('_f', variable) & !grepl('_m', variable)) %>%
   transform(year = parse_number(variable)) 
 
@@ -976,8 +989,8 @@ for (i in 1:n_draws) {
   int_phiA   <- outmat[row_idx, "int.phiA"]
   ##FIX THESE
   fec_low  <- outmat[row_idx, "int.fec_low"]
-    fec_med  <- outmat[row_idx, "int.fec_high"]
-  fec_high <- outmat[row_idx, "int.fec_low"]
+    fec_med  <- outmat[row_idx, "int.fec_med"]
+  fec_high <- outmat[row_idx, "int.fec_high"]
 
   int_phiPM   <- outmat[row_idx, "int.phiPM"]
   int_phi1M     <- outmat[row_idx, "int.phi1M"]
