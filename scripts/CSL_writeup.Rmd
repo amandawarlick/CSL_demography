@@ -833,9 +833,15 @@ implied_fec_all <- pup_counts/adult_females
 ```{r calculate metrics from IPM fit and post pred checks, eval = T, results = 'keep'}
 
 # out_IPM <- readRDS(file = here('results', 'out_IPM_sst_DD_slice120.RDS'))
-out_IPM <- readRDS(file = here('results', 'out_IPM_sst_DD_slice2.RDS'))
+out_IPM <- readRDS(file = here('results', 'out_IPM_sst_DD_slice2.RDS')) #current best
 
-# outmat <- do.call(rbind, out_IPM)
+#these are bad
+# out_3 <- readRDS(here::here('results', "out_IPM_sst_DD_200_3.RDS"))
+# out_4 <- readRDS(here::here('results', "out_IPM_sst_DD_200_4.RDS"))
+
+# # combine them and make an mcmc object
+# library(coda)
+# # out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
 
 outmat <- as.matrix(out_IPM)
 
