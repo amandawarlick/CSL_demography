@@ -4502,7 +4502,7 @@ for (t in (fc_m[i] + 1):n_occasions) {
     
     #warm year penality approach
     logit(int.fec[t]) <- mu.fec + b.warm*(EN_fec_vec[t]-1)
-    expected_pups_born[t+1] <- (sum(N_vec[6:23])*int.fec[t]) 
+    expected_pups_tot[t+1] <- (sum(N_f[6:23,t+1])*int.fec[t]) 
     # logit(int.fec_med[t]) <- mu.fec_med + b.warm*(EN_fec_vec[t]-1)
     # logit(int.fec_high[t]) <- mu.fec_high + b.warm*(EN_fec_vec[t]-1)
     # expected_pups_born[t+1] <- (sum(N_vec[6:8])*int.fec_low[t]) +
@@ -4524,6 +4524,7 @@ nim.data <- list(y = y, ym = ym, y_pup_counts = pup_cnt_filled$US_PupCnt)
 
 nim.constants <- list(n_f = dim(y)[1], n_m = dim(ym)[1], 
                       n_occasions = n_occasions,
+                      EN_fec_vec = EN_fec_vec,
                       init_pop_size_f = init_pop_f, init_pop_size_m = init_pop_m,
                       sst_pupForage = sst_dat[,2],
                       sst_np = sst_dat[,4],
@@ -4542,7 +4543,7 @@ inits <- list(int.phiP = 0.6, int.phi1 = 0.6, int.phi2.3 = 0.85,
               b.sst.P = 0, b.sst.1 = 0,
               beta.DD = 0.02,
               # int.fec_low = 0.4, int.fec = 0.6, 
-              int.fec = 0.7, b.warm = 0.8,
+              mu.fec = 0.7, b.warm = 0.8,
               sigma.cnt = 2000,
               b.sst.2.3 = 0, b.sst.4.6 = 0, b.sst.7.9 = 0, b.sst.A = 0,
               b.sst.2.3M = 0, b.sst.4.6M = 0,
@@ -4574,7 +4575,7 @@ params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA',
 n.iter = 15000; n.chains = 3; n.burnin = 7000; nthin = 2; nAdapt = 20
 n.iter = 12000; n.chains = 2; n.burnin = 7000; nthin = 2; nAdapt = 20
 # n.iter = 5000; n.chains = 2; n.burnin = 2000; nthin = 2; nAdapt = 20
-n.iter = 10000; n.chains = 2; n.burnin = 5000; nthin = 2; nAdapt = 20
+n.iter = 10000; n.chains = 1; n.burnin = 5000; nthin = 2; nAdapt = 20
 
 
 start <- Sys.time()
@@ -5082,7 +5083,7 @@ for (t in (fc_m[i] + 1):n_occasions) {
     logit(int.fec_low[t]) <- mu.fec_low + b.warm*(EN_fec_vec[t]-1)
     logit(int.fec_med[t]) <- mu.fec_med + b.warm*(EN_fec_vec[t]-1)
     logit(int.fec_high[t]) <- mu.fec_high + b.warm*(EN_fec_vec[t]-1)
-    expected_pups_born[t+1] <- (sum(N_vec[6:8])*int.fec_low[t]*0.5) +
+    expected_pups_tot[t+1] <- (sum(N_vec[6:8])*int.fec_low[t]*0.5) +
                 (sum(N_vec[9:18])*int.fec_med[t]*0.5) + (sum(N_vec[19:23])*int.fec_high[t]*0.5)
     
     # evaluate the biological expected pups directly against the census data
