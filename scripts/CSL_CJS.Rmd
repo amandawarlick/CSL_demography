@@ -4618,17 +4618,17 @@ out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin,
 
 } # chain loop
 
-# out_1 <- readRDS(here::here('results', "out_IPM_sst_DD_slice150_1.RDS"))
-# out_2 <- readRDS(here::here('results', "out_IPM_sst_DD_slice150_2.RDS"))
+out_1 <- readRDS(here::here('results', "out_IPM_sst_DD_1fec_warm_1.RDS"))
+out_2 <- readRDS(here::here('results', "out_IPM_sst_DD_1fec_warm_2.RDS"))
 # out_3 <- readRDS(here::here('results', "out_IPM_sst_DD_slice150_3.RDS"))
 # out_1 <- readRDS(here::here('results', paste("out_IPM_sst_DD_fec_warm_", n.chains, ".RDS", sep = "")))
 # 
 # # combine them and make an mcmc object
-# library(coda)
-# # out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
+library(coda)
+out <- list(`out_1`, `out_2`) %>% as.mcmc.list()
 # out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
 
-# saveRDS(out, file = here('results', 'out_IPM_sst_DD_slice150.rds'))
+# saveRDS(out, file = here('results', 'out_IPM_sst_DD_1fec_warm.rds'))
 # saveRDS(out, file = here('results', 'out_IPM_sst_DD.rds'))
 
 

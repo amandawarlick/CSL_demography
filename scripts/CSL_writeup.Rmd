@@ -2,6 +2,18 @@
 title: ""
 output: html_document
 date: ""
+knit: |
+  (function(inputFile, encoding) {
+    base_name <- tools::file_path_sans_ext(inputFile)
+    date_str  <- Sys.Date()
+    out_name  <- paste0(base_name, "_", date_str, ".html")
+    
+    rmarkdown::render(
+      input = inputFile,
+      encoding = encoding,
+      output_file = out_name
+    )
+  })
 ---
 
 ```{r setup, include=FALSE}
@@ -88,7 +100,7 @@ phi_plot <- ggplot(int_dat %>% filter(grepl('phi', variable)),
   scale_color_manual(values = c('black', 'darkgrey'), name = 'Sex')
   # scale_color_manual(values = rainbow2[c(2,6,7,8)], name = 'Sex')
 
-#fecundity
+#fecundity: time-invariant
 fec_dat <- post_sum %>% filter(grepl('int.fec', variable)) %>%
   # bind_rows(post_sum %>% filter(grepl('int.psi', variable))) %>%
   transform(variable = ifelse(grepl('low', variable), 'Fec_low', 'Fec_high')) %>%
@@ -97,6 +109,23 @@ fec_dat <- post_sum %>% filter(grepl('int.fec', variable)) %>%
 
 fec_plot <- ggplot(fec_dat, aes(x = age, y = value)) +
   geom_errorbar(aes(x = age, ymin=lower, ymax=upper),
+                position = position_dodge(0.5),
+                width = 0.35) +
+  geom_point(size = 0.8, position = position_dodge(0.5)) +
+  xlab('Fecundity age bins') + ylab(expression(paste('Fecundity ',  '(', f, ')'))) +
+  ggtitle('') +
+  # facet_wrap(~sex, scales = 'free_x', drop = T) +
+  plot_theme(legend.position = 'top', 
+             panel.border = element_rect(fill = NA),
+             plot.title = element_text(hjust = 0.5))
+
+#fecundity: time-variant based on b.warm
+fec_dat <- post_sum %>% filter(grepl('int.fec', variable)) %>%
+  transform(year = as.numeric(as.character(gsub('.+\\[([0-9]+)\\].*$', '\\1',
+                                                variable))))
+
+fec_plot <- ggplot(fec_dat, aes(x = year, y = med)) +
+  geom_errorbar(aes(x = year, ymin=lower, ymax=upper),
                 position = position_dodge(0.5),
                 width = 0.35) +
   geom_point(size = 0.8, position = position_dodge(0.5)) +
@@ -363,7 +392,7 @@ sst_preds_plot <- ggplot(preds_all %>% filter(sex != 'M'), aes(x = sst_val, y = 
 
 #discrete prediction values
 
-seq(min(sst_dat[,2]), max(sst_dat[,2]), length.out = 100)
+# seq(min(sst_dat[,2]), max(sst_dat[,2]), length.out = 100)
 preds_all <- data.frame()
 sst_pup_vals <- list(min(sst_dat[,2]), max(sst_dat[,2]))
 sst_np_vals <- list(min(sst_dat[,4]), max(sst_dat[,4]))
@@ -425,9 +454,9 @@ sst_preds_hilo_plot <- ggplot(preds, aes(x = cov, y = med)) +
 
 
 #ENSO "memory" effects
-out_ENSO <- readRDS(file = here('results', 'out_ENSO_memory.RDS'))
+out_ENSO <- readRDS(file = here('results', 'out.parallel_enso_1.RDS'))
+# out_ENSO <- readRDS(file = here('results', 'out_ENSO_memory.RDS'))
 
-# all_pars <- colnames(out_ENSO[[1]])
 outmat_ENSO <- as.matrix(out_ENSO)
 
 post_sum_ENSO <- data.frame(
@@ -435,7 +464,6 @@ post_sum_ENSO <- data.frame(
   lower = apply(outmat_ENSO, 2, function(x) quantile(x, probs = 0.025, na.rm = T, names = F)),
   upper = apply(outmat_ENSO, 2, function(x) quantile(x, probs = 0.975, na.rm = T, names = F)))
 post_sum_ENSO$variable <- row.names(post_sum_ENSO)
-
 
 b.enso <- post_sum_ENSO %>% 
   filter(grepl('b.enso', variable)) %>%
@@ -457,10 +485,8 @@ enso_eff_plot <- ggplot(b.enso, aes(x = var_name, y = med)) +
              plot.title = element_text(hjust = 0.5))
 
 #lepto/DA
-#ENSO "memory" effects
 out_lep <- readRDS(file = here('results', 'out_leptoDA.RDS'))
 
-# all_pars <- colnames(out_ENSO[[1]])
 outmat_lep <- as.matrix(out_lep)
 
 post_sum_lep <- data.frame(
@@ -468,7 +494,6 @@ post_sum_lep <- data.frame(
   lower = apply(outmat_lep, 2, function(x) quantile(x, probs = 0.025, na.rm = T, names = F)),
   upper = apply(outmat_lep, 2, function(x) quantile(x, probs = 0.975, na.rm = T, names = F)))
 post_sum_lep$variable <- row.names(post_sum_lep)
-
 
 b.lepDA <- post_sum_lep %>% 
   filter(grepl('b.lep', variable) | grepl('b.DA', variable)) %>%
@@ -785,11 +810,11 @@ summary_table <- post %>%
 
 
 # calculate the implied fecundity
-# How many pups were born per adult female (assuming ages 4-24 are adults)?
-adult_females <- colSums(recon$N_f[5:24, ]) #this should just be [6+,] but fec > 1.0
+# How many pups were born per adult female (assuming ages 5-23 are adults)
+adult_females <- colSums(recon$N_f[5:23, ]) #this should just be [6:23,] 
 implied_fec_all <- pup_counts/adult_females
-
-# fec_calc_plot <- plot(x = 1990:2024, y = implied_fec_all, type = "b", col = "darkred", pch = 16,
+ 
+# plot(x = 1990:2024, y = implied_fec_all, type = "b", col = "darkred", pch = 16,
 #      # main = "Implied birth rate",
 #      ylab = "Fecundity (pups per adult female)", xlab = "")
 
@@ -833,7 +858,8 @@ implied_fec_all <- pup_counts/adult_females
 ```{r calculate metrics from IPM fit and post pred checks, eval = T, results = 'keep'}
 
 # out_IPM <- readRDS(file = here('results', 'out_IPM_sst_DD_slice120.RDS'))
-out_IPM <- readRDS(file = here('results', 'out_IPM_sst_DD_slice2.RDS')) #current best
+# out_IPM <- readRDS(file = here('results', 'out_IPM_sst_DD_slice2.RDS')) #current best
+out_IPM <- readRDS(file = here('results', 'out_IPM_sst_DD.RDS'))
 
 #these are bad
 # out_3 <- readRDS(here::here('results', "out_IPM_sst_DD_200_3.RDS"))
@@ -901,17 +927,18 @@ DD_plot <- ggplot(DD_sum, aes(y = med, x = variable)) +
 
 ##PPC
 # expected pups columns chronologically
-pup_cols <- paste0("expected_pups_tot[", 2:(n_occasions), "]") # Starts at 2 because t+1 in the loop
+pup_cols <- paste0("expected_pups_tot[", 2:(n_occasions-1), "]") # Starts at 2 because t+1 in the loop
 pup_post <- outmat[, pup_cols]
 
 # calculate the median and 95% CI for each year and append census data 
+#need to extend expected_pups_tot to n_occ instead of n_occ-1 in the model
 pup_summary <- data.frame(
-  TimeStep = 2:n_occasions, 
-  year = 1991:2024,
-  Expected_Median = apply(pup_post, 2, median),
-  Expected_LCI = apply(pup_post, 2, quantile, probs = 0.025),
-  Expected_UCI = apply(pup_post, 2, quantile, probs = 0.975),
-  Observed = pup_cnt_filled$US_PupCnt[2:n_occasions]
+  TimeStep = 2:(n_occasions-1), 
+  year = 1991:2023,
+  Expected_Median = apply(pup_post, 2, median)[1:33],
+  Expected_LCI = apply(pup_post, 2, quantile, probs = 0.025)[1:33],
+  Expected_UCI = apply(pup_post, 2, quantile, probs = 0.975)[1:33],
+  Observed = pup_cnt_filled$US_PupCnt[2:(n_occasions-1)]
 )
 
 pups_ppc_plot <- ggplot(pup_summary, aes(x = year)) +
@@ -932,7 +959,7 @@ pups_ppc_plot <- ggplot(pup_summary, aes(x = year)) +
 #### also plot scatterplot of int.phiP and beta.DD?
 
 #abundance
-Ntot_post_sum <- post_sum %>% filter(grepl('N_total', variable)) %>%
+Ntot_post_sum <- post_sumIPM %>% filter(grepl('N_total', variable)) %>%
   # filter(!grepl('_f', variable) & !grepl('_m', variable)) %>%
   transform(year = parse_number(variable)) 
 
@@ -983,8 +1010,8 @@ for (i in 1:n_draws) {
   int_phiA   <- outmat[row_idx, "int.phiA"]
   ##FIX THESE
   fec_low  <- outmat[row_idx, "int.fec_low"]
-    fec_med  <- outmat[row_idx, "int.fec_high"]
-  fec_high <- outmat[row_idx, "int.fec_low"]
+    fec_med  <- outmat[row_idx, "int.fec_med"]
+  fec_high <- outmat[row_idx, "int.fec_high"]
 
   int_phiPM   <- outmat[row_idx, "int.phiPM"]
   int_phi1M     <- outmat[row_idx, "int.phi1M"]
@@ -1819,6 +1846,7 @@ sst_eff_plot
 sst_preds_plot
 sst_preds_hilo_plot
 enso_eff_plot
+lepDA_eff_plot
 
 ```
 
@@ -1828,7 +1856,9 @@ Figure (B): probability-scale effects of the SST covariate effect for each age: 
 
 Figure (C): probability-scale effects of high versus low SST for each age group (females only). 
 
-Figure (D): I'm calling this the "ENSO memory" effect: whether individuals are affected in subsequent years if born in an ENSO year. This shows that (for example) survival is high at ages 2-6 for individuals born in ENSO years and lower for adults that were born in ENSO years. We should talk through this a bit more, but my guess is that this is more showing us a cyclic effect rather than some sort of lasting ENSO effect that pups carry with them as they age. Once pups that were born in an ENSO event have reached ages 2-6, those years are probably cold, and once those same pups that were born in an ENSO event have reached 7+ survival is maybe lower again because they're back into an ENSO event. 
+Figure (D): I'm calling this the "ENSO memory" effect: whether individuals are affected in subsequent years if born in an ENSO year. This shows that (for example) survival is low for yearlings and 7-9yo adults and average for the other ages. My guess is that this pattern is more showing us a cyclic effect rather than some sort of lasting ENSO effect that pups carry with them as they age. Once pups that were born in an ENSO event have reached ages 7-9, those years are probably warm again and therefore survival is low again.  
+
+Figure (E): This plot shows the logit-scale effect of the proportion of strandings that note DA (for females) and leptospirosis (males) cases on each age-specific survival. This shows, for example, that when the proportion of strandings composed of DA cases is higher, female survival for ages 4-16 is lower. No effect found here for the effect of lepto cases on male survival. 
 
 ##### Management metrics: *K* and MNPL 
 
