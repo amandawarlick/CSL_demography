@@ -2884,7 +2884,7 @@ params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA',
 
 ### run model
 n.iter = 15000; n.chains = 3; n.burnin = 7000; nthin = 2; nAdapt = 20
-n.iter = 10000; n.chains = 2; n.burnin = 5000; nthin = 2; nAdapt = 20
+n.iter = 10000; n.chains = 4; n.burnin = 5000; nthin = 2; nAdapt = 20
 # n.iter = 5000; n.chains = 2; n.burnin = 2000; nthin = 2; nAdapt = 20
 
 
@@ -2896,7 +2896,7 @@ n.iter = 10000; n.chains = 2; n.burnin = 5000; nthin = 2; nAdapt = 20
 # registerDoParallel(cl)
 
 # foreach(i = n.chains:n.chains) %dopar% {
-for (i in 1:n.chains) {
+for (i in 4:n.chains) {
   library(nimble)
   library(here)
   source(here("scripts", "nimbleFunctions.R"))
@@ -3439,7 +3439,7 @@ params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA',
 
 ### run model
 n.iter = 15000; n.chains = 3; n.burnin = 7000; nthin = 2; nAdapt = 20
-n.iter = 10000; n.chains = 2; n.burnin = 5000; nthin = 2; nAdapt = 20
+n.iter = 10000; n.chains = 4; n.burnin = 5000; nthin = 2; nAdapt = 20
 # n.iter = 5000; n.chains = 2; n.burnin = 2000; nthin = 2; nAdapt = 20
 
 
@@ -3451,7 +3451,7 @@ n.iter = 10000; n.chains = 2; n.burnin = 5000; nthin = 2; nAdapt = 20
 # registerDoParallel(cl)
 
 # foreach(i = n.chains:n.chains) %dopar% {
-for (i in 1:n.chains) {
+for (i in 4:n.chains) {
   library(nimble)
   library(here)
   source(here("scripts", "nimbleFunctions.R"))
@@ -4576,7 +4576,7 @@ n.iter = 15000; n.chains = 3; n.burnin = 7000; nthin = 2; nAdapt = 20
 n.iter = 12000; n.chains = 2; n.burnin = 7000; nthin = 2; nAdapt = 20
 # n.iter = 5000; n.chains = 2; n.burnin = 2000; nthin = 2; nAdapt = 20
 n.iter = 10000; n.chains = 1; n.burnin = 5000; nthin = 2; nAdapt = 20
-
+n.iter = 15000; n.chains = 1; n.burnin = 8000; nthin = 5; nAdapt = 20
 
 start <- Sys.time()
 
@@ -4613,7 +4613,7 @@ out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin,
                samplesAsCodaMCMC = TRUE)
 
 
-  saveRDS(out, here('results', paste("out_IPM_sst_DD_1fec_warm_", i, ".RDS", sep = "")))
+  saveRDS(out, here('results', paste("out_IPM_sst_DD_1fec_warm_longer_", i, ".RDS", sep = "")))
 # saveRDS(out, here('results', paste("out_IPM_sst_DD.RDS", sep = "")))
 
 } # chain loop
