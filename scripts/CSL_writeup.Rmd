@@ -101,23 +101,23 @@ phi_plot <- ggplot(int_dat %>% filter(grepl('phi', variable)),
   # scale_color_manual(values = rainbow2[c(2,6,7,8)], name = 'Sex')
 
 #fecundity
-fec_dat <- post_sum %>% filter(grepl('int.fec', variable)) %>%
-  # bind_rows(post_sum %>% filter(grepl('int.psi', variable))) %>%
-  transform(variable = ifelse(grepl('low', variable), 'Fec_low', 'Fec_high')) %>%
-   transform(age = factor(variable, levels = c('Fec_low', 'Fec_high'),
-                          labels = c('4:9', '10:22'))) 
-
-fec_plot <- ggplot(fec_dat, aes(x = age, y = value)) +
-  geom_errorbar(aes(x = age, ymin=lower, ymax=upper),
-                position = position_dodge(0.5),
-                width = 0.35) +
-  geom_point(size = 0.8, position = position_dodge(0.5)) +
-  xlab('Fecundity age bins') + ylab(expression(paste('Fecundity ',  '(', f, ')'))) +
-  ggtitle('') +
-  # facet_wrap(~sex, scales = 'free_x', drop = T) +
-  plot_theme(legend.position = 'top', 
-             panel.border = element_rect(fill = NA),
-             plot.title = element_text(hjust = 0.5))
+# fec_dat <- post_sum %>% filter(grepl('int.fec', variable)) %>%
+#   # bind_rows(post_sum %>% filter(grepl('int.psi', variable))) %>%
+#   transform(variable = ifelse(grepl('low', variable), 'Fec_low', 'Fec_high')) %>%
+#    transform(age = factor(variable, levels = c('Fec_low', 'Fec_high'),
+#                           labels = c('4:9', '10:22'))) 
+# 
+# fec_plot <- ggplot(fec_dat, aes(x = age, y = value)) +
+#   geom_errorbar(aes(x = age, ymin=lower, ymax=upper),
+#                 position = position_dodge(0.5),
+#                 width = 0.35) +
+#   geom_point(size = 0.8, position = position_dodge(0.5)) +
+#   xlab('Fecundity age bins') + ylab(expression(paste('Fecundity ',  '(', f, ')'))) +
+#   ggtitle('') +
+#   # facet_wrap(~sex, scales = 'free_x', drop = T) +
+#   plot_theme(legend.position = 'top', 
+#              panel.border = element_rect(fill = NA),
+#              plot.title = element_text(hjust = 0.5))
 
 #detection
 int_dat_p <- post_sum %>% filter(grepl('int.p', variable)) %>%
@@ -841,7 +841,8 @@ implied_fec_all <- pup_counts/adult_females
 ```{r calculate metrics from IPM fit and post pred checks, eval = T, results = 'keep'}
 
 # out_IPM <- readRDS(file = here('results', 'out_IPM_sst_DD_slice120.RDS'))
-out_IPM <- readRDS(file = here('results', 'out_IPM_sst_DD.RDS'))
+# out_IPM <- readRDS(file = here('results', 'out_IPM_sst_DD.RDS'))
+out_IPM <- readRDS(file = here('results', 'out_IPM_sst_DD_1fec_150_1.RDS'))
 
 # outmat <- do.call(rbind, out_IPM)
 
@@ -885,7 +886,7 @@ phi_plot_compare <- ggplot(plot_dat, aes(age, med, color = mod)) +
 #fecundity
 fec_dat <- data.frame(outmat) %>% dplyr::select(contains('int.fec'))
 # colnames(fec_dat) <- c('Age 18+', 'Age 5-7', 'Age 8-17')
-colnames(fec_dat) <- c('High', 'Low')
+# colnames(fec_dat) <- c('High', 'Low')
 
 fec_plot <- ggplot(fec_dat %>% reshape2::melt(), 
                    aes(x = variable, y = value)) +
@@ -920,7 +921,7 @@ pup_summary <- data.frame(
 pups_ppc_plot <- ggplot(pup_summary, aes(x = year)) +
   geom_ribbon(aes(ymin = Expected_LCI, ymax = Expected_UCI), 
               fill = "steelblue", alpha = 0.3) +
-  geom_line(aes(y = Expected_Median), color = "steelblue", size = 1) +
+  geom_line(aes(y = Expected_Median), color = "steelblue", linewidth = 1) +
   geom_point(aes(y = Observed), color = "black", size = 2) +
   geom_line(aes(y = Observed), linetype = 'dashed', col = 'darkgrey') +
   theme_bw() +
