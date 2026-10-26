@@ -4543,7 +4543,7 @@ inits <- list(int.phiP = 0.6, int.phi1 = 0.6, int.phi2.3 = 0.85,
               b.sst.P = 0, b.sst.1 = 0,
               beta.DD = 0.02,
               # int.fec_low = 0.4, int.fec = 0.6, 
-              mu.fec = 0.7, b.warm = 0,
+              mu.fec = 0.7, #b.warm = 0,
               sigma.cnt = 2000,
               b.sst.2.3 = 0, b.sst.4.6 = 0, b.sst.7.9 = 0, b.sst.A = 0,
               b.sst.2.3M = 0, b.sst.4.6M = 0,
@@ -4575,8 +4575,8 @@ params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA',
 n.iter = 15000; n.chains = 3; n.burnin = 7000; nthin = 2; nAdapt = 20
 n.iter = 12000; n.chains = 2; n.burnin = 7000; nthin = 2; nAdapt = 20
 # n.iter = 5000; n.chains = 2; n.burnin = 2000; nthin = 2; nAdapt = 20
-n.iter = 15000; n.chains = 2; n.burnin = 8000; nthin = 5; nAdapt = 20
-
+n.iter = 10000; n.chains = 1; n.burnin = 5000; nthin = 2; nAdapt = 20
+n.iter = 15000; n.chains = 1; n.burnin = 8000; nthin = 5; nAdapt = 20
 
 start <- Sys.time()
 
@@ -4618,17 +4618,17 @@ out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin,
 
 } # chain loop
 
-# out_1 <- readRDS(here::here('results', "out_IPM_sst_DD_slice150_1.RDS"))
-# out_2 <- readRDS(here::here('results', "out_IPM_sst_DD_slice150_2.RDS"))
+out_1 <- readRDS(here::here('results', "out_IPM_sst_DD_1fec_warm_1.RDS"))
+out_2 <- readRDS(here::here('results', "out_IPM_sst_DD_1fec_warm_2.RDS"))
 # out_3 <- readRDS(here::here('results', "out_IPM_sst_DD_slice150_3.RDS"))
 # out_1 <- readRDS(here::here('results', paste("out_IPM_sst_DD_fec_warm_", n.chains, ".RDS", sep = "")))
 # 
 # # combine them and make an mcmc object
-# library(coda)
-# # out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
+library(coda)
+out <- list(`out_1`, `out_2`) %>% as.mcmc.list()
 # out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
 
-# saveRDS(out, file = here('results', 'out_IPM_sst_DD_slice150.rds'))
+# saveRDS(out, file = here('results', 'out_IPM_sst_DD_1fec_warm.rds'))
 # saveRDS(out, file = here('results', 'out_IPM_sst_DD.rds'))
 
 
@@ -5089,7 +5089,7 @@ for (t in (fc_m[i] + 1):n_occasions) {
     # logit(int.fec_high[t]) <- mu.fec_high + b.warm*(EN_fec_vec[t]-1)
     # expected_pups_born[t+1] <- (sum(N_vec[6:8])*int.fec_low[t]) +
     #             (sum(N_vec[9:18])*int.fec_med[t]) + (sum(N_vec[19:23])*int.fec_high[t])
-    
+        # logit(int.fec_low[t]) <- mu.fec_low + b.warm*(EN_fec_vec[t]-1)
     
     # evaluate the biological expected pups directly against the census data
     # y_pup_counts[t+1] ~ dpois(expected_pups_tot[t+1]) 

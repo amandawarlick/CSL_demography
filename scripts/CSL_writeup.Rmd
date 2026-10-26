@@ -119,6 +119,42 @@ phi_plot <- ggplot(int_dat %>% filter(grepl('phi', variable)),
 #              panel.border = element_rect(fill = NA),
 #              plot.title = element_text(hjust = 0.5))
 
+#fecundity: time-invariant
+# fec_dat <- post_sum %>% filter(grepl('int.fec', variable)) %>%
+#   # bind_rows(post_sum %>% filter(grepl('int.psi', variable))) %>%
+#   transform(variable = ifelse(grepl('low', variable), 'Fec_low', 'Fec_high')) %>%
+#    transform(age = factor(variable, levels = c('Fec_low', 'Fec_high'),
+#                           labels = c('4:9', '10:22'))) 
+# 
+# fec_plot <- ggplot(fec_dat, aes(x = age, y = value)) +
+#   geom_errorbar(aes(x = age, ymin=lower, ymax=upper),
+#                 position = position_dodge(0.5),
+#                 width = 0.35) +
+#   geom_point(size = 0.8, position = position_dodge(0.5)) +
+#   xlab('Fecundity age bins') + ylab(expression(paste('Fecundity ',  '(', f, ')'))) +
+#   ggtitle('') +
+#   # facet_wrap(~sex, scales = 'free_x', drop = T) +
+#   plot_theme(legend.position = 'top', 
+#              panel.border = element_rect(fill = NA),
+#              plot.title = element_text(hjust = 0.5))
+
+#fecundity: time-variant based on b.warm
+fec_dat <- post_sum %>% filter(grepl('int.fec', variable)) %>%
+  transform(year = as.numeric(as.character(gsub('.+\\[([0-9]+)\\].*$', '\\1',
+                                                variable))))
+
+fec_plot <- ggplot(fec_dat, aes(x = year, y = med)) +
+  geom_errorbar(aes(x = year, ymin=lower, ymax=upper),
+                position = position_dodge(0.5),
+                width = 0.35) +
+  geom_point(size = 0.8, position = position_dodge(0.5)) +
+  xlab('Fecundity age bins') + ylab(expression(paste('Fecundity ',  '(', f, ')'))) +
+  ggtitle('') +
+  # facet_wrap(~sex, scales = 'free_x', drop = T) +
+  plot_theme(legend.position = 'top', 
+             panel.border = element_rect(fill = NA),
+             plot.title = element_text(hjust = 0.5))
+
 #detection
 int_dat_p <- post_sum %>% filter(grepl('int.p', variable)) %>%
   # bind_rows(post_sum %>% filter(grepl('int.psi', variable))) %>%
@@ -844,7 +880,13 @@ implied_fec_all <- pup_counts/adult_females
 # out_IPM <- readRDS(file = here('results', 'out_IPM_sst_DD.RDS'))
 out_IPM <- readRDS(file = here('results', 'out_IPM_sst_DD_1fec_150_1.RDS'))
 
-# outmat <- do.call(rbind, out_IPM)
+#these are bad
+# out_3 <- readRDS(here::here('results', "out_IPM_sst_DD_200_3.RDS"))
+# out_4 <- readRDS(here::here('results', "out_IPM_sst_DD_200_4.RDS"))
+
+# # combine them and make an mcmc object
+# library(coda)
+# # out <- list(`out_1`, `out_2`, `out_3`) %>% as.mcmc.list()
 
 outmat <- as.matrix(out_IPM)
 
