@@ -4228,7 +4228,9 @@ out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin,
 
 
   # saveRDS(out, here('results', paste("out_IPM_sst_DD_", i, ".RDS", sep = "")))
-saveRDS(out, here('results', paste("out_IPM_sst_DD_1fec_30_", i, "DDexp.RDS", sep = "")))
+
+# saveRDS(out, here('results', paste("out_IPM_sst_DD_1fec_150_", i, ".RDS", sep = "")))
+saveRDS(out, here('results', paste("out_IPM_sst_DD_1fec_150_", i, "DDexp.RDS", sep = "")))
 # saveRDS(out, here('results', paste("out_IPM_sst_DD.RDS", sep = "")))
 
 } # closes parallel loop
@@ -4744,6 +4746,7 @@ params <- c('int.p1', 'int.p2.3', 'int.p4.6', 'int.p7.12', 'int.pA',
 
 ### run model
 n.iter = 15000; n.chains = 3; n.burnin = 7000; nthin = 2; nAdapt = 20
+n.iter = 12000; n.chains = 1; n.burnin = 7000; nthin = 2; nAdapt = 20
 n.iter = 10000; n.chains = 4; n.burnin = 5000; nthin = 2; nAdapt = 20
 # n.iter = 5000; n.chains = 2; n.burnin = 2000; nthin = 2; nAdapt = 20
 
