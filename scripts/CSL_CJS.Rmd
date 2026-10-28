@@ -13,6 +13,7 @@ library(nimbleEcology)
 library(foreach)
 library(doParallel)
 library(readr)
+library(RTMB)
 
 # source(here::here('scripts', 'PlotTheme.R'))
 
@@ -105,16 +106,18 @@ ch_dat_f <- read.csv(here::here('data', 'res_dat_f_20260623.csv'),
                    header = T, stringsAsFactors = F) %>% 
   transform(adjsex == 'Fem') %>%
   dplyr::select(-adjsex) %>%
-  group_by(cohort) %>%
-  slice_sample(n = 150, replace = F) %>%
-  arrange(brand)
+  # group_by(cohort) %>%
+  # slice_sample(n = 30, replace = F) %>%
+  arrange(brand) %>%
+  filter(cohort < 2024)
 
 ch_dat_m <- read.csv(here::here('data', 'res_dat_m_20260623.csv'),
                    header = T, stringsAsFactors = F) %>%
   dplyr::select(-adjsex) %>%
-  group_by(cohort) %>%
-  slice_sample(n = 125, replace = F) %>%
-  arrange(brand)
+  # group_by(cohort) %>%
+  # slice_sample(n = 25, replace = F) %>%
+  arrange(brand) %>%
+  filter(cohort < 2024)
 
 EN_phi <- c(1991, 1992, 1996, 1997, 2002, 2009, 2010, 2012, 2013, 2014, 2015, 
                 2022, 2023) #includes moderate
@@ -216,9 +219,6 @@ ggplot(plot_dat, aes(nonpupJulytoJuneSSTAnomalies, mean_wt, col = sex)) +
   geom_smooth(method = 'lm') +
   facet_grid(~sex) +
   theme_bw()
-
-
-
 
 ```
 
@@ -1508,7 +1508,6 @@ saveRDS(out, here::here('results', 'out_sst_probs_v2.RDS'))
 
 ```
 
-
 ```{r lepto DA model}
 
 #has unique young male detection probabilities and b.sst coefficients
@@ -1927,7 +1926,6 @@ saveRDS(out, here::here('results', 'out_leptoDA.RDS'))
 
 
 ```
-
 
 ```{r enso memory model}
 
@@ -2368,7 +2366,7 @@ for (t in 1:(n_occasions - 2)) {
   # Adults transition (Indices 6-24 -> 7-25)
   for (a in 6:12) {
     N_f_track[a+1, t+1] <- round(N_f_track[a, t] * phi_A)
-    N_m_track[a+1, t+1] <- round(N_m_track[a, t] * phi_A)
+    N_m_track[a+1, t+1] <- round(N_m_track[a, t] * phi_AM)
   }
   
     for (a in 13:24) {
@@ -2376,7 +2374,7 @@ for (t in 1:(n_occasions - 2)) {
     }
   
   for (a in 13:19) {
-    N_m_track[a+1, t+1] <- round(N_m_track[a, t] * phi_AA)
+    N_m_track[a+1, t+1] <- round(N_m_track[a, t] * phi_AAM)
   }
 }
 
@@ -2392,6 +2390,1313 @@ init_pop_f <- N_f_track[, 1]
 init_pop_m <- N_m_track[, 1]
 
 ```
+
+```{r CJS TMB}
+
+library(RTMB)
+
+csl_simple_cjs <- function(par) {
+  
+  yf <- dat$yf
+  fc <- dat$fc
+  last_seen <- dat$last_seen
+  n_fem <- nrow(yf)
+  n_occ <- ncol(yf)
+  
+  # Just two parameters!
+  phi <- plogis(par$logit_phi)
+  p   <- plogis(par$logit_p)
+  
+  # z_f <- par$z_f
+  nll <- 0
+  
+  for (i in 1:n_fem) {
+    
+ if (last_seen[i] > fc[i]) {
+      for (t in (fc[i] + 1):last_seen[i]) {
+        
+        # It MUST have survived to be seen later
+        nll <- nll - log(phi + 1e-10)
+        
+        # Was it detected in this specific year?
+        if (yf[i, t] == 1) {
+          nll <- nll - log(p + 1e-10)
+        } else {
+          nll <- nll - log(1 - p + 1e-10)
+        }
+      }
+    }
+    
+    # ==========================================================
+    # PART 2: The Unobserved Tail (The Chi Recursion)
+    # The probability of NEVER being seen again after last_seen
+    # ==========================================================
+    if (last_seen[i] < n_occ) {
+      
+      # Base case: At the end of the study, the probability of 
+      # not being seen in the future is exactly 1.
+      chi <- 1 
+      
+      # Work backwards from the end of the study to the year after last_seen
+      for (t in n_occ:(last_seen[i] + 1)) {
+        # chi = (Prob Died) + (Prob Lived * Prob Missed * chi_next_year)
+        chi <- (1 - phi) + (phi * (1 - p) * chi)
+      }
+      
+      # Add this single probability to the likelihood
+      nll <- nll - log(chi + 1e-10)
+    }
+  }
+  
+  return(nll)
+}
+
+yf <- ifelse(y == 19, 0, 1)
+yf <- ifelse(is.na(yf), 0, yf)
+
+# 2. Generate initial states (using your exact function)
+z.init.f <- get_z_init(yf, fc)
+
+get_last_seen <- function(y, fc) {
+  n_ind <- nrow(y)
+  last_seen <- numeric(n_ind)
+  for (i in 1:n_ind) {
+    ls <- suppressWarnings(max(which(y[i, ] == 1)))
+    # If never seen again, last_seen is just the tagging year
+    if (is.finite(ls) && ls > fc[i]) {
+      last_seen[i] <- ls
+    } else {
+      last_seen[i] <- fc[i]
+    }
+  }
+  return(last_seen)
+}
+
+last_seen_f <- get_last_seen(yf, fc)
+
+# 3. Package the stripped-down lists
+dat <- list(
+  yf = yf, 
+  last_seen = last_seen_f,
+  fc = fc
+)
+
+# NO discrete states in the parameter list!
+parameters <- list(
+  logit_phi = 0, 
+  logit_p = 0 
+)
+
+# 4. Compile! (NO integrate argument!)
+obj <- MakeADFun(
+  func = csl_simple_cjs,
+  parameters = parameters
+)
+
+# 5. Optimize!
+opt <- nlminb(obj$par, obj$fn, obj$gr)
+sd_rep <- sdreport(obj)
+summary(sd_rep, "report")
+
+```
+
+```{r IPM 1 fec TMB}
+
+csl_ipm <- function(par) {
+  
+  # ==========================================================
+  # 1. UNPACK DATA
+  # ==========================================================
+  yf <- dat$yf                 
+  ym <- dat$ym
+  fc <- dat$fc               
+  fc_m <- dat$fc_m 
+  last_seen_f <- dat$last_seen_f
+  last_seen_m <- dat$last_seen_m
+  
+  y_pup_counts <- dat$pup_counts 
+  sst_pup <- dat$sst_pup
+  sst_np <- dat$sst_np
+  
+  n_fem <- nrow(yf)
+  n_m <- nrow(ym)
+  n_occ <- ncol(yf)
+  max_age_f <- 24
+  max_age_m <- 19
+  
+  nll <- 0 
+  
+  # ==========================================================
+  # 2. PARAMETERS & PRIORS
+  # ==========================================================
+  b_DD <- exp(par$log_b_DD)
+  
+  # FIX 1: Bypass dexp() boundary checks entirely. 
+  # The negative log-likelihood of an Exponential(1) is simply +x
+  nll <- nll + b_DD
+  
+  # FIX 2: Bounding SDs to prevent precision matrix explosion in Laplace!
+  sd_cnt  <- exp(par$log_sd_cnt) + 10       # Floor at 10 (Biological reality for aerial counts)
+  # sigma_fec <- exp(par$log_sigma_fec) + 0.01 # Floor at 0.01 for the random effect
+  
+  # eps_fec <- par$eps_fec 
+  # nll <- nll - sum(dnorm(eps_fec, mean = 0, sd = sigma_fec, log = TRUE))
+  
+  # ==========================================================
+  # 3. POPULATION PROJECTION
+  # ==========================================================
+  N_f <- vector("list", n_occ)
+  N_m <- vector("list", n_occ)
+  expected_pups <- vector("list", n_occ)
+  phif_pop <- vector("list", n_occ)
+  phim_pop <- vector("list", n_occ)
+  pf_pop   <- vector("list", n_occ)
+  pm_pop   <- vector("list", n_occ)
+  
+  N_f[[1]] <- dat$init_pop_f 
+  N_m[[1]] <- dat$init_pop_m
+  
+  p1    <- plogis(par$mup1)
+  p2_3  <- plogis(par$mup2_3)
+  p4_6  <- plogis(par$mup4_6)
+  p7_12 <- plogis(par$mup7_12)
+  pA    <- plogis(par$mupA)
+  pf_vec <- c(0, p1, rep(p2_3, 2), rep(p4_6, 3), rep(p7_12, 6), rep(pA, 12))
+  
+  p1M    <- plogis(par$mup1M)
+  p2_3M  <- plogis(par$mup2_3M)
+  p4_6M  <- plogis(par$mup4_6M)
+  p7_12M <- plogis(par$mup7_12M)
+  pAM    <- plogis(par$mupAM)
+  pm_vec <- c(0, p1M, rep(p2_3M, 2), rep(p4_6M, 3), rep(p7_12M, 6), rep(pAM, 7))
+  
+  for (t in 1:n_occ) {
+    pf_pop[[t]] <- pf_vec
+    pm_pop[[t]] <- pm_vec
+  }
+  
+  for (t in 1:(n_occ - 1)) {
+    N_curr_f <- N_f[[t]]
+    N_curr_m <- N_m[[t]]
+    
+    N_scaled <- (sum(N_curr_f) + sum(N_curr_m)) / 100000 
+    
+    # Safe covariate extractions (Silently handles out-of-bounds just in case)
+    curr_sst_pup <- ifelse(is.na(sst_pup[t]), 0, sst_pup[t])
+    curr_sst_np  <- ifelse(is.na(sst_np[t]), 0, sst_np[t])
+    
+    phiP <- plogis(par$muP + par$b_sstP * curr_sst_pup - b_DD * N_scaled)
+    phi1 <- plogis(par$mu1 + par$b_sst1 * curr_sst_np)
+    phi2_3 <- plogis(par$mu2_3 + par$b_sst2_3 * curr_sst_np)
+    phi4_6 <- plogis(par$mu4_6 + par$b_sst4_6 * curr_sst_np)
+    phi7_9 <- plogis(par$mu7_9 + par$b_sst7_9 * curr_sst_np)
+    phi10_12 <- plogis(par$mu10_12 + par$b_sst10_12 * curr_sst_np)
+    phi13_16 <- plogis(par$mu13_16 + par$b_sst13_16 * curr_sst_np)
+    phiA <- plogis(par$muA + par$b_sstA * curr_sst_np)
+    
+    phif_vec <- c(phiP, phi1, rep(phi2_3, 2), rep(phi4_6, 3), rep(phi7_9, 3),
+                  rep(phi10_12, 3), rep(phi13_16, 4), rep(phiA, 8))
+    phif_pop[[t]] <- phif_vec 
+    
+    phiPM <- plogis(par$muPM + par$b_sstP * curr_sst_pup - b_DD * N_scaled)
+    phi1M <- plogis(par$mu1M + par$b_sst1 * curr_sst_np)
+    phi2_3M <- plogis(par$mu2_3M + par$b_sst2_3M * curr_sst_np)
+    phi4_6M <- plogis(par$mu4_6M + par$b_sst4_6M * curr_sst_np)
+    phi7_9M <- plogis(par$mu7_9M + par$b_sst7_9M * curr_sst_np)
+    phi10_12M <- plogis(par$mu10_12M + par$b_sst10_12M * curr_sst_np)
+    phi13_16M <- plogis(par$mu13_16M + par$b_sst13_16M * curr_sst_np)
+    phiAM <- plogis(par$muAM + par$b_sstAM * curr_sst_np)
+    
+    phim_vec <- c(phiPM, phi1M, rep(phi2_3M, 2), rep(phi4_6M, 3), rep(phi7_9M, 3),
+                  rep(phi10_12M, 3), rep(phi13_16M, 4), rep(phiAM, 3))
+    phim_pop[[t]] <- phim_vec 
+    
+    N_next_adults_f <- N_curr_f[1:24] * phif_vec[1:24]
+    N_next_adults_m <- N_curr_m[1:19] * phim_vec[1:19]
+
+    int_fec <- plogis(par$mu_fec)
+    expected_pups[[t+1]] <- sum(N_curr_f[6:23]) * int_fec
+    
+    # FIX 3: Silent NA Guard (If y_pup_counts is missing or out of bounds, use expected)
+    if (!is.na(y_pup_counts[t+1])) {
+      new_pups <- y_pup_counts[t+1]/2
+    } else {
+      new_pups <- expected_pups[[t+1]]/2
+    }
+    
+    N_f[[t+1]] <- c(new_pups, N_next_adults_f)
+    N_m[[t+1]] <- c(new_pups, N_next_adults_m)
+  }
+  
+  # C. Aerial count likelihood 
+  for (t in 2:n_occ) {
+    if (!is.na(y_pup_counts[t])) {
+      nll <- nll - dnorm(y_pup_counts[t], expected_pups[[t]], sd_cnt, log = TRUE)
+    }
+  }
+  
+  # ==========================================================
+  # 4. MARK RECAPTURE LIKELIHOOD 
+  # ==========================================================
+  
+  # --- FEMALES ---
+  for (i in 1:n_fem) {
+    if (last_seen_f[i] > fc[i]) {
+      for (t in (fc[i] + 1):last_seen_f[i]) {
+        age_s <- min(t - fc[i], max_age_f + 1)
+        age_d <- min(t - fc[i] + 1, max_age_f + 1)
+        
+        phi <- phif_pop[[t - 1]][age_s]
+        p   <- pf_pop[[t]][age_d]
+        
+        nll <- nll - log(phi + 1e-10)
+        if (yf[i, t] == 1) {
+          nll <- nll - log(p + 1e-10)
+        } else {
+          nll <- nll - log(1 - p + 1e-10)
+        }
+      }
+    }
+    
+    if (last_seen_f[i] < n_occ) {
+      chi <- 1 
+      for (t in n_occ:(last_seen_f[i] + 1)) {
+        age_s <- min(t - fc[i], max_age_f + 1)
+        age_d <- min(t - fc[i] + 1, max_age_f + 1)
+        
+        phi <- phif_pop[[t - 1]][age_s]
+        p   <- pf_pop[[t]][age_d]
+        
+        chi <- (1 - phi) + (phi * (1 - p) * chi)
+      }
+      nll <- nll - log(chi + 1e-10)
+    }
+  }
+  
+  # --- MALES ---
+  for (i in 1:n_m) {
+    if (last_seen_m[i] > fc_m[i]) {
+      for (t in (fc_m[i] + 1):last_seen_m[i]) {
+        age_s <- min(t - fc_m[i], max_age_m + 1)
+        age_d <- min(t - fc_m[i] + 1, max_age_m + 1)
+        
+        phi <- phim_pop[[t - 1]][age_s]
+        p   <- pm_pop[[t]][age_d]
+        
+        nll <- nll - log(phi + 1e-10)
+        if (ym[i, t] == 1) {
+          nll <- nll - log(p + 1e-10)
+        } else {
+          nll <- nll - log(1 - p + 1e-10)
+        }
+      }
+    }
+    
+    if (last_seen_m[i] < n_occ) {
+      chi <- 1 
+      for (t in n_occ:(last_seen_m[i] + 1)) {
+        age_s <- min(t - fc_m[i], max_age_m + 1)
+        age_d <- min(t - fc_m[i] + 1, max_age_m + 1)
+        
+        phi <- phim_pop[[t - 1]][age_s]
+        p   <- pm_pop[[t]][age_d]
+        
+        chi <- (1 - phi) + (phi * (1 - p) * chi)
+      }
+      nll <- nll - log(chi + 1e-10)
+    }
+  }
+  
+  #summary stats
+  Ntot <- sum(N_f[[n_occ]]) + sum(N_m[[n_occ]])
+  
+  # Back-transform key baseline vital rates to probabilities!
+  int.phiP   <- plogis(par$muP)
+  int.phi1   <- plogis(par$mu1)
+  int.phi2_3   <- plogis(par$mu2_3)
+  int.phi4_6   <- plogis(par$mu4_6)
+  int.phi7_9   <- plogis(par$mu7_9)
+  int.phi10_12   <- plogis(par$mu10_12)
+  int.phi13_16   <- plogis(par$mu13_16)
+  int.phiA   <- plogis(par$muA)
+  
+  int.phiPM   <- plogis(par$muPM)
+  int.phi1M   <- plogis(par$mu1M)
+  int.phi2_3M   <- plogis(par$mu2_3M)
+  int.phi4_6M   <- plogis(par$mu4_6M)
+  int.phi7_9M   <- plogis(par$mu7_9M)
+  int.phi10_12M   <- plogis(par$mu10_12M)
+  int.phi13_16M   <- plogis(par$mu13_16M)
+  int.phiAM   <- plogis(par$muAM)
+  
+  int.p1   <- plogis(par$mup1)
+  int.p2_3   <- plogis(par$mup2_3)
+  int.p4_6   <- plogis(par$mup4_6)
+  int.p7_12   <- plogis(par$mup7_12)
+  int.pA   <- plogis(par$mupA)
+  
+  int.p1M   <- plogis(par$mup1M)
+  int.p2_3M   <- plogis(par$mup2_3M)
+  int.p4_6M   <- plogis(par$mup4_6M)
+  int.p7_12M   <- plogis(par$mup7_12M)
+  int.pAM   <- plogis(par$mupAM)
+  
+  # Back-transform variance and density dependence 
+  b_DD    <- exp(par$log_b_DD)
+  # sigma_fecundity       <- exp(par$log_sigma_fec) + 0.01
+  # fec <- plogis(par$mu_fec + eps_fec)
+
+  #reports
+  ADREPORT(Ntot)
+  # ADREPORT(fec)
+  ADREPORT(int.phiP)
+  ADREPORT(int.phi1)
+  ADREPORT(int.phi2_3)
+  ADREPORT(int.phi4_6)
+  ADREPORT(int.phi7_9)
+  ADREPORT(int.phi10_12)
+  ADREPORT(int.phi13_16)
+  ADREPORT(int.phiA)
+  ADREPORT(int.phiPM)
+  ADREPORT(int.phi1M)
+  ADREPORT(int.phi2_3M)
+  ADREPORT(int.phi4_6M)
+  ADREPORT(int.phi7_9M)
+  ADREPORT(int.phi10_12M)
+  ADREPORT(int.phi13_16M)
+  ADREPORT(int.phiAM)
+
+  ADREPORT(int.p1)
+  ADREPORT(int.p2_3)
+  ADREPORT(int.p4_6)
+  ADREPORT(int.p7_12)
+  ADREPORT(int.pA)
+  ADREPORT(int.p1M)
+  ADREPORT(int.p2_3M)
+  ADREPORT(int.p4_6M)
+  ADREPORT(int.p7_12M)
+  ADREPORT(int.pAM)
+  
+  ADREPORT(b_DD)
+  # ADREPORT(sigma_fecundity)
+
+  return(nll)
+}
+
+#change from age-based states to 0's and 1's
+yf <- ifelse(y == 19, 0, 1)
+yf <- ifelse(is.na(yf), 0, yf)
+ym <- ifelse(ym == 19, 0, 1)
+ym <- ifelse(is.na(ym), 0, ym)
+
+n_occ <- n_occasions
+
+#z.init: 0's before tagging and after last seen, otherwise 1
+get_z_init <- function(y, fc) {
+  
+  n_ind <- nrow(y)
+  n_occ <- ncol(y)
+  
+  z_init <- matrix(0, nrow = n_ind, ncol = n_occ)
+  
+  for (i in 1:n_ind) {
+    last_seen <- suppressWarnings(max(which(y[i, ] == 1)))
+    
+    # If seen again after tagging
+    if (is.finite(last_seen) && last_seen > fc[i]) {
+      z_init[i, fc[i]:last_seen] <- 1
+    } else {
+      # If never seen again, it is only known to be alive on the tagging day
+      z_init[i, fc[i]] <- 1 
+    }
+  }
+  return(z_init)
+}
+
+# Run it on your new binary observation data
+z.init.f <- get_z_init(yf, fc)
+z.init.m <- get_z_init(ym, fc_m)
+
+get_last_seen <- function(y, fc) {
+  n_ind <- nrow(y)
+  last_seen <- numeric(n_ind)
+  for (i in 1:n_ind) {
+    ls <- suppressWarnings(max(which(y[i, ] == 1)))
+    if (is.finite(ls) && ls > fc[i]) {
+      last_seen[i] <- ls
+    } else {
+      last_seen[i] <- fc[i]
+    }
+  }
+  return(last_seen)
+}
+
+last_seen_f <- get_last_seen(yf, fc)
+last_seen_m <- get_last_seen(ym, fc_m)
+
+# package data (ensure everything is numeric, no NAs)
+dat <- list(
+  yf = yf, ym = ym,
+  fc = fc, fc_m = fc_m,
+  last_seen_f = last_seen_f,
+  last_seen_m = last_seen_m,
+  pup_counts = round(pup_cnt_filled$US_PupCnt),
+  init_pop_f = init_pop_f, init_pop_m = init_pop_m,
+  sst_pup = sst_dat[,2],
+  sst_np = sst_dat[,4])
+
+# NO discrete states (z) in this list!
+parameters <- list(
+  muP = 0, mu1 = 0, mu2_3 = 0, mu4_6 = 0, mu7_9 = 0, mu10_12 = 0, 
+  mu13_16 = 0, muA = 0, mu13_16M = 0, muAM = 0,
+  muPM = 0, mu1M = 0, mu2_3M = 0, mu4_6M = 0, mu7_9M = 0, mu10_12M = 0, 
+  mup1 = 0, mup2_3 = 0, mup4_6 = 0, mup7_12 = 0, mupA = 0,
+  mup1M = 0, mup2_3M = 0, mup4_6M = 0, mup7_12M = 0, mupAM = 0,
+  b_sstP = 0, b_sst1 = 0, b_sst2_3 = 0, b_sst4_6 = 0, b_sst7_9 = 0, b_sst10_12 = 0, 
+  b_sst13_16 = 0, b_sstA = 0, b_sst2_3M = 0, b_sst4_6M = 0, b_sst7_9M = 0, 
+  b_sst10_12M = 0, b_sst13_16M = 0, b_sstAM = 0,
+  log_b_DD = log(0.02),
+  mu_fec = 0.5, 
+  # log_sigma_fec = log(0.5),
+  # eps_fec = rep(0, n_occ-1),
+  log_sd_cnt = log(2000))
+
+# Only integrate the continuous random effect!
+obj <- MakeADFun(
+  func = csl_ipm,
+  parameters = parameters)
+
+opt <- nlminb(obj$par, obj$fn, obj$gr, 
+              control = list(eval.max = 10000, iter.max = 10000))
+
+sd_rep <- sdreport(obj)
+summary(sd_rep, "report") #listed by adreport
+
+summary(sd_rep, "fixed") #all params
+
+#summarize and save
+# 1. Extract both parameter types from the sdreport object
+fixed_params <- summary(sd_rep, "fixed")
+derived_params <- summary(sd_rep, "report")
+
+# 2. Bind them into a single dataframe
+results_df <- as.data.frame(rbind(fixed_params, derived_params))
+colnames(results_df) <- c("Estimate", "Std_Error")
+
+# 3. Calculate 95% Confidence Intervals
+results_df$CI_lower <- results_df$Estimate - (1.96 * results_df$Std_Error)
+results_df$CI_upper <- results_df$Estimate + (1.96 * results_df$Std_Error)
+
+# 4. View the clean table in the console
+print(results_df)
+
+# 5. Save directly to your working directory
+write.csv(results_df, here('results', "CSL_IPM_tmb_1fec.csv"), row.names = TRUE)
+
+
+```
+
+```{r IPM 2 fec TMB}
+
+csl_ipm <- function(par) {
+  
+  # ==========================================================
+  # 1. UNPACK DATA
+  # ==========================================================
+  yf <- dat$yf                 
+  ym <- dat$ym
+  fc <- dat$fc               
+  fc_m <- dat$fc_m 
+  last_seen_f <- dat$last_seen_f
+  last_seen_m <- dat$last_seen_m
+  
+  y_pup_counts <- dat$pup_counts 
+  sst_pup <- dat$sst_pup
+  sst_np <- dat$sst_np
+  
+  n_fem <- nrow(yf)
+  n_m <- nrow(ym)
+  n_occ <- ncol(yf)
+  max_age_f <- 24
+  max_age_m <- 19
+  
+  nll <- 0 
+  
+  # ==========================================================
+  # 2. PARAMETERS & PRIORS
+  # ==========================================================
+  b_DD <- exp(par$log_b_DD)
+  
+  # FIX 1: Bypass dexp() boundary checks entirely. 
+  # The negative log-likelihood of an Exponential(1) is simply +x
+  nll <- nll + b_DD
+  
+  # FIX 2: Bounding SDs to prevent precision matrix explosion in Laplace!
+  sd_cnt  <- exp(par$log_sd_cnt) + 10       # Floor at 10 (Biological reality for aerial counts)
+  # sigma_fec <- exp(par$log_sigma_fec) + 0.01 # Floor at 0.01 for the random effect
+  
+  # eps_fec <- par$eps_fec 
+  # nll <- nll - sum(dnorm(eps_fec, mean = 0, sd = sigma_fec, log = TRUE))
+  
+  # ==========================================================
+  # 3. POPULATION PROJECTION
+  # ==========================================================
+  N_f <- vector("list", n_occ)
+  N_m <- vector("list", n_occ)
+  expected_pups <- vector("list", n_occ)
+  phif_pop <- vector("list", n_occ)
+  phim_pop <- vector("list", n_occ)
+  pf_pop   <- vector("list", n_occ)
+  pm_pop   <- vector("list", n_occ)
+  
+  N_f[[1]] <- dat$init_pop_f 
+  N_m[[1]] <- dat$init_pop_m
+  
+  p1    <- plogis(par$mup1)
+  p2_3  <- plogis(par$mup2_3)
+  p4_6  <- plogis(par$mup4_6)
+  p7_12 <- plogis(par$mup7_12)
+  pA    <- plogis(par$mupA)
+  pf_vec <- c(0, p1, rep(p2_3, 2), rep(p4_6, 3), rep(p7_12, 6), rep(pA, 12))
+  
+  p1M    <- plogis(par$mup1M)
+  p2_3M  <- plogis(par$mup2_3M)
+  p4_6M  <- plogis(par$mup4_6M)
+  p7_12M <- plogis(par$mup7_12M)
+  pAM    <- plogis(par$mupAM)
+  pm_vec <- c(0, p1M, rep(p2_3M, 2), rep(p4_6M, 3), rep(p7_12M, 6), rep(pAM, 7))
+  
+  for (t in 1:n_occ) {
+    pf_pop[[t]] <- pf_vec
+    pm_pop[[t]] <- pm_vec
+  }
+  
+  for (t in 1:(n_occ - 1)) {
+    N_curr_f <- N_f[[t]]
+    N_curr_m <- N_m[[t]]
+    
+    N_scaled <- (sum(N_curr_f) + sum(N_curr_m)) / 100000 
+    
+    # Safe covariate extractions (Silently handles out-of-bounds just in case)
+    curr_sst_pup <- ifelse(is.na(sst_pup[t]), 0, sst_pup[t])
+    curr_sst_np  <- ifelse(is.na(sst_np[t]), 0, sst_np[t])
+    
+    phiP <- plogis(par$muP + par$b_sstP * curr_sst_pup - b_DD * N_scaled)
+    phi1 <- plogis(par$mu1 + par$b_sst1 * curr_sst_np)
+    phi2_3 <- plogis(par$mu2_3 + par$b_sst2_3 * curr_sst_np)
+    phi4_6 <- plogis(par$mu4_6 + par$b_sst4_6 * curr_sst_np)
+    phi7_9 <- plogis(par$mu7_9 + par$b_sst7_9 * curr_sst_np)
+    phi10_12 <- plogis(par$mu10_12 + par$b_sst10_12 * curr_sst_np)
+    phi13_16 <- plogis(par$mu13_16 + par$b_sst13_16 * curr_sst_np)
+    phiA <- plogis(par$muA + par$b_sstA * curr_sst_np)
+    
+    phif_vec <- c(phiP, phi1, rep(phi2_3, 2), rep(phi4_6, 3), rep(phi7_9, 3),
+                  rep(phi10_12, 3), rep(phi13_16, 4), rep(phiA, 8))
+    phif_pop[[t]] <- phif_vec 
+    
+    phiPM <- plogis(par$muPM + par$b_sstP * curr_sst_pup - b_DD * N_scaled)
+    phi1M <- plogis(par$mu1M + par$b_sst1 * curr_sst_np)
+    phi2_3M <- plogis(par$mu2_3M + par$b_sst2_3M * curr_sst_np)
+    phi4_6M <- plogis(par$mu4_6M + par$b_sst4_6M * curr_sst_np)
+    phi7_9M <- plogis(par$mu7_9M + par$b_sst7_9M * curr_sst_np)
+    phi10_12M <- plogis(par$mu10_12M + par$b_sst10_12M * curr_sst_np)
+    phi13_16M <- plogis(par$mu13_16M + par$b_sst13_16M * curr_sst_np)
+    phiAM <- plogis(par$muAM + par$b_sstAM * curr_sst_np)
+    
+    phim_vec <- c(phiPM, phi1M, rep(phi2_3M, 2), rep(phi4_6M, 3), rep(phi7_9M, 3),
+                  rep(phi10_12M, 3), rep(phi13_16M, 4), rep(phiAM, 3))
+    phim_pop[[t]] <- phim_vec 
+    
+    N_next_adults_f <- N_curr_f[1:24] * phif_vec[1:24]
+    N_next_adults_m <- N_curr_m[1:19] * phim_vec[1:19]
+
+    int_fec_new <- plogis(par$mu_fec_new)
+    int_fec_prime <- plogis(par$mu_fec_prime)
+    
+    # Apply them to their specific age brackets 
+    expected_pups[[t+1]] <- (sum(N_curr_f[6:8]) * int_fec_new) + 
+                            (sum(N_curr_f[9:23]) * int_fec_prime)
+    
+    # FIX 3: Silent NA Guard (If y_pup_counts is missing or out of bounds, use expected)
+    if (!is.na(y_pup_counts[t+1])) {
+      new_pups <- y_pup_counts[t+1]/2
+    } else {
+      new_pups <- expected_pups[[t+1]]/2
+    }
+    
+    N_f[[t+1]] <- c(new_pups, N_next_adults_f)
+    N_m[[t+1]] <- c(new_pups, N_next_adults_m)
+  }
+  
+  # C. Aerial count likelihood 
+  for (t in 2:n_occ) {
+    if (!is.na(y_pup_counts[t])) {
+      nll <- nll - dnorm(y_pup_counts[t], expected_pups[[t]], sd_cnt, log = TRUE)
+    }
+  }
+  
+  # ==========================================================
+  # 4. MARK RECAPTURE LIKELIHOOD 
+  # ==========================================================
+  
+  # --- FEMALES ---
+  for (i in 1:n_fem) {
+    if (last_seen_f[i] > fc[i]) {
+      for (t in (fc[i] + 1):last_seen_f[i]) {
+        age_s <- min(t - fc[i], max_age_f + 1)
+        age_d <- min(t - fc[i] + 1, max_age_f + 1)
+        
+        phi <- phif_pop[[t - 1]][age_s]
+        p   <- pf_pop[[t]][age_d]
+        
+        nll <- nll - log(phi + 1e-10)
+        if (yf[i, t] == 1) {
+          nll <- nll - log(p + 1e-10)
+        } else {
+          nll <- nll - log(1 - p + 1e-10)
+        }
+      }
+    }
+    
+    if (last_seen_f[i] < n_occ) {
+      chi <- 1 
+      for (t in n_occ:(last_seen_f[i] + 1)) {
+        age_s <- min(t - fc[i], max_age_f + 1)
+        age_d <- min(t - fc[i] + 1, max_age_f + 1)
+        
+        phi <- phif_pop[[t - 1]][age_s]
+        p   <- pf_pop[[t]][age_d]
+        
+        chi <- (1 - phi) + (phi * (1 - p) * chi)
+      }
+      nll <- nll - log(chi + 1e-10)
+    }
+  }
+  
+  # --- MALES ---
+  for (i in 1:n_m) {
+    if (last_seen_m[i] > fc_m[i]) {
+      for (t in (fc_m[i] + 1):last_seen_m[i]) {
+        age_s <- min(t - fc_m[i], max_age_m + 1)
+        age_d <- min(t - fc_m[i] + 1, max_age_m + 1)
+        
+        phi <- phim_pop[[t - 1]][age_s]
+        p   <- pm_pop[[t]][age_d]
+        
+        nll <- nll - log(phi + 1e-10)
+        if (ym[i, t] == 1) {
+          nll <- nll - log(p + 1e-10)
+        } else {
+          nll <- nll - log(1 - p + 1e-10)
+        }
+      }
+    }
+    
+    if (last_seen_m[i] < n_occ) {
+      chi <- 1 
+      for (t in n_occ:(last_seen_m[i] + 1)) {
+        age_s <- min(t - fc_m[i], max_age_m + 1)
+        age_d <- min(t - fc_m[i] + 1, max_age_m + 1)
+        
+        phi <- phim_pop[[t - 1]][age_s]
+        p   <- pm_pop[[t]][age_d]
+        
+        chi <- (1 - phi) + (phi * (1 - p) * chi)
+      }
+      nll <- nll - log(chi + 1e-10)
+    }
+  }
+  
+  #summary stats
+  Ntot <- sum(N_f[[n_occ]]) + sum(N_m[[n_occ]])
+  
+  # Back-transform key baseline vital rates to probabilities!
+  int.phiP   <- plogis(par$muP)
+  int.phi1   <- plogis(par$mu1)
+  int.phi2_3   <- plogis(par$mu2_3)
+  int.phi4_6   <- plogis(par$mu4_6)
+  int.phi7_9   <- plogis(par$mu7_9)
+  int.phi10_12   <- plogis(par$mu10_12)
+  int.phi13_16   <- plogis(par$mu13_16)
+  int.phiA   <- plogis(par$muA)
+  
+  int.phiPM   <- plogis(par$muPM)
+  int.phi1M   <- plogis(par$mu1M)
+  int.phi2_3M   <- plogis(par$mu2_3M)
+  int.phi4_6M   <- plogis(par$mu4_6M)
+  int.phi7_9M   <- plogis(par$mu7_9M)
+  int.phi10_12M   <- plogis(par$mu10_12M)
+  int.phi13_16M   <- plogis(par$mu13_16M)
+  int.phiAM   <- plogis(par$muAM)
+  
+  int.p1   <- plogis(par$mup1)
+  int.p2_3   <- plogis(par$mup2_3)
+  int.p4_6   <- plogis(par$mup4_6)
+  int.p7_12   <- plogis(par$mup7_12)
+  int.pA   <- plogis(par$mupA)
+  
+  int.p1M   <- plogis(par$mup1M)
+  int.p2_3M   <- plogis(par$mup2_3M)
+  int.p4_6M   <- plogis(par$mup4_6M)
+  int.p7_12M   <- plogis(par$mup7_12M)
+  int.pAM   <- plogis(par$mupAM)
+  
+  # Back-transform variance and density dependence 
+  b_DD    <- exp(par$log_b_DD)
+  # sigma_fecundity       <- exp(par$log_sigma_fec) + 0.01
+  # fec <- plogis(par$mu_fec + eps_fec)
+
+  #reports
+  ADREPORT(Ntot)
+  ADREPORT(int_fec_new)
+  ADREPORT(int_fec_prime)
+  ADREPORT(int.phiP)
+  ADREPORT(int.phi1)
+  ADREPORT(int.phi2_3)
+  ADREPORT(int.phi4_6)
+  ADREPORT(int.phi7_9)
+  ADREPORT(int.phi10_12)
+  ADREPORT(int.phi13_16)
+  ADREPORT(int.phiA)
+  ADREPORT(int.phiPM)
+  ADREPORT(int.phi1M)
+  ADREPORT(int.phi2_3M)
+  ADREPORT(int.phi4_6M)
+  ADREPORT(int.phi7_9M)
+  ADREPORT(int.phi10_12M)
+  ADREPORT(int.phi13_16M)
+  ADREPORT(int.phiAM)
+
+  ADREPORT(int.p1)
+  ADREPORT(int.p2_3)
+  ADREPORT(int.p4_6)
+  ADREPORT(int.p7_12)
+  ADREPORT(int.pA)
+  ADREPORT(int.p1M)
+  ADREPORT(int.p2_3M)
+  ADREPORT(int.p4_6M)
+  ADREPORT(int.p7_12M)
+  ADREPORT(int.pAM)
+  
+  ADREPORT(b_DD)
+  # ADREPORT(sigma_fecundity)
+
+  return(nll)
+}
+
+#change from age-based states to 0's and 1's
+yf <- ifelse(y == 19, 0, 1)
+yf <- ifelse(is.na(yf), 0, yf)
+ym <- ifelse(ym == 19, 0, 1)
+ym <- ifelse(is.na(ym), 0, ym)
+
+n_occ <- n_occasions
+
+#z.init: 0's before tagging and after last seen, otherwise 1
+get_z_init <- function(y, fc) {
+  
+  n_ind <- nrow(y)
+  n_occ <- ncol(y)
+  
+  z_init <- matrix(0, nrow = n_ind, ncol = n_occ)
+  
+  for (i in 1:n_ind) {
+    last_seen <- suppressWarnings(max(which(y[i, ] == 1)))
+    
+    # If seen again after tagging
+    if (is.finite(last_seen) && last_seen > fc[i]) {
+      z_init[i, fc[i]:last_seen] <- 1
+    } else {
+      # If never seen again, it is only known to be alive on the tagging day
+      z_init[i, fc[i]] <- 1 
+    }
+  }
+  return(z_init)
+}
+
+# Run it on your new binary observation data
+z.init.f <- get_z_init(yf, fc)
+z.init.m <- get_z_init(ym, fc_m)
+
+get_last_seen <- function(y, fc) {
+  n_ind <- nrow(y)
+  last_seen <- numeric(n_ind)
+  for (i in 1:n_ind) {
+    ls <- suppressWarnings(max(which(y[i, ] == 1)))
+    if (is.finite(ls) && ls > fc[i]) {
+      last_seen[i] <- ls
+    } else {
+      last_seen[i] <- fc[i]
+    }
+  }
+  return(last_seen)
+}
+
+last_seen_f <- get_last_seen(yf, fc)
+last_seen_m <- get_last_seen(ym, fc_m)
+
+# package data (ensure everything is numeric, no NAs)
+dat <- list(
+  yf = yf, ym = ym,
+  fc = fc, fc_m = fc_m,
+  last_seen_f = last_seen_f,
+  last_seen_m = last_seen_m,
+  pup_counts = round(pup_cnt_filled$US_PupCnt),
+  init_pop_f = init_pop_f, init_pop_m = init_pop_m,
+  sst_pup = sst_dat[,2],
+  sst_np = sst_dat[,4])
+
+# NO discrete states (z) in this list!
+parameters <- list(
+  muP = 0, mu1 = 0, mu2_3 = 0, mu4_6 = 0, mu7_9 = 0, mu10_12 = 0, 
+  mu13_16 = 0, muA = 0, mu13_16M = 0, muAM = 0,
+  muPM = 0, mu1M = 0, mu2_3M = 0, mu4_6M = 0, mu7_9M = 0, mu10_12M = 0, 
+  mup1 = 0, mup2_3 = 0, mup4_6 = 0, mup7_12 = 0, mupA = 0,
+  mup1M = 0, mup2_3M = 0, mup4_6M = 0, mup7_12M = 0, mupAM = 0,
+  b_sstP = 0, b_sst1 = 0, b_sst2_3 = 0, b_sst4_6 = 0, b_sst7_9 = 0, b_sst10_12 = 0, 
+  b_sst13_16 = 0, b_sstA = 0, b_sst2_3M = 0, b_sst4_6M = 0, b_sst7_9M = 0, 
+  b_sst10_12M = 0, b_sst13_16M = 0, b_sstAM = 0,
+  log_b_DD = log(0.02),
+  mu_fec_new = -0.5,   # ages 6-8 (lower initial guess)
+  mu_fec_prime = 0.5,
+  log_sd_cnt = log(2000))
+
+# Only integrate the continuous random effect!
+obj <- MakeADFun(
+  func = csl_ipm,
+  parameters = parameters)
+
+opt <- nlminb(obj$par, obj$fn, obj$gr, 
+              control = list(eval.max = 10000, iter.max = 10000))
+
+sd_rep <- sdreport(obj)
+summary(sd_rep, "report") #listed by adreport
+
+summary(sd_rep, "fixed") #all params
+
+#summarize and save
+# 1. Extract both parameter types from the sdreport object
+fixed_params <- summary(sd_rep, "fixed")
+derived_params <- summary(sd_rep, "report")
+
+# 2. Bind them into a single dataframe
+results_df <- as.data.frame(rbind(fixed_params, derived_params))
+colnames(results_df) <- c("Estimate", "Std_Error")
+
+# 3. Calculate 95% Confidence Intervals
+results_df$CI_lower <- results_df$Estimate - (1.96 * results_df$Std_Error)
+results_df$CI_upper <- results_df$Estimate + (1.96 * results_df$Std_Error)
+
+# 4. View the clean table in the console
+print(results_df)
+
+# 5. Save directly to your working directory
+write.csv(results_df, here('results', "CSL_IPM_tmb_2fec.csv"), row.names = TRUE)
+
+
+```
+
+
+
+```{r IPM fec_t TMB}
+
+library(RTMB)
+
+csl_ipm <- function(par) {
+  
+  # ==========================================================
+  # 1. UNPACK DATA
+  # ==========================================================
+  yf <- dat$yf                 
+  ym <- dat$ym
+  fc <- dat$fc               
+  fc_m <- dat$fc_m 
+  last_seen_f <- dat$last_seen_f
+  last_seen_m <- dat$last_seen_m
+  
+  y_pup_counts <- dat$pup_counts 
+  sst_pup <- dat$sst_pup
+  sst_np <- dat$sst_np
+  
+  n_fem <- nrow(yf)
+  n_m <- nrow(ym)
+  n_occ <- ncol(yf)
+  max_age_f <- 24
+  max_age_m <- 19
+  
+  nll <- 0 
+  
+  # ==========================================================
+  # 2. PARAMETERS & PRIORS
+  # ==========================================================
+  b_DD <- exp(par$log_b_DD)
+  
+  # FIX 1: Bypass dexp() boundary checks entirely. 
+  # The negative log-likelihood of an Exponential(1) is simply +x
+  nll <- nll + b_DD
+  
+  # FIX 2: Bounding SDs to prevent precision matrix explosion in Laplace!
+  sd_cnt  <- exp(par$log_sd_cnt) + 10       # Floor at 10 (Biological reality for aerial counts)
+  sigma_fec <- exp(par$log_sigma_fec) + 0.01 # Floor at 0.01 for the random effect
+  
+  eps_fec <- par$eps_fec 
+  nll <- nll - sum(dnorm(eps_fec, mean = 0, sd = sigma_fec, log = TRUE))
+  
+  # ==========================================================
+  # 3. POPULATION PROJECTION
+  # ==========================================================
+  N_f <- vector("list", n_occ)
+  N_m <- vector("list", n_occ)
+  expected_pups <- vector("list", n_occ)
+  phif_pop <- vector("list", n_occ)
+  phim_pop <- vector("list", n_occ)
+  pf_pop   <- vector("list", n_occ)
+  pm_pop   <- vector("list", n_occ)
+  
+  N_f[[1]] <- dat$init_pop_f 
+  N_m[[1]] <- dat$init_pop_m
+  
+  p1    <- plogis(par$mup1)
+  p2_3  <- plogis(par$mup2_3)
+  p4_6  <- plogis(par$mup4_6)
+  p7_12 <- plogis(par$mup7_12)
+  pA    <- plogis(par$mupA)
+  pf_vec <- c(0, p1, rep(p2_3, 2), rep(p4_6, 3), rep(p7_12, 6), rep(pA, 12))
+  
+  p1M    <- plogis(par$mup1M)
+  p2_3M  <- plogis(par$mup2_3M)
+  p4_6M  <- plogis(par$mup4_6M)
+  p7_12M <- plogis(par$mup7_12M)
+  pAM    <- plogis(par$mupAM)
+  pm_vec <- c(0, p1M, rep(p2_3M, 2), rep(p4_6M, 3), rep(p7_12M, 6), rep(pAM, 7))
+  
+  for (t in 1:n_occ) {
+    pf_pop[[t]] <- pf_vec
+    pm_pop[[t]] <- pm_vec
+  }
+  
+  for (t in 1:(n_occ - 1)) {
+    N_curr_f <- N_f[[t]]
+    N_curr_m <- N_m[[t]]
+    
+    N_scaled <- (sum(N_curr_f) + sum(N_curr_m)) / 100000 
+    
+    # Safe covariate extractions (Silently handles out-of-bounds just in case)
+    curr_sst_pup <- ifelse(is.na(sst_pup[t]), 0, sst_pup[t])
+    curr_sst_np  <- ifelse(is.na(sst_np[t]), 0, sst_np[t])
+    
+    phiP <- plogis(par$muP + par$b_sstP * curr_sst_pup - b_DD * N_scaled)
+    phi1 <- plogis(par$mu1 + par$b_sst1 * curr_sst_np)
+    phi2_3 <- plogis(par$mu2_3 + par$b_sst2_3 * curr_sst_np)
+    phi4_6 <- plogis(par$mu4_6 + par$b_sst4_6 * curr_sst_np)
+    phi7_9 <- plogis(par$mu7_9 + par$b_sst7_9 * curr_sst_np)
+    phi10_12 <- plogis(par$mu10_12 + par$b_sst10_12 * curr_sst_np)
+    phi13_16 <- plogis(par$mu13_16 + par$b_sst13_16 * curr_sst_np)
+    phiA <- plogis(par$muA + par$b_sstA * curr_sst_np)
+    
+    phif_vec <- c(phiP, phi1, rep(phi2_3, 2), rep(phi4_6, 3), rep(phi7_9, 3),
+                  rep(phi10_12, 3), rep(phi13_16, 4), rep(phiA, 8))
+    phif_pop[[t]] <- phif_vec 
+    
+    phiPM <- plogis(par$muPM + par$b_sstP * curr_sst_pup - b_DD * N_scaled)
+    phi1M <- plogis(par$mu1M + par$b_sst1 * curr_sst_np)
+    phi2_3M <- plogis(par$mu2_3M + par$b_sst2_3M * curr_sst_np)
+    phi4_6M <- plogis(par$mu4_6M + par$b_sst4_6M * curr_sst_np)
+    phi7_9M <- plogis(par$mu7_9M + par$b_sst7_9M * curr_sst_np)
+    phi10_12M <- plogis(par$mu10_12M + par$b_sst10_12M * curr_sst_np)
+    phi13_16M <- plogis(par$mu13_16M + par$b_sst13_16M * curr_sst_np)
+    phiAM <- plogis(par$muAM + par$b_sstAM * curr_sst_np)
+    
+    phim_vec <- c(phiPM, phi1M, rep(phi2_3M, 2), rep(phi4_6M, 3), rep(phi7_9M, 3),
+                  rep(phi10_12M, 3), rep(phi13_16M, 4), rep(phiAM, 3))
+    phim_pop[[t]] <- phim_vec 
+    
+    N_next_adults_f <- N_curr_f[1:24] * phif_vec[1:24]
+    N_next_adults_m <- N_curr_m[1:19] * phim_vec[1:19]
+
+    fec_t <- plogis(par$mu_fec + eps_fec[t])
+    expected_pups[[t+1]] <- sum(N_curr_f[6:23]) * fec_t
+    
+    # FIX 3: Silent NA Guard (If y_pup_counts is missing or out of bounds, use expected)
+    if (!is.na(y_pup_counts[t+1])) {
+      new_pups <- y_pup_counts[t+1]/2
+    } else {
+      new_pups <- expected_pups[[t+1]]/2
+    }
+    
+    N_f[[t+1]] <- c(new_pups, N_next_adults_f)
+    N_m[[t+1]] <- c(new_pups, N_next_adults_m)
+  }
+  
+  # C. Aerial count likelihood 
+  for (t in 2:n_occ) {
+    if (!is.na(y_pup_counts[t])) {
+      nll <- nll - dnorm(y_pup_counts[t], expected_pups[[t]], sd_cnt, log = TRUE)
+    }
+  }
+  
+  # ==========================================================
+  # 4. MARK RECAPTURE LIKELIHOOD 
+  # ==========================================================
+  
+  # --- FEMALES ---
+  for (i in 1:n_fem) {
+    if (last_seen_f[i] > fc[i]) {
+      for (t in (fc[i] + 1):last_seen_f[i]) {
+        age_s <- min(t - fc[i], max_age_f + 1)
+        age_d <- min(t - fc[i] + 1, max_age_f + 1)
+        
+        phi <- phif_pop[[t - 1]][age_s]
+        p   <- pf_pop[[t]][age_d]
+        
+        nll <- nll - log(phi + 1e-10)
+        if (yf[i, t] == 1) {
+          nll <- nll - log(p + 1e-10)
+        } else {
+          nll <- nll - log(1 - p + 1e-10)
+        }
+      }
+    }
+    
+    if (last_seen_f[i] < n_occ) {
+      chi <- 1 
+      for (t in n_occ:(last_seen_f[i] + 1)) {
+        age_s <- min(t - fc[i], max_age_f + 1)
+        age_d <- min(t - fc[i] + 1, max_age_f + 1)
+        
+        phi <- phif_pop[[t - 1]][age_s]
+        p   <- pf_pop[[t]][age_d]
+        
+        chi <- (1 - phi) + (phi * (1 - p) * chi)
+      }
+      nll <- nll - log(chi + 1e-10)
+    }
+  }
+  
+  # --- MALES ---
+  for (i in 1:n_m) {
+    if (last_seen_m[i] > fc_m[i]) {
+      for (t in (fc_m[i] + 1):last_seen_m[i]) {
+        age_s <- min(t - fc_m[i], max_age_m + 1)
+        age_d <- min(t - fc_m[i] + 1, max_age_m + 1)
+        
+        phi <- phim_pop[[t - 1]][age_s]
+        p   <- pm_pop[[t]][age_d]
+        
+        nll <- nll - log(phi + 1e-10)
+        if (ym[i, t] == 1) {
+          nll <- nll - log(p + 1e-10)
+        } else {
+          nll <- nll - log(1 - p + 1e-10)
+        }
+      }
+    }
+    
+    if (last_seen_m[i] < n_occ) {
+      chi <- 1 
+      for (t in n_occ:(last_seen_m[i] + 1)) {
+        age_s <- min(t - fc_m[i], max_age_m + 1)
+        age_d <- min(t - fc_m[i] + 1, max_age_m + 1)
+        
+        phi <- phim_pop[[t - 1]][age_s]
+        p   <- pm_pop[[t]][age_d]
+        
+        chi <- (1 - phi) + (phi * (1 - p) * chi)
+      }
+      nll <- nll - log(chi + 1e-10)
+    }
+  }
+  
+  #summary stats
+  Ntot <- sum(N_f[[n_occ]]) + sum(N_m[[n_occ]])
+  
+  # Back-transform key baseline vital rates to probabilities!
+  int.phiP   <- plogis(par$muP)
+  int.phi1   <- plogis(par$mu1)
+  int.phi2_3   <- plogis(par$mu2_3)
+  int.phi4_6   <- plogis(par$mu4_6)
+  int.phi7_9   <- plogis(par$mu7_9)
+  int.phi10_12   <- plogis(par$mu10_12)
+  int.phi13_16   <- plogis(par$mu13_16)
+  int.phiA   <- plogis(par$muA)
+  
+  int.phiPM   <- plogis(par$muPM)
+  int.phi1M   <- plogis(par$mu1M)
+  int.phi2_3M   <- plogis(par$mu2_3M)
+  int.phi4_6M   <- plogis(par$mu4_6M)
+  int.phi7_9M   <- plogis(par$mu7_9M)
+  int.phi10_12M   <- plogis(par$mu10_12M)
+  int.phi13_16M   <- plogis(par$mu13_16M)
+  int.phiAM   <- plogis(par$muAM)
+  
+  int.p1   <- plogis(par$mup1)
+  int.p2_3   <- plogis(par$mup2_3)
+  int.p4_6   <- plogis(par$mup4_6)
+  int.p7_12   <- plogis(par$mup7_12)
+  int.pA   <- plogis(par$mupA)
+  
+  int.p1M   <- plogis(par$mup1M)
+  int.p2_3M   <- plogis(par$mup2_3M)
+  int.p4_6M   <- plogis(par$mup4_6M)
+  int.p7_12M   <- plogis(par$mup7_12M)
+  int.pAM   <- plogis(par$mupAM)
+  
+  # Back-transform variance and density dependence 
+  b_DD    <- exp(par$log_b_DD)
+  sigma_fecundity       <- exp(par$log_sigma_fec) + 0.01
+  fec <- plogis(par$mu_fec + eps_fec)
+
+  #reports
+  ADREPORT(Ntot)
+  ADREPORT(fec)
+  ADREPORT(int.phiP)
+  ADREPORT(int.phi1)
+  ADREPORT(int.phi2_3)
+  ADREPORT(int.phi4_6)
+  ADREPORT(int.phi7_9)
+  ADREPORT(int.phi10_12)
+  ADREPORT(int.phi13_16)
+  ADREPORT(int.phiA)
+  ADREPORT(int.phiPM)
+  ADREPORT(int.phi1M)
+  ADREPORT(int.phi2_3M)
+  ADREPORT(int.phi4_6M)
+  ADREPORT(int.phi7_9M)
+  ADREPORT(int.phi10_12M)
+  ADREPORT(int.phi13_16M)
+  ADREPORT(int.phiAM)
+
+  ADREPORT(int.p1)
+  ADREPORT(int.p2_3)
+  ADREPORT(int.p4_6)
+  ADREPORT(int.p7_12)
+  ADREPORT(int.pA)
+  ADREPORT(int.p1M)
+  ADREPORT(int.p2_3M)
+  ADREPORT(int.p4_6M)
+  ADREPORT(int.p7_12M)
+  ADREPORT(int.pAM)
+  
+  ADREPORT(b_DD)
+  ADREPORT(sigma_fecundity)
+
+  return(nll)
+}
+
+#change from age-based states to 0's and 1's
+yf <- ifelse(y == 19, 0, 1)
+yf <- ifelse(is.na(yf), 0, yf)
+ym <- ifelse(ym == 19, 0, 1)
+ym <- ifelse(is.na(ym), 0, ym)
+
+n_occ <- n_occasions
+
+#z.init: 0's before tagging and after last seen, otherwise 1
+get_z_init <- function(y, fc) {
+  
+  n_ind <- nrow(y)
+  n_occ <- ncol(y)
+  
+  z_init <- matrix(0, nrow = n_ind, ncol = n_occ)
+  
+  for (i in 1:n_ind) {
+    last_seen <- suppressWarnings(max(which(y[i, ] == 1)))
+    
+    # If seen again after tagging
+    if (is.finite(last_seen) && last_seen > fc[i]) {
+      z_init[i, fc[i]:last_seen] <- 1
+    } else {
+      # If never seen again, it is only known to be alive on the tagging day
+      z_init[i, fc[i]] <- 1 
+    }
+  }
+  return(z_init)
+}
+
+# Run it on your new binary observation data
+z.init.f <- get_z_init(yf, fc)
+z.init.m <- get_z_init(ym, fc_m)
+
+get_last_seen <- function(y, fc) {
+  n_ind <- nrow(y)
+  last_seen <- numeric(n_ind)
+  for (i in 1:n_ind) {
+    ls <- suppressWarnings(max(which(y[i, ] == 1)))
+    if (is.finite(ls) && ls > fc[i]) {
+      last_seen[i] <- ls
+    } else {
+      last_seen[i] <- fc[i]
+    }
+  }
+  return(last_seen)
+}
+
+last_seen_f <- get_last_seen(yf, fc)
+last_seen_m <- get_last_seen(ym, fc_m)
+
+# package data (ensure everything is numeric, no NAs)
+dat <- list(
+  yf = yf, ym = ym,
+  fc = fc, fc_m = fc_m,
+  last_seen_f = last_seen_f,
+  last_seen_m = last_seen_m,
+  pup_counts = round(pup_cnt_filled$US_PupCnt),
+  init_pop_f = init_pop_f, init_pop_m = init_pop_m,
+  sst_pup = sst_dat[,2],
+  sst_np = sst_dat[,4])
+
+# NO discrete states (z) in this list!
+parameters <- list(
+  muP = 0, mu1 = 0, mu2_3 = 0, mu4_6 = 0, mu7_9 = 0, mu10_12 = 0, 
+  mu13_16 = 0, muA = 0, mu13_16M = 0, muAM = 0,
+  muPM = 0, mu1M = 0, mu2_3M = 0, mu4_6M = 0, mu7_9M = 0, mu10_12M = 0, 
+  mup1 = 0, mup2_3 = 0, mup4_6 = 0, mup7_12 = 0, mupA = 0,
+  mup1M = 0, mup2_3M = 0, mup4_6M = 0, mup7_12M = 0, mupAM = 0,
+  b_sstP = 0, b_sst1 = 0, b_sst2_3 = 0, b_sst4_6 = 0, b_sst7_9 = 0, b_sst10_12 = 0, 
+  b_sst13_16 = 0, b_sstA = 0, b_sst2_3M = 0, b_sst4_6M = 0, b_sst7_9M = 0, 
+  b_sst10_12M = 0, b_sst13_16M = 0, b_sstAM = 0,
+  log_b_DD = log(0.02),
+  mu_fec = 0.5, 
+  log_sigma_fec = log(0.5),
+  eps_fec = rep(0, n_occ-1),
+  log_sd_cnt = log(2000))
+
+# Only integrate the continuous random effect!
+obj <- MakeADFun(
+  func = csl_ipm,
+  parameters = parameters,
+  random = "eps_fec")
+
+opt <- nlminb(obj$par, obj$fn, obj$gr, 
+              control = list(eval.max = 10000, iter.max = 10000))
+
+sd_rep <- sdreport(obj)
+summary(sd_rep, "report") #listed by adreport
+
+summary(sd_rep, "fixed") #all params
+
+#summarize and save
+# 1. Extract both parameter types from the sdreport object
+fixed_params <- summary(sd_rep, "fixed")
+derived_params <- summary(sd_rep, "report")
+
+# 2. Bind them into a single dataframe
+results_df <- as.data.frame(rbind(fixed_params, derived_params))
+colnames(results_df) <- c("Estimate", "Std_Error")
+
+# 3. Calculate 95% Confidence Intervals
+results_df$CI_lower <- results_df$Estimate - (1.96 * results_df$Std_Error)
+results_df$CI_upper <- results_df$Estimate + (1.96 * results_df$Std_Error)
+
+# 4. View the clean table in the console
+print(results_df)
+
+# 5. Save directly to your working directory
+write.csv(results_df, here('results', "CSL_IPM_tmb_fect.csv"), row.names = TRUE)
+
+
+```
+
 
 ```{r IPM 1 fec}
 
@@ -2923,7 +4228,7 @@ out <- runMCMC(Cmcmc, niter = n.iter, nburnin = n.burnin,
 
 
   # saveRDS(out, here('results', paste("out_IPM_sst_DD_", i, ".RDS", sep = "")))
-saveRDS(out, here('results', paste("out_IPM_sst_DD_1fec_150_", i, "DDexp.RDS", sep = "")))
+saveRDS(out, here('results', paste("out_IPM_sst_DD_1fec_30_", i, "DDexp.RDS", sep = "")))
 # saveRDS(out, here('results', paste("out_IPM_sst_DD.RDS", sep = "")))
 
 } # closes parallel loop

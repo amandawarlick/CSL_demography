@@ -878,7 +878,7 @@ implied_fec_all <- pup_counts/adult_females
 
 # out_IPM <- readRDS(file = here('results', 'out_IPM_sst_DD_slice120.RDS'))
 # out_IPM <- readRDS(file = here('results', 'out_IPM_sst_DD.RDS'))
-out_IPM <- readRDS(file = here('results', 'out_IPM_sst_DD_1fec_150_1.RDS'))
+out_IPM <- readRDS(file = here('results', 'out_IPM_sst_DD_2fec_150_1.RDS'))
 
 #these are bad
 # out_3 <- readRDS(here::here('results', "out_IPM_sst_DD_200_3.RDS"))
