@@ -472,20 +472,24 @@ csl_ipm <- function(par) {
   b_DD <- exp(par$log_b_DD)
   
   # nll <- nll + b_DD # the negative log-likelihood of an Exponential(1) is simply +x
-  nll <- nll - dnorm(par$log_b_DD, mean = log(0.1), sd = 0.25, log = TRUE) #could do 0.01
+  # nll <- nll - dnorm(par$log_b_DD, mean = log(0.1), sd = 0.25, log = TRUE) #a-d
+  # nll <- nll - dnorm(par$log_b_DD, mean = log(0.1), sd = 0.5, log = TRUE) #e
+  # nll <- nll - dnorm(par$log_b_DD, mean = log(0.1), sd = 1, log = TRUE) #f, g (loose mu penalty back)
+  nll <- nll - dnorm(par$log_b_DD, mean = log(0.1), sd = 0.25, log = TRUE) #h (medium mu penalty back)
   
   ## bounding SDs to prevent precision matrix explosion in Laplace
   sd_cnt  <- exp(par$log_sd_cnt) + 10       #estimated variance; floor at 10
   # sd_cnt <- dat$sd_cnt #stronger "trust" in counts as a census 
   
   #add prior to penalize large sd's
-  nll <- nll - dnorm(par$log_sd_cnt, mean = 8, sd = 1.5, log = TRUE)
-  
+  # nll <- nll - dnorm(par$log_sd_cnt, mean = 8, sd = 1.5, log = TRUE) #a-h
+  nll <- nll - dnorm(par$log_sd_cnt, mean = 8, sd = 3, log = TRUE) #i
+
   ##ridge penalties
   pup_mus <- c(par$muP, par$muPM)
   
   all_mus <- c(par$mu1, par$mu2_3, par$mu4_6, par$mu7_9, par$mu10_12, 
-               par$mu_fec,
+               par$mu_fec, #par$muP, par$muPM,
                par$mu13_16, par$muA, par$mu1M, par$mu2_3M, par$mu4_6M, 
                par$mu7_9M, par$mu10_12M, par$mu13_16M, par$muAM, par$mup1, 
                par$mup2_3, par$mup4_6, par$mup7_12, par$mupA, par$mup1M, 
@@ -497,7 +501,10 @@ csl_ipm <- function(par) {
                  par$b_sst4_6M, par$b_sst7_9M, par$b_sst10_12M, par$b_sst13_16M, 
                  par$b_sstAM)
                  
-  nll <- nll - sum(dnorm(pup_mus, mean = qlogis(0.66), sd = 0.2, log = TRUE))
+  # nll <- nll - sum(dnorm(pup_mus, mean = qlogis(0.66), sd = 0.2, log = TRUE)) #a
+  # nll <- nll - sum(dnorm(pup_mus, mean = qlogis(0.70), sd = 1, log = TRUE)) #b
+  # nll <- nll - sum(dnorm(pup_mus, mean = qlogis(0.70), sd = 2, log = TRUE)) #c; #d none
+  nll <- nll - sum(dnorm(pup_mus, mean = qlogis(0.7), sd = 0.5, log = TRUE)) #g with looser b_DD
   
   # apply N(0, sd = 1.5) prior to all logits, probabilities heavily bound between 0.05 and 0.95 
   nll <- nll - sum(dnorm(all_mus, mean = 0, sd = 1.5, log = TRUE))
@@ -884,11 +891,11 @@ colnames(results_df) <- c("Estimate", "Std_Error")
 results_df$lower <- results_df$Estimate - (1.96 * results_df$Std_Error)
 results_df$upper <- results_df$Estimate + (1.96 * results_df$Std_Error)
 results_df$variable <- row.names(results_df)
-results_df$mod <- 'fec'
+results_df$mod <- 'feci'
 
 # print(results_df)
 # opt$convergence #0 means converged
-write.csv(results_df, here('results', 'TMB', "CSL_IPM_tmb_1fec.csv"), row.names = TRUE)
+write.csv(results_df, here('results', 'TMB', "CSL_IPM_tmb_1feci.csv"), row.names = TRUE)
 
 
 ```
@@ -1333,6 +1340,9 @@ sd_rep <- sdreport(obj)
 # summary(sd_rep, "report") #listed by adreport
 # 
 # summary(sd_rep, "fixed") #all params
+
+prof <- tmbprofile(obj, name = "mu_fec")
+plot(prof)
 
 #summarize and save
 fixed_params <- summary(sd_rep, "fixed")
@@ -2296,14 +2306,39 @@ write.csv(results_df, here('results', 'TMB', "CSL_IPM_tmb_2fect.csv"), row.names
 
 prefix <- 'CSL_IPM_tmb_'
 
+# res <- bind_rows(read.csv(here('results', 'TMB', paste0(prefix, '1fec.csv')), 
+#                           header = T, stringsAsFactors = F),
+#                  read.csv(here('results', 'TMB', paste0(prefix, 'fect.csv')), 
+#                           header = T, stringsAsFactors = F),
+#                  read.csv(here('results', 'TMB', paste0(prefix, 'fect_sst.csv')), 
+#                           header = T, stringsAsFactors = F),
+#                  read.csv(here('results', 'TMB', paste0(prefix, '2fect.csv')), 
+#                           header = T, stringsAsFactors = F)) %>%
+#   dplyr::select(-X)
+
+#prior sensitivity
 res <- bind_rows(read.csv(here('results', 'TMB', paste0(prefix, '1fec.csv')), 
                           header = T, stringsAsFactors = F),
-                 read.csv(here('results', 'TMB', paste0(prefix, 'fect.csv')), 
+                 read.csv(here('results', 'TMB', paste0(prefix, '1fecb.csv')), 
                           header = T, stringsAsFactors = F),
-                 read.csv(here('results', 'TMB', paste0(prefix, 'fect_sst.csv')), 
+                 read.csv(here('results', 'TMB', paste0(prefix, '1fecc.csv')), 
                           header = T, stringsAsFactors = F),
-                 read.csv(here('results', 'TMB', paste0(prefix, '2fect.csv')), 
-                          header = T, stringsAsFactors = F)) %>%
+                 read.csv(here('results', 'TMB', paste0(prefix, '1fecd.csv')), 
+                          header = T, stringsAsFactors = F),
+                 read.csv(here('results', 'TMB', paste0(prefix, '1fece.csv')), 
+                          header = T, stringsAsFactors = F),
+                 read.csv(here('results', 'TMB', paste0(prefix, '1fecf.csv')), 
+                          header = T, stringsAsFactors = F),
+                 read.csv(here('results', 'TMB', paste0(prefix, '1fecg.csv')), 
+                          header = T, stringsAsFactors = F),
+                 read.csv(here('results', 'TMB', paste0(prefix, '1fech.csv')), 
+                          header = T, stringsAsFactors = F),
+                 read.csv(here('results', 'TMB', paste0(prefix, '1feci.csv')), 
+                          header = T, stringsAsFactors = F)) %>% #,
+                 # read.csv(here('results', 'TMB', paste0(prefix, 'fect_sst.csv')), 
+                 #          header = T, stringsAsFactors = F),
+                 # read.csv(here('results', 'TMB', paste0(prefix, '2fect.csv')), 
+                 #          header = T, stringsAsFactors = F)) %>%
   dplyr::select(-X)
 
 Ntot <- res %>% filter(grepl('Ntot', variable) & variable != 'Ntot') %>%
@@ -2353,6 +2388,13 @@ fec2_dat <- res %>% filter(variable %in% c('real_fec1', 'real_fec2'))
 ggplot(fec2_dat, aes(x = variable, y = Estimate)) +
   geom_point() + geom_errorbar(aes(ymin = lower, ymax = upper, x = variable))
 
+int_fec <- res %>% filter(grepl('int_fec', variable))
+
+ggplot(int_fec, aes(x = variable, y = Estimate, col = mod, group = mod)) +
+  geom_point(position = position_dodge(width = 0.3)) + 
+  geom_errorbar(aes(x = variable, ymin = lower, ymax = upper), position = position_dodge(width = 0.3))
+
+
 b_sst <- res %>% filter(grepl('b_sst', variable) | variable == 'b_warm') %>%
   mutate(age = gsub('b_sst', '', variable)) %>%
   mutate(age = ifelse(age == 'b_warm', 'fec', age)) %>%
@@ -2364,6 +2406,19 @@ ggplot(b_sst, aes(x = age, y = Estimate, col = mod, group = mod)) +
   geom_point(position = position_dodge(width = 0.3)) + 
   geom_errorbar(aes(x = age, ymin = lower, ymax = upper), position = position_dodge(width = 0.3))
 
+
+b_DD <- res %>% filter(variable == 'b_DD')
+
+ggplot(b_DD, aes(x = variable, y = Estimate, col = mod, group = mod)) +
+  geom_point(position = position_dodge(width = 0.3)) + 
+  geom_errorbar(aes(x = variable, ymin = lower, ymax = upper), position = position_dodge(width = 0.3))
+
+
+sd_cnts <- res %>% filter(variable == 'sd_cnt') 
+
+ggplot(sd_cnts, aes(x = variable, y = Estimate, col = mod, group = mod)) +
+  geom_point(position = position_dodge(width = 0.3)) + 
+  geom_errorbar(aes(x = variable, ymin = lower, ymax = upper), position = position_dodge(width = 0.3))
 
 
 ```
