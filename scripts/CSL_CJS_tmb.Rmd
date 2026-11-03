@@ -15,7 +15,7 @@ library(doParallel)
 library(readr)
 library(RTMB)
 
-# source(here::here('scripts', 'PlotTheme.R'))
+source(here::here('scripts', 'PlotTheme.R'))
 
 
 ```
@@ -965,7 +965,8 @@ csl_ipm <- function(par) {
                  par$b_sst4_6M, par$b_sst7_9M, par$b_sst10_12M, par$b_sst13_16M, 
                  par$b_sstAM)
                  
-  nll <- nll - sum(dnorm(pup_mus, mean = qlogis(0.70), sd = 0.5, log = TRUE))
+  # nll <- nll - sum(dnorm(pup_mus, mean = qlogis(0.70), sd = 0.5, log = TRUE))
+   nll <- nll - sum(dnorm(pup_mus, mean = 0, sd = 1, log = TRUE))
   
   # Apply N(0, sd = 1.5) prior to all logits, probabilities heavily bound between 0.05 and 0.95 
   nll <- nll - sum(dnorm(all_mus, mean = 0, sd = 1.5, log = TRUE))
@@ -999,12 +1000,23 @@ csl_ipm <- function(par) {
   real_phi13_16M <- numeric(n_occ-1)
   real_phiA <- numeric(n_occ-1)
   real_phiAM <- numeric(n_occ-1)
-  real_fec <- numeric(n_occ-1)
+  lreal_fec <- numeric(n_occ-1)
   Ntot <- numeric(n_occ)
   
   N_f[[1]] <- dat$init_pop_f 
   N_m[[1]] <- dat$init_pop_m
   Ntot[1] <- sum(N_f[[1]])+sum(N_m[[1]])
+  
+  lp1    <- par$mup1
+  lp2_3  <- par$mup2_3
+  lp4_6  <- par$mup4_6
+  lp7_12 <- par$mup7_12
+  lpA    <- par$mupA
+  lp1M    <- par$mup1M
+  lp2_3M  <- par$mup2_3M
+  lp4_6M  <- par$mup4_6M
+  lp7_12M <- par$mup7_12M
+  lpAM    <- par$mupAM
   
   p1    <- plogis(par$mup1)
   p2_3  <- plogis(par$mup2_3)
@@ -1073,9 +1085,10 @@ csl_ipm <- function(par) {
     N_next_adults_m <- N_curr_m[1:19] * phim_vec[1:19]
 
     # fec_t <- plogis(par$mu_fec + eps_fec[t])
-    fec_t <- plogis(par$mu_fec + (par$b_warm * curr_sst_np) + eps_fec[t])
+    lfec_t <- par$mu_fec + (par$b_warm * curr_sst_np) + eps_fec[t]
+    fec_t <- plogis(lfec_t)
      # fec_t <- plogis(par$mu_fec + (par$b_warm * curr_sst_np))
-    real_fec[t] <- fec_t
+    lreal_fec[t] <- lfec_t
     expected_pups[t+1] <- sum(N_curr_f[6:24]) * fec_t
     
     real_phiP[t] <- phiP
@@ -1185,7 +1198,7 @@ csl_ipm <- function(par) {
     }
   }
   
-  # Back-transform key baseline vital rates to probabilities
+  # Back-transform and summarize key baseline vital rates to probabilities
   b_warm <- par$b_warm
   real_phiPM_med <- mean(real_phiPM)
   real_phiP_med <- mean(real_phiP)
@@ -1234,14 +1247,14 @@ csl_ipm <- function(par) {
   int.p7_12M   <- plogis(par$mup7_12M)
   int.pAM   <- plogis(par$mupAM)
   
-  int_fec <- mean(real_fec)
+  lfec <- mean(lreal_fec)
 
   #reports
   ADREPORT(sd_cnt)
   ADREPORT(Ntot)
   ADREPORT(expected_pups)
-  ADREPORT(int_fec)
-  ADREPORT(real_fec)
+  ADREPORT(lfec)
+  ADREPORT(lreal_fec)
   ADREPORT(real_phiP_med)
   ADREPORT(real_phiPM_med)
   ADREPORT(real_phi1_med)
@@ -1291,16 +1304,16 @@ csl_ipm <- function(par) {
   ADREPORT(int.phi13_16M)
   ADREPORT(int.phiAM)
 
-  ADREPORT(int.p1)
-  ADREPORT(int.p2_3)
-  ADREPORT(int.p4_6)
-  ADREPORT(int.p7_12)
-  ADREPORT(int.pA)
-  ADREPORT(int.p1M)
-  ADREPORT(int.p2_3M)
-  ADREPORT(int.p4_6M)
-  ADREPORT(int.p7_12M)
-  ADREPORT(int.pAM)
+  ADREPORT(lp1)
+  ADREPORT(lp2_3)
+  ADREPORT(lp4_6)
+  ADREPORT(lp7_12)
+  ADREPORT(lpA)
+  ADREPORT(lp1M)
+  ADREPORT(lp2_3M)
+  ADREPORT(lp4_6M)
+  ADREPORT(lp7_12M)
+  ADREPORT(lpAM)
   
   ADREPORT(b_DD)
   ADREPORT(sigma_fec)
@@ -1339,14 +1352,14 @@ parameters <- list(
   log_sigma_fec = log(0.5),
   eps_fec = rep(0, n_occ-1))
 
-obj <- MakeADFun(
+obj <- RTMB::MakeADFun(
   func = csl_ipm, random = 'eps_fec',
   parameters = parameters)
 
 opt <- nlminb(obj$par, obj$fn, obj$gr, 
               control = list(eval.max = 10000, iter.max = 10000))
 
-sd_rep <- sdreport(obj)
+sd_rep <- RTMB::sdreport(obj)
 # summary(sd_rep, "report") #listed by adreport
 # 
 # summary(sd_rep, "fixed") #all params
@@ -1367,6 +1380,16 @@ print(results_df)
 opt$convergence #0 means converged
 write.csv(results_df, here('results', 'TMB', "CSL_IPM_tmb_fect_sst.csv"), row.names = TRUE)
 
+##likelihood profiles
+# library(TMB)
+# prof <- tmbprofile(obj, name = 'mu_fec', ytol = 10, trace = F)
+# 
+# plot(prof)
+# 
+# prof_DD <- tmbprofile(obj, name = 'log_b_DD', ytol = 10, trace = F)
+# 
+# plot(prof_DD)
+
 
 ```
 
@@ -1378,6 +1401,9 @@ write.csv(results_df, here('results', 'TMB', "CSL_IPM_tmb_fect_sst.csv"), row.na
 ##C. loosen muP (sd = 1.5) and b_DD (sd = 2)
 ##D. loosen muP (sd = 1.5) and b_DD (sd = 5)
 ##E. loosen muP (sd = 1.5) and b_DD (sd = 0.5) and mu_fec (sd = 5)
+##F. loosen muP (sd = 1.5) and med b_DD (sd = 0.5)
+##G. F and sd_cnt = smaller
+##H. no ridge penalties?
 
 
 csl_ipm <- function(par) {
@@ -1402,7 +1428,6 @@ csl_ipm <- function(par) {
   max_age_m <- 19
   
   nll <- 0 
-  
   
   ### PARAMETERS & PRIORS
   
@@ -1440,7 +1465,8 @@ csl_ipm <- function(par) {
                  par$b_sst4_6M, par$b_sst7_9M, par$b_sst10_12M, par$b_sst13_16M, 
                  par$b_sstAM)
                  
-  nll <- nll - sum(dnorm(pup_mus, mean = qlogis(0.70), sd = dat$muP_sd, log = TRUE))
+  # nll <- nll - sum(dnorm(pup_mus, mean = qlogis(0.70), sd = dat$muP_sd, log = TRUE))
+  nll <- nll - sum(dnorm(pup_mus, mean = 0, sd = dat$muP_sd, log = TRUE))
   
   # Apply N(0, sd = 1.5) prior to all logits, probabilities heavily bound between 0.05 and 0.95 
   nll <- nll - sum(dnorm(all_mus, mean = 0, sd = 1.5, log = TRUE))
@@ -1790,12 +1816,14 @@ csl_ipm <- function(par) {
 ##B. loosen muP (sd = 1.5)
 ##C. loosen muP (sd = 1.5) and b_DD (sd = 2)
 ##D. loosen muP (sd = 1.5) and b_DD (sd = 5)
-##E. loosen muP (sd = 1.5) and b_DD (sd = 0.5) and mu_fec (sd = 5)
+##E. loosen muP (sd = 1.5) and b_DD (sd = 0.25) and mu_fec (sd = 5)
+##F. loosen muP (sd = 1.5) and med b_DD (sd = 0.5)
+##G. F and sd_cnt = smaller
 
-sc_dat <- data.frame(muP = c(0.5, 1.5, 1.5, 1.5, 1.5),
-                     DD = c(0.25, 0.25, 1.5, 5, 0.25),
-                     fec = c(1.5, 1.5, 1.5, 1.5, 5),
-                     cnt = c(rep(1.5,5)))
+sc_dat <- data.frame(muP = c(0.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5),
+                     DD = c(0.25, 0.25, 1.5, 5, 0.25, 0.5, 0.5),
+                     fec = c(1.5, 1.5, 1.5, 1.5, 5, 1.5, 1.5),
+                     cnt = c(rep(1.5,6), 0.5))
 
 all_results <- list()
 all_k_draws <- list()
@@ -2027,55 +2055,558 @@ rownames(res_df)
 
 k_df <- do.call(rbind, all_k_draws)
 
-# write.csv(res_df, here('results', 'TMB', "CSL_IPM_tmb_fec_sst_sens.csv"), row.names = TRUE)
+write.csv(res_df, here('results', 'TMB', "CSL_IPM_tmb_fec_sst_sens.csv"), row.names = TRUE)
 write.csv(k_df, here('results', 'TMB', "k_df_sensitivity.csv"), row.names = TRUE)
 
 
 ```
 
 
+```{r IPM fec_sst retro}
+
+#test leaving out N trailing pup counts:
+
+csl_ipm <- function(par) {
+  
+  ### DATA
+  
+  yf <- dat$yf                 
+  ym <- dat$ym
+  fc <- dat$fc               
+  fc_m <- dat$fc_m 
+  last_seen_f <- dat$last_seen_f
+  last_seen_m <- dat$last_seen_m
+  
+  y_pup_counts <- dat$pup_counts 
+  sst_pup <- dat$sst_pup
+  sst_np <- dat$sst_np
+  
+  n_fem <- nrow(yf)
+  n_m <- nrow(ym)
+  n_occ <- ncol(yf)
+  max_age_f <- 24
+  max_age_m <- 19
+  
+  nll <- 0 
+  
+  ### PARAMETERS & PRIORS
+  
+  b_DD <- exp(par$log_b_DD)
+  
+  # nll <- nll + b_DD # the negative log-likelihood of an Exponential(1) is simply +x
+  nll <- nll - dnorm(par$log_b_DD, mean = log(0.1), sd = dat$DD_sd, log = TRUE) #could do 0.01
+  
+  ## bounding SDs to prevent precision matrix explosion in Laplace!
+  sd_cnt  <- exp(par$log_sd_cnt) + 10       #estimated variance; floor at 10
+  # sd_cnt <- dat$sd_cnt #stronger "trust" in counts as a census 
+  
+  #add prior to penalize large sd's
+  nll <- nll - dnorm(par$log_sd_cnt, mean = 8, sd = dat$cnt_sd, log = TRUE)
+  
+  sigma_fec <- exp(par$log_sigma_fec) + 0.01 # Floor at 0.01 for the random effect
+  eps_fec <- par$eps_fec
+  nll <- nll - sum(dnorm(eps_fec, mean = 0, sd = sigma_fec, log = TRUE))
+  
+  ##ridge penalties
+  pup_mus <- c(par$muP, par$muPM)
+  
+  all_mus <- c(par$mu1, par$mu2_3, par$mu4_6, par$mu7_9, par$mu10_12, 
+               # par$mu_fec,
+               # par$muP, par$muPM,
+               par$b_warm,
+               par$mu13_16, par$muA, par$mu1M, par$mu2_3M, par$mu4_6M, 
+               par$mu7_9M, par$mu10_12M, par$mu13_16M, par$muAM, par$mup1, 
+               par$mup2_3, par$mup4_6, par$mup7_12, par$mupA, par$mup1M, 
+               par$mup2_3M, par$mup4_6M, par$mup7_12M, par$mupAM)
+               
+  # Group all environmental covariate slopes
+  all_bssts <- c(par$b_sstP, par$b_sst1, par$b_sst2_3, par$b_sst4_6, par$b_sst7_9, 
+                 par$b_sst10_12, par$b_sst13_16, par$b_sstA, par$b_sst2_3M, 
+                 par$b_sst4_6M, par$b_sst7_9M, par$b_sst10_12M, par$b_sst13_16M, 
+                 par$b_sstAM)
+                 
+  # nll <- nll - sum(dnorm(pup_mus, mean = qlogis(0.70), sd = dat$muP_sd, log = TRUE))
+  nll <- nll - sum(dnorm(pup_mus, mean = 0, sd = dat$muP_sd, log = TRUE))
+  
+  # Apply N(0, sd = 1.5) prior to all logits, probabilities heavily bound between 0.05 and 0.95 
+  nll <- nll - sum(dnorm(all_mus, mean = 0, sd = 1.5, log = TRUE))
+  
+  # Shrink slopes toward 0 to prevent covariate overfitting
+  nll <- nll - sum(dnorm(all_bssts, mean = 0, sd = dat$sst_sd, log = TRUE))
+  
+  nll <- nll - sum(dnorm(par$mu_fec, mean = 0, sd = dat$fec_sd, log = TRUE))
+  
+  # POPULATION PROJECTION
+  
+  N_f <- vector("list", n_occ)
+  N_m <- vector("list", n_occ)
+  expected_pups <- numeric(n_occ)
+  phif_pop <- vector("list", n_occ)
+  phim_pop <- vector("list", n_occ)
+  pf_pop   <- vector("list", n_occ)
+  pm_pop   <- vector("list", n_occ)
+  real_phiP <- numeric(n_occ-1)
+  real_phiPM <- numeric(n_occ-1)
+  real_phi1 <- numeric(n_occ-1)
+  real_phi1M <- numeric(n_occ-1)
+  real_phi2_3 <- numeric(n_occ-1)
+  real_phi2_3M <- numeric(n_occ-1)
+  real_phi4_6 <- numeric(n_occ-1)
+  real_phi4_6M <- numeric(n_occ-1)
+  real_phi7_9 <- numeric(n_occ-1)
+  real_phi7_9M <- numeric(n_occ-1)
+  real_phi10_12 <- numeric(n_occ-1)
+  real_phi10_12M <- numeric(n_occ-1)
+  real_phi13_16 <- numeric(n_occ-1)
+  real_phi13_16M <- numeric(n_occ-1)
+  real_phiA <- numeric(n_occ-1)
+  real_phiAM <- numeric(n_occ-1)
+  lreal_fec <- numeric(n_occ-1)
+  Ntot <- numeric(n_occ)
+  
+  N_f[[1]] <- dat$init_pop_f 
+  N_m[[1]] <- dat$init_pop_m
+  Ntot[1] <- sum(N_f[[1]])+sum(N_m[[1]])
+  
+  p1    <- plogis(par$mup1)
+  p2_3  <- plogis(par$mup2_3)
+  p4_6  <- plogis(par$mup4_6)
+  p7_12 <- plogis(par$mup7_12)
+  pA    <- plogis(par$mupA)
+  pf_vec <- c(0, p1, rep(p2_3, 2), rep(p4_6, 3), rep(p7_12, 6), rep(pA, 12))
+  
+  p1M    <- plogis(par$mup1M)
+  p2_3M  <- plogis(par$mup2_3M)
+  p4_6M  <- plogis(par$mup4_6M)
+  p7_12M <- plogis(par$mup7_12M)
+  pAM    <- plogis(par$mupAM)
+  pm_vec <- c(0, p1M, rep(p2_3M, 2), rep(p4_6M, 3), rep(p7_12M, 6), rep(pAM, 7))
+  
+  for (t in 1:n_occ) {
+    pf_pop[[t]] <- pf_vec
+    pm_pop[[t]] <- pm_vec
+  }
+  
+  for (t in 1:(n_occ - 1)) {
+    N_curr_f <- N_f[[t]]
+    N_curr_m <- N_m[[t]]
+    
+    N_scaled <- (sum(N_curr_f) + sum(N_curr_m)) / 100000 
+    
+    # Safe covariate extractions (Silently handles out-of-bounds just in case)
+    curr_sst_pup <- ifelse(is.na(sst_pup[t]), 0, sst_pup[t])
+    curr_sst_np  <- ifelse(is.na(sst_np[t]), 0, sst_np[t])
+    
+    # L <- 0.2
+    # U <- 0.75
+    # pmuP <- L + (U-L)*plogis(par$muP)
+    # muP_trim <- qlogis(pmuP)
+    # pmuPM <- L + (U-L)*plogis(par$muPM)
+    # muPM_trim <- qlogis(pmuPM)
+    
+    # phiP <- plogis(muP_trim + par$b_sstP * curr_sst_pup - b_DD * N_scaled)
+    phiP <- plogis(par$muP + par$b_sstP * curr_sst_pup - b_DD * N_scaled)
+    phi1 <- plogis(par$mu1 + par$b_sst1 * curr_sst_np)
+    phi2_3 <- plogis(par$mu2_3 + par$b_sst2_3 * curr_sst_np)
+    phi4_6 <- plogis(par$mu4_6 + par$b_sst4_6 * curr_sst_np)
+    phi7_9 <- plogis(par$mu7_9 + par$b_sst7_9 * curr_sst_np)
+    phi10_12 <- plogis(par$mu10_12 + par$b_sst10_12 * curr_sst_np)
+    phi13_16 <- plogis(par$mu13_16 + par$b_sst13_16 * curr_sst_np)
+    phiA <- plogis(par$muA + par$b_sstA * curr_sst_np)
+    
+    phif_vec <- c(phiP, phi1, rep(phi2_3, 2), rep(phi4_6, 3), rep(phi7_9, 3),
+                  rep(phi10_12, 3), rep(phi13_16, 4), rep(phiA, 8))
+    phif_pop[[t]] <- phif_vec 
+    
+    phiPM <- plogis(par$muPM + par$b_sstP * curr_sst_pup - b_DD * N_scaled)
+    phi1M <- plogis(par$mu1M + par$b_sst1 * curr_sst_np)
+    phi2_3M <- plogis(par$mu2_3M + par$b_sst2_3M * curr_sst_np)
+    phi4_6M <- plogis(par$mu4_6M + par$b_sst4_6M * curr_sst_np)
+    phi7_9M <- plogis(par$mu7_9M + par$b_sst7_9M * curr_sst_np)
+    phi10_12M <- plogis(par$mu10_12M + par$b_sst10_12M * curr_sst_np)
+    phi13_16M <- plogis(par$mu13_16M + par$b_sst13_16M * curr_sst_np)
+    phiAM <- plogis(par$muAM + par$b_sstAM * curr_sst_np)
+    
+    phim_vec <- c(phiPM, phi1M, rep(phi2_3M, 2), rep(phi4_6M, 3), rep(phi7_9M, 3),
+                  rep(phi10_12M, 3), rep(phi13_16M, 4), rep(phiAM, 3))
+    phim_pop[[t]] <- phim_vec 
+    
+    N_next_adults_f <- N_curr_f[1:24] * phif_vec[1:24]
+    N_next_adults_m <- N_curr_m[1:19] * phim_vec[1:19]
+
+    # fec_t <- plogis(par$mu_fec + eps_fec[t])
+    fec_t <- plogis(par$mu_fec + (par$b_warm * curr_sst_np) + eps_fec[t])
+    lfec_t <- par$mu_fec + (par$b_warm * curr_sst_np) + eps_fec[t]
+    lreal_fec[t] <- lfec_t
+    expected_pups[t+1] <- sum(N_curr_f[6:24]) * fec_t
+    
+    real_phiP[t] <- phiP
+    real_phiPM[t] <- phiPM
+    real_phi1[t] <- phi1
+    real_phi1M[t] <- phi1M
+    real_phi2_3[t] <- phi2_3
+    real_phi2_3M[t] <- phi2_3M
+    real_phi4_6[t] <- phi4_6
+    real_phi4_6M[t] <- phi4_6M
+    real_phi7_9[t] <- phi7_9
+    real_phi7_9M[t] <- phi7_9M
+    real_phi10_12[t] <- phi10_12
+    real_phi10_12M[t] <- phi10_12M
+    real_phi13_16[t] <- phi13_16
+    real_phi13_16M[t] <- phi13_16M
+    real_phiA[t] <- phiA
+    real_phiAM[t] <- phiAM
+    
+    # if y_pup_counts is missing or out of bounds, use expected; not necessary
+    if (!is.na(y_pup_counts[t+1])) {
+      new_pups <- y_pup_counts[t+1]/2
+    } else {
+      new_pups <- expected_pups[t+1]/2
+    }
+    
+    N_f[[t+1]] <- c(new_pups, N_next_adults_f)
+    N_m[[t+1]] <- c(new_pups, N_next_adults_m)
+    Ntot[t+1] <- sum(N_f[[t+1]]) + sum(N_m[[t+1]])
+  }
+  
+  # aerial count likelihood 
+  for (t in 2:n_occ) {
+    if (!is.na(y_pup_counts[t])) {
+      nll <- nll - dnorm(y_pup_counts[t], expected_pups[t], sd_cnt, log = TRUE)
+    }
+  }
+  
+  
+  # MARK RECAPTURE LIKELIHOOD 
+  
+  # --- FEMALES ---
+  for (i in 1:n_fem) {
+    if (last_seen_f[i] > fc[i]) {
+      for (t in (fc[i] + 1):last_seen_f[i]) {
+        age_s <- min(t - fc[i], max_age_f + 1)
+        age_d <- min(t - fc[i] + 1, max_age_f + 1)
+        
+        phi <- phif_pop[[t - 1]][age_s]
+        p   <- pf_pop[[t]][age_d]
+        
+        nll <- nll - log(phi + 1e-10)
+        if (yf[i, t] == 1) {
+          nll <- nll - log(p + 1e-10)
+        } else {
+          nll <- nll - log(1 - p + 1e-10)
+        }
+      }
+    }
+    
+    if (last_seen_f[i] < n_occ) {
+      chi <- 1 
+      for (t in n_occ:(last_seen_f[i] + 1)) {
+        age_s <- min(t - fc[i], max_age_f + 1)
+        age_d <- min(t - fc[i] + 1, max_age_f + 1)
+        
+        phi <- phif_pop[[t - 1]][age_s]
+        p   <- pf_pop[[t]][age_d]
+        
+        chi <- (1 - phi) + (phi * (1 - p) * chi)
+      }
+      nll <- nll - log(chi + 1e-10)
+    }
+  }
+  
+  # --- MALES ---
+  for (i in 1:n_m) {
+    if (last_seen_m[i] > fc_m[i]) {
+      for (t in (fc_m[i] + 1):last_seen_m[i]) {
+        age_s <- min(t - fc_m[i], max_age_m + 1)
+        age_d <- min(t - fc_m[i] + 1, max_age_m + 1)
+        
+        phi <- phim_pop[[t - 1]][age_s]
+        p   <- pm_pop[[t]][age_d]
+        
+        nll <- nll - log(phi + 1e-10)
+        if (ym[i, t] == 1) {
+          nll <- nll - log(p + 1e-10)
+        } else {
+          nll <- nll - log(1 - p + 1e-10)
+        }
+      }
+    }
+    
+    if (last_seen_m[i] < n_occ) {
+      chi <- 1 
+      for (t in n_occ:(last_seen_m[i] + 1)) {
+        age_s <- min(t - fc_m[i], max_age_m + 1)
+        age_d <- min(t - fc_m[i] + 1, max_age_m + 1)
+        
+        phi <- phim_pop[[t - 1]][age_s]
+        p   <- pm_pop[[t]][age_d]
+        
+        chi <- (1 - phi) + (phi * (1 - p) * chi)
+      }
+      nll <- nll - log(chi + 1e-10)
+    }
+  }
+  
+  # Back-transform key baseline vital rates to probabilities
+  b_warm <- par$b_warm
+  real_phiPM_med <- mean(real_phiPM)
+  real_phiP_med <- mean(real_phiP)
+  real_phi1M_med <- mean(real_phi1M)
+  real_phi1_med <- mean(real_phi1)
+  real_phi2_3M_med <- mean(real_phi2_3M)
+  real_phi2_3_med <- mean(real_phi2_3)
+  real_phi4_6M_med <- mean(real_phi4_6M)
+  real_phi4_6_med <- mean(real_phi4_6)
+  real_phi7_9M_med <- mean(real_phi7_9M)
+  real_phi7_9_med <- mean(real_phi7_9)
+  real_phi10_12M_med <- mean(real_phi10_12M)
+  real_phi10_12_med <- mean(real_phi10_12)
+  real_phi13_16M_med <- mean(real_phi13_16M)
+  real_phi13_16_med <- mean(real_phi13_16)
+  real_phiAM_med <- mean(real_phiAM)
+  real_phiA_med <- mean(real_phiA)
+  
+  int.phiP   <- plogis(par$muP)
+  int.phi1   <- plogis(par$mu1)
+  int.phi2_3   <- plogis(par$mu2_3)
+  int.phi4_6   <- plogis(par$mu4_6)
+  int.phi7_9   <- plogis(par$mu7_9)
+  int.phi10_12   <- plogis(par$mu10_12)
+  int.phi13_16   <- plogis(par$mu13_16)
+  int.phiA   <- plogis(par$muA)
+  
+  int.phiPM   <- plogis(par$muPM)
+  int.phi1M   <- plogis(par$mu1M)
+  int.phi2_3M   <- plogis(par$mu2_3M)
+  int.phi4_6M   <- plogis(par$mu4_6M)
+  int.phi7_9M   <- plogis(par$mu7_9M)
+  int.phi10_12M   <- plogis(par$mu10_12M)
+  int.phi13_16M   <- plogis(par$mu13_16M)
+  int.phiAM   <- plogis(par$muAM)
+  
+  int.p1   <- plogis(par$mup1)
+  int.p2_3   <- plogis(par$mup2_3)
+  int.p4_6   <- plogis(par$mup4_6)
+  int.p7_12   <- plogis(par$mup7_12)
+  int.pA   <- plogis(par$mupA)
+  
+  int.p1M   <- plogis(par$mup1M)
+  int.p2_3M   <- plogis(par$mup2_3M)
+  int.p4_6M   <- plogis(par$mup4_6M)
+  int.p7_12M   <- plogis(par$mup7_12M)
+  int.pAM   <- plogis(par$mupAM)
+  
+  lfec <- mean(lreal_fec)
+
+  #reports
+  ADREPORT(sd_cnt)
+  ADREPORT(Ntot)
+  ADREPORT(expected_pups)
+  ADREPORT(lfec)
+  ADREPORT(lreal_fec)
+  ADREPORT(real_phiP_med)
+  ADREPORT(real_phiPM_med)
+  ADREPORT(real_phi1_med)
+  ADREPORT(real_phi1M_med)
+  ADREPORT(real_phi2_3_med)
+  ADREPORT(real_phi2_3M_med)
+  ADREPORT(real_phi4_6_med)
+  ADREPORT(real_phi4_6M_med)
+  ADREPORT(real_phi7_9_med)
+  ADREPORT(real_phi7_9M_med)
+  ADREPORT(real_phi10_12_med)
+  ADREPORT(real_phi10_12M_med)
+  ADREPORT(real_phi13_16_med)
+  ADREPORT(real_phi13_16M_med)
+  ADREPORT(real_phiA_med)
+  ADREPORT(real_phiAM_med)
+  ADREPORT(real_phiP)
+  ADREPORT(real_phiPM)
+  ADREPORT(real_phi1)
+  ADREPORT(real_phi1M)
+  ADREPORT(real_phi2_3)
+  ADREPORT(real_phi2_3M)
+  ADREPORT(real_phi4_6)
+  ADREPORT(real_phi4_6M)
+  ADREPORT(real_phi7_9)
+  ADREPORT(real_phi7_9M)
+  ADREPORT(real_phi10_12)
+  ADREPORT(real_phi10_12M)
+  ADREPORT(real_phi13_16)
+  ADREPORT(real_phi13_16M)
+  ADREPORT(real_phiA)
+  ADREPORT(real_phiAM)
+  ADREPORT(int.phiP)
+  ADREPORT(int.phi1)
+  ADREPORT(int.phi2_3)
+  ADREPORT(int.phi4_6)
+  ADREPORT(int.phi7_9)
+  ADREPORT(int.phi10_12)
+  ADREPORT(int.phi13_16)
+  ADREPORT(int.phiA)
+  ADREPORT(int.phiPM)
+  ADREPORT(int.phi1M)
+  ADREPORT(int.phi2_3M)
+  ADREPORT(int.phi4_6M)
+  ADREPORT(int.phi7_9M)
+  ADREPORT(int.phi10_12M)
+  ADREPORT(int.phi13_16M)
+  ADREPORT(int.phiAM)
+
+  ADREPORT(int.p1)
+  ADREPORT(int.p2_3)
+  ADREPORT(int.p4_6)
+  ADREPORT(int.p7_12)
+  ADREPORT(int.pA)
+  ADREPORT(int.p1M)
+  ADREPORT(int.p2_3M)
+  ADREPORT(int.p4_6M)
+  ADREPORT(int.p7_12M)
+  ADREPORT(int.pAM)
+  
+  ADREPORT(b_DD)
+  ADREPORT(sigma_fec)
+  ADREPORT(b_warm)
+
+  return(nll)
+}
+
+#leave out N trailing pup counts
+
+sc_dat <- data.frame(muP = c(0.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5),
+                     DD = c(0.25, 0.25, 1.5, 5, 0.25, 0.5, 0.5),
+                     fec = c(1.5, 1.5, 1.5, 1.5, 5, 1.5, 1.5),
+                     cnt = c(rep(1.5,6), 0.5))
+
+all_results <- list()
+
+s <- 5
+
+#leave out years of pup count data
+N_lo <- c(1,2,3,4,5,7,10)
+pup_cnt <- c(round(pup_cnt_filled$US_PupCnt),NA) #expand to get to 2025 to match MR data
+
+for (n in 1:length(N_lo)) {
+  
+ drop_idx <- (n_occ - N_lo[n]+1):(n_occ)
+ pup_cnt_lo <- pup_cnt
+ pup_cnt_lo[drop_idx] <- NA
+  
+# data
+dat <- list(
+  yf = yf, ym = ym,
+  fc = fc, fc_m = fc_m,
+  last_seen_f = last_seen_f,
+  last_seen_m = last_seen_m,
+  pup_counts = pup_cnt_lo,
+  # sd_cnt = 1500, #e.g., trust the census to within 1000 pups
+  DD_sd = sc_dat[s,2], cnt_sd = sc_dat[s,4], muP_sd = sc_dat[s,1], sst_sd = 1.0, fec_sd = sc_dat[s,3],
+  init_pop_f = init_pop_f, init_pop_m = init_pop_m,
+  sst_pup = sst_dat[,2],
+  sst_np = sst_dat[,4])
+
+# No discrete states (z)
+parameters <- list(
+  muP = 0, mu1 = 0, mu2_3 = 0, mu4_6 = 0, mu7_9 = 0, mu10_12 = 0, 
+  mu13_16 = 0, muA = 0, mu13_16M = 0, muAM = 0,
+  muPM = 0, mu1M = 0, mu2_3M = 0, mu4_6M = 0, mu7_9M = 0, mu10_12M = 0, 
+  mup1 = 0, mup2_3 = 0, mup4_6 = 0, mup7_12 = 0, mupA = 0,
+  mup1M = 0, mup2_3M = 0, mup4_6M = 0, mup7_12M = 0, mupAM = 0,
+  b_sstP = 0, b_sst1 = 0, b_sst2_3 = 0, b_sst4_6 = 0, b_sst7_9 = 0, b_sst10_12 = 0, 
+  b_sst13_16 = 0, b_sstA = 0, b_sst2_3M = 0, b_sst4_6M = 0, b_sst7_9M = 0, 
+  b_sst10_12M = 0, b_sst13_16M = 0, b_sstAM = 0,
+  log_b_DD = log(0.02),
+  log_sd_cnt = log(2000),
+  b_warm = 0,
+  mu_fec = 0.6, 
+  log_sigma_fec = log(0.5),
+  eps_fec = rep(0, n_occ-1))
+
+obj <- RTMB::MakeADFun(
+  func = csl_ipm, random = 'eps_fec',
+  parameters = parameters)
+
+opt <- nlminb(obj$par, obj$fn, obj$gr, 
+              control = list(eval.max = 10000, iter.max = 10000))
+
+sd_rep <- RTMB::sdreport(obj)
+# summary(sd_rep, "report") #listed by adreport
+# 
+# summary(sd_rep, "fixed") #all params
+
+#summarize and save
+fixed_params <- summary(sd_rep, "fixed")
+derived_params <- summary(sd_rep, "report")
+
+exp_pups <- derived_params[rownames(derived_params) == "expected_pups", ]
+exp_pups <- exp_pups[-1,] #drops 1990 placeholder
+  
+  temp_df <- as.data.frame(exp_pups)
+  colnames(temp_df) <- c("Estimate", "Std_Error")
+  temp_df$Year <- 1:(n_occ-1)
+  temp_df$Scenario <- paste0("Drop_", N_lo[n], "_Years")
+  
+  # Add the TRUE hidden counts and the BLINDED model counts for easy plotting
+  temp_df$Actual_Truth <- pup_cnt[-1] #take out 1990
+  temp_df$Model_Input <- pup_cnt_lo[-1] 
+  
+  all_results[[n]] <- temp_df
+}
+
+retro_df <- do.call(rbind, all_results)
+
+
+write.csv(retro_df, here('results', 'TMB', "CSL_IPM_tmb_fec_sst_retro.csv"), row.names = TRUE)
+
+
+```
+
+
+
 ```{r model compare}
 
-prefix <- 'CSL_IPM_tmb_'
-
+# prefix <- 'CSL_IPM_tmb_'
+# 
+# # res <- bind_rows(read.csv(here('results', 'TMB', paste0(prefix, '1fec.csv')), 
+# #                           header = T, stringsAsFactors = F),
+# #                  read.csv(here('results', 'TMB', paste0(prefix, 'fect.csv')), 
+# #                           header = T, stringsAsFactors = F),
+# #                  read.csv(here('results', 'TMB', paste0(prefix, 'fect_sst.csv')), 
+# #                           header = T, stringsAsFactors = F),
+# #                  read.csv(here('results', 'TMB', paste0(prefix, '2fect.csv')), 
+# #                           header = T, stringsAsFactors = F)) %>%
+# #   dplyr::select(-X)
+# 
+# #prior sensitivity
 # res <- bind_rows(read.csv(here('results', 'TMB', paste0(prefix, '1fec.csv')), 
 #                           header = T, stringsAsFactors = F),
 #                  read.csv(here('results', 'TMB', paste0(prefix, 'fect.csv')), 
 #                           header = T, stringsAsFactors = F),
 #                  read.csv(here('results', 'TMB', paste0(prefix, 'fect_sst.csv')), 
 #                           header = T, stringsAsFactors = F),
-#                  read.csv(here('results', 'TMB', paste0(prefix, '2fect.csv')), 
-#                           header = T, stringsAsFactors = F)) %>%
+#                  read.csv(here('results', 'TMB', paste0(prefix, '1fecb.csv')), 
+#                           header = T, stringsAsFactors = F),
+#                  read.csv(here('results', 'TMB', paste0(prefix, '1fecc.csv')), 
+#                           header = T, stringsAsFactors = F),
+#                  read.csv(here('results', 'TMB', paste0(prefix, '1fecd.csv')), 
+#                           header = T, stringsAsFactors = F),
+#                  read.csv(here('results', 'TMB', paste0(prefix, '1fece.csv')), 
+#                           header = T, stringsAsFactors = F),
+#                  read.csv(here('results', 'TMB', paste0(prefix, '1fecf.csv')), 
+#                           header = T, stringsAsFactors = F),
+#                  read.csv(here('results', 'TMB', paste0(prefix, '1fecg.csv')), 
+#                           header = T, stringsAsFactors = F),
+#                  read.csv(here('results', 'TMB', paste0(prefix, '1fech.csv')), 
+#                           header = T, stringsAsFactors = F),
+#                  read.csv(here('results', 'TMB', paste0(prefix, '1feci.csv')), 
+#                           header = T, stringsAsFactors = F)) %>% #,
+#                  # read.csv(here('results', 'TMB', paste0(prefix, 'fect_sst.csv')), 
+#                  #          header = T, stringsAsFactors = F),
+#                  # read.csv(here('results', 'TMB', paste0(prefix, '2fect.csv')), 
+#                  #          header = T, stringsAsFactors = F)) %>%
 #   dplyr::select(-X)
 
-#prior sensitivity
-res <- bind_rows(read.csv(here('results', 'TMB', paste0(prefix, '1fec.csv')), 
-                          header = T, stringsAsFactors = F),
-                 read.csv(here('results', 'TMB', paste0(prefix, 'fect.csv')), 
-                          header = T, stringsAsFactors = F),
-                 read.csv(here('results', 'TMB', paste0(prefix, 'fect_sst.csv')), 
-                          header = T, stringsAsFactors = F),
-                 read.csv(here('results', 'TMB', paste0(prefix, '1fecb.csv')), 
-                          header = T, stringsAsFactors = F),
-                 read.csv(here('results', 'TMB', paste0(prefix, '1fecc.csv')), 
-                          header = T, stringsAsFactors = F),
-                 read.csv(here('results', 'TMB', paste0(prefix, '1fecd.csv')), 
-                          header = T, stringsAsFactors = F),
-                 read.csv(here('results', 'TMB', paste0(prefix, '1fece.csv')), 
-                          header = T, stringsAsFactors = F),
-                 read.csv(here('results', 'TMB', paste0(prefix, '1fecf.csv')), 
-                          header = T, stringsAsFactors = F),
-                 read.csv(here('results', 'TMB', paste0(prefix, '1fecg.csv')), 
-                          header = T, stringsAsFactors = F),
-                 read.csv(here('results', 'TMB', paste0(prefix, '1fech.csv')), 
-                          header = T, stringsAsFactors = F),
-                 read.csv(here('results', 'TMB', paste0(prefix, '1feci.csv')), 
-                          header = T, stringsAsFactors = F)) %>% #,
-                 # read.csv(here('results', 'TMB', paste0(prefix, 'fect_sst.csv')), 
-                 #          header = T, stringsAsFactors = F),
-                 # read.csv(here('results', 'TMB', paste0(prefix, '2fect.csv')), 
-                 #          header = T, stringsAsFactors = F)) %>%
-  dplyr::select(-X)
+res <- read.csv(here('results', 'TMB', 'CSL_IPM_tmb_fec_sst_sens.csv'), header = T, stringsAsFactors = F)
 
 Ntot <- res %>% filter(grepl('Ntot', variable) & variable != 'Ntot') %>%
   mutate(variable = gsub('Ntot.', 'Ntot_', variable)) %>%
@@ -2131,11 +2662,6 @@ ggplot(fec_dat, aes(x = year, y = Estimate, col = mod, group = mod)) +
   geom_point() + geom_line() +
   geom_errorbar(aes(x = year, ymin = lower, ymax = upper))
 
-fec2_dat <- res %>% filter(variable %in% c('real_fec1', 'real_fec2'))
-
-ggplot(fec2_dat, aes(x = variable, y = Estimate)) +
-  geom_point() + geom_errorbar(aes(ymin = lower, ymax = upper, x = variable))
-
 int_fec <- res %>% filter(grepl('int_fec', variable))
 
 ggplot(int_fec, aes(x = variable, y = Estimate, col = mod, group = mod)) +
@@ -2158,8 +2684,9 @@ ggplot(b_sst, aes(x = age, y = Estimate, col = mod, group = mod)) +
 b_DD <- res %>% filter(variable == 'b_DD')
 
 ggplot(b_DD, aes(x = variable, y = Estimate, col = mod, group = mod)) +
-  geom_point(position = position_dodge(width = 0.3)) + 
-  geom_errorbar(aes(x = variable, ymin = lower, ymax = upper), position = position_dodge(width = 0.3))
+  geom_point(position = position_dodge(width = 0.5)) + 
+  geom_errorbar(aes(x = variable, ymin = lower, ymax = upper), position = position_dodge(width = 0.5), 
+                width = 0.25)
 
 
 sd_cnts <- res %>% filter(variable == 'sd_cnt') 
@@ -2173,8 +2700,32 @@ ggplot(sd_cnts, aes(x = variable, y = Estimate, col = mod, group = mod)) +
 
 ```{r vital rates etc}
 
+prefix <- 'CSL_IPM_tmb_'
+
 ests <- read.csv(here('results', 'TMB', paste0(prefix, 'fect_sst.csv')), 
                           header = T, stringsAsFactors = F)
+
+p_dat <- ests %>% filter(grepl('lp', variable)) %>%
+  transform(variable = gsub('lp', '', variable)) %>%
+  transform(sex = ifelse(grepl('M', variable), 'M', 'F')) %>%
+  transform(variable = gsub('M', '', variable)) %>%
+  transform(age = factor(variable, levels = c('1', '2_3', '4_6', '7_12', 'A'),
+                              labels = c('1', '2-4', '4-7', '7-13', '13+'))) %>%
+  transform(pEst = plogis(Estimate),
+            lower = plogis(Estimate-1.96*Std_Error),
+            upper = plogis(Estimate+1.96*Std_Error))
+
+p_plot <- ggplot(p_dat, aes(x = age, y = pEst, col = sex, group = sex)) +
+  geom_point(position = position_dodge(0.5)) +
+  geom_errorbar(aes(x = age, ymin = lower, ymax = upper, col = sex, group = sex),
+                position = position_dodge(0.5), width = 0.25) +
+  xlab('Age class') + ylab(expression(paste('Survival probability ',  '(', phi, ')'))) +
+  ggtitle('') +
+  # facet_wrap(~sex, scales = 'free_x', drop = T) +
+  plot_theme(legend.position = 'top', 
+             panel.border = element_rect(fill = NA),
+             plot.title = element_text(hjust = 0.5)) +
+  scale_color_manual(values = c('black', 'darkgrey'), name = '')
 
 Ntot <- ests %>% filter(grepl('Ntot', variable) & variable != 'Ntot') %>%
   mutate(variable = gsub('Ntot.', 'Ntot_', variable)) %>%
@@ -2188,7 +2739,7 @@ ggplot(Ntot, aes(year, Estimate)) +
   plot_theme(legend.position = 'none', panel.border = element_rect(fill = NA),
              plot.title = element_text(hjust = 0.5)) +
   guides(color = guide_legend("", nrow = 1)) +
-  scale_x_continuous(breaks = c(seq(1, 35, by = 5)), labels = c(seq(1990, 2024, by = 5)))
+  scale_x_continuous(breaks = c(seq(1, 35, by = 5)), labels = c(seq(1991, 2025, by = 5)))
 
 Npups <- ests %>% filter(grepl('expected_pups', variable) & Estimate != 0.00) %>%
   mutate(variable = gsub('expected_pups.', 'expected_pups_', variable)) %>%
@@ -2197,16 +2748,16 @@ Npups <- ests %>% filter(grepl('expected_pups', variable) & Estimate != 0.00) %>
                   year = c(1:(n_occ-1))-1), by = 'year') #adjust counts back 1 year
 
 ggplot(Npups, aes(year, Estimate)) +
-  geom_point() + geom_line() +
-  geom_ribbon(aes(x = year, ymin = lower, ymax = upper), alpha = 0.3) +
-  geom_point(aes(y = obs), color = "black", size = 2) +
-  geom_line(aes(y = obs), linetype = 'dashed', col = 'darkgrey') +
+  geom_line(col = 'steelblue', size = 1) +
+  geom_ribbon(aes(x = year, ymin = lower, ymax = upper), fill = 'steelblue', alpha = 0.2) +
+  geom_line(aes(y = obs), linetype = 'dashed', col = 'grey50', size = 1) +
+    geom_point(aes(y = obs), color = "black", size = 1.5) +
   xlab('') + ylab(expression(paste('Total abundance'))) +
   ggtitle('') +
   plot_theme(legend.position = 'none', panel.border = element_rect(fill = NA),
              plot.title = element_text(hjust = 0.5)) +
   guides(color = guide_legend("", nrow = 1)) +
-  scale_x_continuous(breaks = c(seq(1, 35, by = 5)), labels = c(seq(1990, 2024, by = 5)))
+  scale_x_continuous(breaks = c(seq(1, 35, by = 5)), labels = c(seq(1991, 2025, by = 5)))
 
 phi_dat <- ests %>% filter(grepl('_med', variable)) %>%
   mutate(variable = gsub('_med', '', variable)) %>%
@@ -2214,41 +2765,52 @@ phi_dat <- ests %>% filter(grepl('_med', variable)) %>%
   mutate(sex = ifelse(grepl('M', variable), 'M', 'F')) %>%
   mutate(age = gsub('M', '', variable)) %>%
    transform(age = factor(age, levels = c('P', '1', '2_3', '4_6', '7_9', '10_12', 
-                            '13_16', 'A')))
+                            '13_16', 'A'),
+                          labels = c('0-1', '1-2', '2-4', '4-7', '7-10', '10-13', '13-17', '17+')))
 
 ggplot(phi_dat, aes(x = age, y = Estimate, col = sex, group = sex)) +
-  geom_point() +
-  geom_errorbar(aes(x = age, ymin = lower, ymax = upper, col = sex, group = sex)) +
-  facet_grid(~sex) +
+  geom_point(position = position_dodge(0.5)) +
+  geom_errorbar(aes(x = age, ymin = lower, ymax = upper, col = sex, group = sex),
+                position = position_dodge(0.5), width = 0.25) +
   xlab('Age class') + ylab(expression(paste('Survival probability ',  '(', phi, ')'))) +
   ggtitle('') +
   # facet_wrap(~sex, scales = 'free_x', drop = T) +
   plot_theme(legend.position = 'top', 
              panel.border = element_rect(fill = NA),
              plot.title = element_text(hjust = 0.5)) +
-  scale_color_manual(values = c('black', 'darkgrey'), name = 'Model')
+  scale_color_manual(values = c('black', 'darkgrey'), name = '')
 
-# phit_dat <- ests %>% filter(grepl('real_phi', variable)) %>%
-#   filter(!grepl('_med', variable)) %>%
-#   mutate(variable = gsub('real_phi', '', variable)) %>%
-#   mutate(sex = ifelse(grepl('M', variable), 'M', 'F')) %>%
-#   mutate(age = gsub('M', '', variable)) %>%
-#   filter(sex == 'F') %>%
-#   mutate(year = as.numeric(gsub('P.', '', age))) 
-# 
-# ggplot(phit_dat, aes(x = year, y = Estimate, col = mod, group = mod)) +
-#   geom_point() + geom_line() +
-#   geom_errorbar(aes(x = year, ymin = lower, ymax = upper))
-  
-library(Hmisc)
-fec_dat <- res %>% filter(grepl('real_fec', variable) & mod %nin% c('fec')) %>%
-  mutate(year = as.numeric(gsub('real_fec.', '', variable))) %>%
-  filter(year != 'real_fec') 
+phit_dat <- ests %>% filter(grepl('real_phiP', variable)) %>%
+  filter(!grepl('_med', variable)) %>%
+  mutate(variable = gsub('real_phi', '', variable)) %>%
+  mutate(sex = ifelse(grepl('M', variable), 'M', 'F')) %>%
+  mutate(age = gsub('M', '', variable)) %>%
+  filter(sex == 'F') %>%
+  mutate(year = as.numeric(gsub('P.', '', age))) %>%
+  filter(!is.na(year))
 
-ggplot(fec_dat, aes(x = year, y = Estimate)) +
+ggplot(phit_dat, aes(x = year, y = Estimate)) +
   geom_point() + geom_line() +
   geom_errorbar(aes(x = year, ymin = lower, ymax = upper)) +
-  xlab('') + ylab('Fecundity') +
+  xlab('') + ylab(expression(paste('Pup survival probability ',  '(', phi, ')'))) +
+  ggtitle('') +
+  plot_theme(legend.position = 'none', panel.border = element_rect(fill = NA),
+             plot.title = element_text(hjust = 0.5)) +
+  guides(color = guide_legend("", nrow = 1)) +
+  scale_x_continuous(breaks = c(seq(1, 35, by = 5)), labels = c(seq(1990, 2024, by = 5)))
+  
+library(Hmisc)
+fec_dat <- ests %>% filter(grepl('lreal_fec', variable) & mod %nin% c('fec')) %>%
+  mutate(year = as.numeric(gsub('lreal_fec.', '', variable))) %>%
+  filter(!is.na(year)) %>%
+  transform(pEstimate = plogis(Estimate),
+            lower = plogis(Estimate-1.96*Std_Error),
+            upper = plogis(Estimate+1.96*Std_Error))
+
+ggplot(fec_dat, aes(x = year, y = pEstimate)) +
+  geom_point() + geom_line() +
+  geom_errorbar(aes(x = year, ymin = lower, ymax = upper)) +
+  xlab('') + ylab('Fecundity (pups born per female)') +
   plot_theme(legend.position = 'none', panel.border = element_rect(fill = NA),
              plot.title = element_text(hjust = 0.5)) +
   guides(color = guide_legend("", nrow = 1)) +
@@ -2261,38 +2823,256 @@ ggplot(fec_dat, aes(x = year, y = Estimate)) +
 #   geom_errorbar(aes(x = variable, ymin = lower, ymax = upper), position = position_dodge(width = 0.3))
 
 
-b_sst <- res %>% filter(grepl('b_sst', variable) | variable == 'b_warm') %>%
+b_sst <- ests %>% filter(grepl('b_sst', variable) | variable == 'b_warm') %>%
   mutate(age = gsub('b_sst', '', variable)) %>%
+  mutate(sex = ifelse(grepl('M', age), 'M', 'F')) %>%
   mutate(age = ifelse(age == 'b_warm', 'fec', age)) %>%
    transform(age = factor(age, levels = c('P', '1', '2_3', '4_6', '7_9', '10_12', 
-                            '13_16', 'A', 'PM', '1M', '2_3M', '4_6M', '7_9M', '10_12M', 
-                            '13_16M', 'AM', 'fec')))
+                            '13_16', 'A', 'fec', '2_3M', '4_6M', '7_9M', '10_12M', 
+                            '13_16M', 'AM'),
+        labels = c('0-1', '1-2', '2-4', '4-7', '7-10', '10-13', '13-17', '17+', 'Fec',
+                   '2-4', '4-7', '7-10', '10-13', '13-17', '17+')))
 
-ggplot(b_sst, aes(x = age, y = Estimate)) +
+ggplot(b_sst, aes(x = age, y = Estimate, col = sex, group = sex)) +
   geom_point(position = position_dodge(width = 0.3)) + 
-  geom_errorbar(aes(x = age, ymin = lower, ymax = upper), position = position_dodge(width = 0.3))
+  geom_errorbar(aes(x = age, ymin = lower, ymax = upper), 
+                position = position_dodge(width = 0.3), width = 0.25) +
+  geom_hline(aes(yintercept = 0), linetype = 'dotted', col = 'darkgrey') +
+  xlab('Age class') + ylab('Logit-scale effect of SST') +
+  ggtitle('') +
+  # facet_wrap(~sex, scales = 'free_x', drop = T) +
+  plot_theme(legend.position = 'top', 
+             panel.border = element_rect(fill = NA),
+             plot.title = element_text(hjust = 0.5)) +
+  scale_color_manual(values = c('black', 'darkgrey'), name = '')
 
 
-b_DD <- res %>% filter(variable == 'b_DD')
+b_DD <- ests %>% filter(variable == 'b_DD')
 
-ggplot(b_DD, aes(x = variable, y = Estimate)) +
+DD_plot <- ggplot(b_DD, aes(x = variable, y = Estimate)) +
   geom_point(position = position_dodge(width = 0.3)) + 
-  geom_errorbar(aes(x = variable, ymin = lower, ymax = upper), position = position_dodge(width = 0.3))
+  geom_errorbar(aes(x = variable, ymin = lower, ymax = upper), 
+                position = position_dodge(width = 0.3), width = 0.1) +
+  xlab('Density dependence') + ylab('Estimate') +
+  plot_theme(legend.position = 'top', 
+             panel.border = element_rect(fill = NA),
+             plot.title = element_text(hjust = 0.5)) +
+  scale_color_manual(values = c('black', 'darkgrey'), name = '')
 
-
-#sst preds
 
 #plot fec and SST
-fec_dat <- res %>% filter(grepl('real_fec', variable) & mod %nin% c('fec', '2fect')) %>%
-  mutate(year = as.numeric(gsub('real_fec.', '', variable))) %>%
-  filter(year != 'real_fec') 
+# plot_dat <- data.frame(fec = fec_dat$Estimate,
+#                        year = fec_dat$year,
+#                        sst = sst_dat[1:34,2])
+# 
+# ggplot(plot_dat, aes(y = fec, x = sst)) +
+#   geom_point() + geom_smooth()
 
-plot_dat <- data.frame(fec = fec_dat$Estimate,
-                       year = fec_dat$year,
-                       sst = sst_dat[,2])
+#sst preds
+#changes in survival from sst
+## sequence of values
+sst_seq <- seq(min(sst_dat[,2]), max(sst_dat[,2]), length.out = 100)
+sst_np_seq <- seq(min(sst_dat[,4]), max(sst_dat[,4]), length.out = 100)
 
-ggplot(plot_dat, aes(y = Estimate, x = sst)) +
-  geom_point() + geom_line()
+# back-transform a single MCMC row across the sequence
+# get_pred <- function(phi, b_sst, sequence) {
+#   mu <- plogis(phi)
+#   logit_p <- mu + b_sst*sequence
+#   return(1 / (1 + exp(-logit_p)))
+# }
+# 
+# samples <- as.matrix(out)
+# #pups
+# preds_p <- apply(samples, 1, function(s) {
+#   get_pred(s["int.phiP"], s["b.sst.P"], sst_seq)
+# })
+# 
+# preds_pm <- apply(samples, 1, function(s) {
+#   get_pred(s["int.phiPM"], s["b.sst.P"], sst_seq)
+# })
+# 
+# preds_1 <- apply(samples, 1, function(s) {
+#   get_pred(s["int.phi1"], s["b.sst.1"], sst_seq)
+# })
+# 
+# preds_1m <- apply(samples, 1, function(s) {
+#   get_pred(s["int.phi1M"], s["b.sst.1"], sst_seq)
+# })
+# 
+# preds_2.3 <- apply(samples, 1, function(s) {
+#   get_pred(s["int.phi2.3"], s["b.sst.2.3"], sst_seq)
+# })
+# 
+# preds_2.3m <- apply(samples, 1, function(s) {
+#   get_pred(s["int.phi2.3M"], s["b.sst.2.3M"], sst_seq)
+# })
+# 
+# preds_4.6 <- apply(samples, 1, function(s) {
+#   get_pred(s["int.phi4.6"], s["b.sst.4.6"], sst_seq)
+# })
+# 
+# # preds_4.6m <- apply(samples, 1, function(s) {
+# #   get_pred(s["int.phi4.6M"], s["b.sst.4.6M"], sst_seq)
+# # })
+# 
+# preds_7.9 <- apply(samples, 1, function(s) {
+#   get_pred(s["int.phi7.9"], s["b.sst.7.9"], sst_seq)
+# })
+# 
+# # preds_7.9m <- apply(samples, 1, function(s) {
+# #   get_pred(s["int.phi7.9M"], s["b.sst.7.9M"], sst_seq)
+# # })
+# 
+# preds_10.12 <- apply(samples, 1, function(s) {
+#   get_pred(s["int.phi10.12"], s["b.sst.A"], sst_seq)
+# })
+# 
+# preds_13.16 <- apply(samples, 1, function(s) {
+#   get_pred(s["int.phi13.16"], s["b.sst.A"], sst_seq)
+# })
+# 
+# preds_A <- apply(samples, 1, function(s) {
+#   get_pred(s["int.phiA"], s["b.sst.A"], sst_seq)
+# })
+# 
+# summarize_preds_pup <- function(pred_matrix) {
+#   data.frame(
+#     sst_val = sst_seq,
+#     val = 1:length(sst_seq),
+#     mean_phi = rowMeans(pred_matrix),
+#     low_phi  = apply(pred_matrix, 1, quantile, probs = 0.025),
+#     high_phi = apply(pred_matrix, 1, quantile, probs = 0.975))
+# }
+# 
+# summarize_preds_np <- function(pred_matrix) {
+#   data.frame(
+#     sst_val = sst_np_seq,
+#     val = 1:length(sst_np_seq),
+#     mean_phi = rowMeans(pred_matrix),
+#     low_phi  = apply(pred_matrix, 1, quantile, probs = 0.025),
+#     high_phi = apply(pred_matrix, 1, quantile, probs = 0.975))
+# }
+# 
+# preds_all <- rbind(summarize_preds_pup(preds_p) %>%
+#                      transform(age = 'P', sex = 'Fem'),
+#                    summarize_preds_pup(preds_pm) %>%
+#                      transform(age = 'P', sex = 'Male')) %>%
+#   bind_rows(rbind(summarize_preds_np(preds_1) %>%
+#                      transform(age = '1', sex = 'Fem'),
+#                    summarize_preds_np(preds_1m) %>%
+#                      transform(age = '1', sex = 'Male'))) %>%
+#   bind_rows(rbind(summarize_preds_np(preds_2.3) %>%
+#                      transform(age = '2:3', sex = 'Fem'),
+#                    summarize_preds_np(preds_2.3m) %>%
+#                      transform(age = '2:3', sex = 'Male'))) %>%
+#   bind_rows(rbind(summarize_preds_np(preds_4.6) %>%
+#                      transform(age = '4:6', sex = 'Fem'))) %>%
+#   bind_rows(summarize_preds_np(preds_7.9) %>%
+#                      transform(age = '7:9', sex = 'Fem')) %>%
+#   bind_rows(summarize_preds_np(preds_10.12) %>%
+#                      transform(age = '10:12', sex = 'Fem')) %>%
+#   bind_rows(summarize_preds_np(preds_13.16) %>%
+#                      transform(age = '13:16', sex = 'Fem')) %>%
+#   bind_rows(summarize_preds_np(preds_A) %>%
+#                      transform(age = '17+', sex = 'Fem')) %>%
+#   transform(age = factor(age, levels = c('P', '1', '2:3', '4:6', '7:9',
+#                                          '10:12', '13:16', '17+')))
+
+#includes both sexes
+# sst_preds_plot <- ggplot(preds_all, aes(x = sst_val, y = mean_phi, col = sex)) +
+#   geom_ribbon(aes(ymin = low_phi, ymax = high_phi), alpha = 0.2, color = NA) +
+#   geom_line(linewidth = 1) +
+#   facet_grid(.~age) +
+#   labs(x = "SST anomalies",
+#        y = "Predicted survival probability") +
+#   theme_bw() +
+#   theme(legend.position = 'top',
+#                 axis.title.x = element_text(margin = margin(t = 7))) +
+#   scale_y_continuous(limits = c(0, 1)) + 
+#   scale_color_manual(values = rainbow2[c(2,6)], name = 'Sex') + 
+#   scale_fill_manual(values = rainbow2[c(2,6)]) #+ 
+#   # scale_x_continuous(limits = c(-1.5, 2.5), breaks = c(seq(-1.5,2.5, length = 5)),
+#   #                    labels = round(c(seq(0.3,0.65, length = 5)),2))
+
+# sst_preds_plot <- ggplot(preds_all %>% filter(sex != 'M'), aes(x = sst_val, y = mean_phi, col = age)) +
+#   geom_ribbon(data = preds_all, aes(ymin = low_phi, ymax = high_phi, fill = age), 
+#               alpha = 0.2, color = NA, show.legend = F) +
+#   geom_line(linewidth = 1) +
+#   facet_grid(.~age) +
+#   labs(x = "SST anomalies",
+#        y = "Predicted survival probability") +
+#   theme_bw() +
+#   theme(legend.position = 'top',
+#                 axis.title.x = element_text(margin = margin(t = 7))) +
+#   scale_y_continuous(limits = c(0, 1)) + 
+#   scale_color_manual(values = rainbow2[c(1,2,4,5,6,7,8,9)], name = 'Age') + 
+#   scale_fill_manual(values = rainbow2[c(1,2,4,5,6,7,8,9)]) #+ 
+#   # scale_x_continuous(limits = c(-1.5, 2.5), breaks = c(seq(-1.5,2.5, length = 5)),
+#   #                    labels = round(c(seq(0.3,0.65, length = 5)),2))
+
+#discrete prediction values
+
+# seq(min(sst_dat[,2]), max(sst_dat[,2]), length.out = 100)
+preds_all <- data.frame()
+sst_pup_vals <- list(min(sst_dat[,2]), max(sst_dat[,2]))
+sst_np_vals <- list(min(sst_dat[,4]), max(sst_dat[,4]))
+sst_names <- c('low', 'high')
+
+for (c in 1:length(sst_pup_vals)) { #low vs high vals of covariate
+
+    cov_val_pup <- sst_pup_vals[[c]]
+    cov_val_np <- sst_np_vals[[c]]
+    
+    # logit_p <- qlogis(outmat[, 'int.phiP']) + outmat[, 'b.sst.P']*cov_val_pup
+    logit_p <- ests[ests$variable == 'muP', 'Estimate'] + ests[ests$variable == 'b_sstP', 'Estimate']*cov_val_pup
+    logit_1 <- ests[ests$variable == 'mu1', 'Estimate'] + ests[ests$variable == 'b_sst1', 'Estimate']*cov_val_np
+    logit_2.3 <- ests[ests$variable == 'mu2_3', 'Estimate'] + ests[ests$variable == 'b_sst2_3', 'Estimate']*cov_val_np
+    logit_4.6 <- ests[ests$variable == 'mu4_6', 'Estimate'] + ests[ests$variable == 'b_sst4_6', 'Estimate']*cov_val_np
+    logit_7.9 <- ests[ests$variable == 'mu7_9', 'Estimate'] + ests[ests$variable == 'b_sst7_9', 'Estimate']*cov_val_np
+    logit_10.12 <- ests[ests$variable == 'mu10_12', 'Estimate'] + ests[ests$variable == 'b_sst10_12', 'Estimate']*cov_val_np
+    logit_13.16 <-ests[ests$variable == 'mu13_16', 'Estimate'] + ests[ests$variable == 'b_sst13_16', 'Estimate']*cov_val_np
+    logit_A <- ests[ests$variable == 'muA', 'Estimate'] + ests[ests$variable == 'b_sstA', 'Estimate']*cov_val_np
+    logit_f <- ests[ests$variable == 'mu_fec', 'Estimate'] + ests[ests$variable == 'b_warm', 'Estimate']*cov_val_np
+    
+    preds_p <- data.frame(estimate = plogis(logit_p), rate = 'P')
+    preds_1 <- data.frame(estimate = plogis(logit_1), rate = '1')
+    preds_2 <- data.frame(estimate = plogis(logit_2.3), rate = '2.3')
+    preds_3 <- data.frame(estimate = plogis(logit_4.6), rate = '4.6')
+    preds_4 <- data.frame(estimate = plogis(logit_7.9), rate = '7.9')
+    preds_5 <- data.frame(estimate = plogis(logit_10.12), rate = '10.12')
+    preds_6 <- data.frame(estimate = plogis(logit_13.16), rate = '13.16')
+    preds_7 <- data.frame(estimate = plogis(logit_A), rate = 'A')
+    preds_8 <- data.frame(estimate = plogis(logit_f), rate = 'Fec')
+    
+    preds <- bind_rows(preds_p, preds_1, preds_2, preds_3, preds_4, preds_5, 
+                       preds_6, preds_7, preds_8) %>%
+      mutate(cov = sst_names[c])
+    
+    preds_all <- bind_rows(preds_all, preds)
+}
+
+preds <- preds_all %>%
+  group_by(rate, cov) %>%
+  dplyr::summarize(med = median(estimate),
+                   lower = quantile(estimate, probs = 0.025),
+                   upper = quantile(estimate, probs = 0.975)) %>%
+  transform(rate = factor(rate, levels = c('P', '1', '2.3', '4.6', '7.9', '10.12', '13.16', 'A', 'Fec'), 
+                          labels = c('0-1', '1-2', '2-4', '4-7', '7-10', '10-13', '13-17', '17+', 'Fec'))) %>%
+  transform(cov = factor(cov, levels = c('low', 'high'), labels = c('Low', 'High')))
+                   
+sst_preds_hilo_plot <- ggplot(preds, aes(x = cov, y = med)) +
+  geom_point(position = position_dodge(width = 0.5)) +
+  geom_errorbar(aes(ymin = lower, ymax = upper), position = position_dodge(width = 0.5),
+                show.legend = F, width = 0.3) +
+  geom_line(aes(group = rate), linewidth = 0.7, linetype = 'dashed', position = position_dodge(width = 0.5)) +
+  facet_grid(.~rate) +
+  labs(x = "SST",
+       y = "Female predicted survival and reproduction") +
+  theme_bw() +
+  theme(legend.position = 'none',
+                axis.title.x = element_text(margin = margin(t = 7))) +
+  scale_y_continuous(limits = c(0,1)) + 
+  scale_color_manual(values = rainbow2[c(1,2,5,6,7,8)], name = '') 
 
 
 
@@ -2471,25 +3251,25 @@ ci_upper_traj <- apply(pop_trajectories, 2, quantile, probs = 0.975)
 realized_K_mean <- mean(realized_K)
 real_K_CI <- quantile(realized_K, probs = c(0.025, 0.975), names = F)
 
-mean_mnpl <- mean(mnpl_estimates)
-mnpl_CI <- quantile(mnpl_estimates, probs = c(0.025, 0.975), names = F)
-mean_mnpl_ratio <- mean(mnpl_ratio)
-
-N_current <- outmat[draw_indices, "N_total[35]"] 
-mean_N_current <- mean(N_current)
-
-# MNPL_vector <- realized_K * 0.60  # statutory default
-MNPL_vector <- mnpl_estimates       # empirical matrix results
-MNPL_mean <- mean(mnpl_estimates)
-
-# probability that the stock is within OSP: how often Ntot[35] is larger than MNPL 
-OSP_check <- N_current > MNPL_vector
-prob_within_OSP <- mean(OSP_check)
-
-# ratio of Ntot[35] relative to MNPL; less than 1.0 means depleted, above means within OSP
-depletion_ratio <- N_current/MNPL_vector
-mean_ratio <- mean(depletion_ratio)
-ci_ratio <- quantile(depletion_ratio, probs = c(0.025, 0.975), names = F)
+# mean_mnpl <- mean(mnpl_estimates)
+# mnpl_CI <- quantile(mnpl_estimates, probs = c(0.025, 0.975), names = F)
+# mean_mnpl_ratio <- mean(mnpl_ratio)
+# 
+# N_current <- outmat[draw_indices, "N_total[35]"] 
+# mean_N_current <- mean(N_current)
+# 
+# # MNPL_vector <- realized_K * 0.60  # statutory default
+# MNPL_vector <- mnpl_estimates       # empirical matrix results
+# MNPL_mean <- mean(mnpl_estimates)
+# 
+# # probability that the stock is within OSP: how often Ntot[35] is larger than MNPL 
+# OSP_check <- N_current > MNPL_vector
+# prob_within_OSP <- mean(OSP_check)
+# 
+# # ratio of Ntot[35] relative to MNPL; less than 1.0 means depleted, above means within OSP
+# depletion_ratio <- N_current/MNPL_vector
+# mean_ratio <- mean(depletion_ratio)
+# ci_ratio <- quantile(depletion_ratio, probs = c(0.025, 0.975), names = F)
 
 plot(1:n_years, mean_trajectory, type = "n",
      main = "Population trajectory with oscillating SST (Realized K)",
@@ -2515,15 +3295,14 @@ legend("bottomright",
 
 ```
 
-```{r sensitivity}
+```{r K sensitivity}
 
 library(ggplot2)
 library(dplyr)
 library(scales) # for comma formatting on the x-axis
 
-res_df <- read.csv(here('results', 'TMB', 'CSL_IPM_fec_sst_sens.csv'), header = T, stringsAsFactors = F)
-
-k_df <- read.csv(here('results', 'TMB', 'k_df_sensitivity.csv'), header = T, stringsAsFactors = F)
+# res_df <- read.csv(here('results', 'TMB', 'CSL_IPM_fec_sst_sens.csv'), header = T, stringsAsFactors = F)
+# k_df <- read.csv(here('results', 'TMB', 'k_df_sensitivity.csv'), header = T, stringsAsFactors = F)
 
 ggplot(k_df, aes(x = K_Estimate, y = Scenario, fill = Scenario)) +
   # full probability density of the 500 draws
@@ -2542,6 +3321,47 @@ ggplot(k_df, aes(x = K_Estimate, y = Scenario, fill = Scenario)) +
   scale_fill_viridis_d(option = "mako", begin = 0.2, end = 0.8)
 
 ```
+
+```{r lo pup sensitivity}
+
+#check how well pup counts are recovered and fecundity estimates
+
+# res_df <- read.csv(here('results', 'TMB', 'CSL_IPM_tmb_fec_sst_retro.csv'), header = T, stringsAsFactors = F)
+
+plot_df <- retro_df %>%
+  mutate(Lower = Estimate - (1.96 * Std_Error),
+    Upper = Estimate + (1.96 * Std_Error),
+    Data_Status = ifelse(is.na(Model_Input) & !is.na(Actual_Truth), 
+                         "Forecast target", 
+                         "Included in model")) %>%
+  filter(!is.na(Actual_Truth)) %>%   # Filter out years where there was no true survey conducted
+  transform(sc = factor(Scenario, 
+                        level = c('Drop_1_Years', 'Drop_2_Years', 'Drop_3_Years', 'Drop_4_Years', 'Drop_5_Years',
+                                  'Drop_7_Years', 'Drop_10_Years'), 
+                        labels = c('0', '1', '2', '3', '4', '6', '9')))
+
+retro_plot <- ggplot(plot_df, aes(x = Year)) +
+  geom_ribbon(aes(ymin = Lower, ymax = Upper), fill = "dodgerblue", alpha = 0.25) +
+  geom_line(aes(y = Estimate), color = "dodgerblue", linewidth = 1) +
+  geom_point(aes(y = Actual_Truth, fill = Data_Status, shape = Data_Status), 
+             size = 2.5, color = "black") +
+    scale_shape_manual(values = c("Included in model" = 21, "Forecast target" = 21)) +
+  scale_fill_manual(values = c("Included in model" = "black", "Forecast target" = "red")) +
+    facet_wrap(~sc, scales = "fixed") +
+  # scale_y_continuous(labels = comma) +
+  theme_bw(base_size = 14) +
+  labs(title = "Retrospective sensitivity analysis",
+    # subtitle = "Blue line indicates model expected pups; Red dots indicate withheld data",
+    x = "", y = "Total pups",
+    fill = "Data status", shape = "Data status") +
+  theme(legend.position = "bottom",
+    panel.grid.minor = element_blank(),
+    strip.background = element_rect(fill = "gray90", color = "black"),
+    strip.text = element_text(face = "bold")) +
+  scale_x_continuous(breaks = c(seq(1, 35, by = 5)), labels = c(seq(1991, 2025, by = 5)))
+
+```
+
 
 
 ###archive versions
