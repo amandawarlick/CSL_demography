@@ -1,12 +1,12 @@
 ---
 title: ""
-output: html_document
+output: pdf_document
 date: ""
 knit: |
   (function(inputFile, encoding) {
     base_name <- tools::file_path_sans_ext(inputFile)
     date_str  <- Sys.Date()
-    out_name  <- paste0(base_name, "_", date_str, ".html")
+    out_name  <- paste0(base_name, "_", date_str, ".pdf")
     
     rmarkdown::render(
       input = inputFile,

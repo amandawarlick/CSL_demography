@@ -1,12 +1,12 @@
 ---
 title: ""
-output: html_document
+output: pdf_document
 date: ""
 knit: |
   (function(inputFile, encoding) {
     base_name <- tools::file_path_sans_ext(inputFile)
     date_str  <- Sys.Date()
-    out_name  <- paste0(base_name, "_", date_str, ".html")
+    out_name  <- paste0(base_name, "_", date_str, ".pdf")
     
     rmarkdown::render(
       input = inputFile,
@@ -80,7 +80,7 @@ EN_fec_vec <- as.numeric(all_yrs %in% EN_fec)+1
 ## occasions
 EN_phi_occ <- which(EN_phi_vec > 1)
 
-#2 = warm, 1 = cold
+#2 = warm, 1 = cold; seems like should be same as EN_phi_vec encoding, fix later
 EN_f <- ch_dat_f %>%
   dplyr::select(brand, cohort) %>%
   transform(EN = ifelse(cohort %in% EN_phi, 2, 1)) %>%
@@ -112,9 +112,7 @@ sst_dat <- sst_raw %>% filter(time > 1989) #%>% filter(time > 2010)
 ```{r fc inits, eval = T}
 
 #first capture
-# #because not all pups are "resighted" in their branding year - a bit of gymnastics
-# yrs <- c(2001:2019)
-# fc <- as.numeric(factor(ch_dat$t_0, levels = yrs))
+# not all pups are resighted in their branding year 
 
 get.first <- function(x) min(which(x==1))
 fc <- apply(ch_dat_f[,-c(1:3)], 1, get.first)
@@ -225,7 +223,7 @@ get_z_init <- function(y, fc) {
   return(z_init)
 }
 
-# Run it on your new binary observation data
+# Run on binary observation data
 z.init.f <- get_z_init(yf, fc)
 z.init.m <- get_z_init(ym, fc_m)
 
@@ -251,13 +249,14 @@ last_seen_m <- get_last_seen(ym, fc_m)
 
 ```{r stable age average, eval = T}
 
-# Calculate the average pup count of the first 5 years
+# calculate the average pup count of the first 8 years to capture the fact that age structure 
+# might not be stable
 avg_early_pups <- mean(pup_cnt_filled$US_PupCnt[1:8])
 
 phi_P <- 0.68
 phi_1 <- 0.8
-phi_J <- 0.85 # Juveniles (Ages 2-5)
-phi_A <- 0.92 # Adults (Ages 6-13)
+phi_J <- 0.85 # juveniles (Ages 2-5)
+phi_A <- 0.92 # adults (Ages 6-13)
 phi_AA <- 0.78
 phi_AM <- 0.8
 phi_AAM <- 0.4
@@ -266,15 +265,15 @@ phi_AAM <- 0.4
 N_f_track <- matrix(0, nrow = 25, ncol = (n_occasions-1))
 N_m_track <- matrix(0, nrow = 20, ncol = (n_occasions-1))
 
-# Use the actual Year 1 count for pups, but build the adults from the average!
+# Use actual year 1 count for pups, build the adults from the average
 N_f_track[1, 1] <- round(pup_cnt_filled$US_PupCnt[1] / 2)
 N_m_track[1, 1] <- pup_cnt_filled$US_PupCnt[1] - N_f_track[1, 1]
 
-# Create a dummy "average" pup base for calculating the adults
+# Create a dummy average pup base for calculating adults
 base_f_pups <- round(avg_early_pups / 2)
 base_m_pups <- avg_early_pups - base_f_pups
 
-# Build the adults using the smoothed base
+# build the adults using the smoothed base
 for (a in 1:24) {
   surv <- ifelse(a == 1, phi_P, 
           ifelse(a == 2, phi_1, 
@@ -300,7 +299,6 @@ for (a in 1:19) {
     N_m_track[a + 1, 1] <- round(N_m_track[a, 1] * surv)
   }
 }
-# (Repeat the same logic for males)
 
 N_f_init <- N_f_track
 N_m_init <- N_m_track
@@ -308,14 +306,13 @@ N_m_init <- N_m_track
 N_f_init[1, ] <- NA
 N_m_init[1, ] <- NA
 
-# use year 1 for for dpois() priors
 init_pop_f <- N_f_track[, 1]
 init_pop_m <- N_m_track[, 1]
 
 ```
 
 
-```{r IPM fec_t sst TMB, eval = T, results = 'hide', message = F, warning = F}
+```{r IPM fec_t sst, eval = T, results = 'hide', message = F, warning = F}
 
 csl_ipm <- function(par) {
   
@@ -345,12 +342,12 @@ csl_ipm <- function(par) {
   
   b_DD <- exp(par$log_b_DD)
   
-  # nll <- nll + b_DD # the negative log-likelihood of an Exponential(1) is simply +x
+  # nll <- nll + b_DD # the negative log-likelihood of an Exponential(1) is +x
   nll <- nll - dnorm(par$log_b_DD, mean = log(0.1), sd = 0.25, log = TRUE) #could do 0.01
   
-  ## bounding SDs to prevent precision matrix explosion in Laplace!
+  ## bounding SDs to prevent precision matrix explosion in Laplace
   sd_cnt  <- exp(par$log_sd_cnt) + 10       #estimated variance; floor at 10
-  # sd_cnt <- dat$sd_cnt #stronger "trust" in counts as a census 
+  # sd_cnt <- dat$sd_cnt #stronger trust in counts as a census 
   
   #add prior to penalize large sd's
   nll <- nll - dnorm(par$log_sd_cnt, mean = 8, sd = 1.5, log = TRUE)
@@ -455,18 +452,10 @@ csl_ipm <- function(par) {
     
     N_scaled <- (sum(N_curr_f) + sum(N_curr_m)) / 100000 
     
-    # Safe covariate extractions (Silently handles out-of-bounds just in case)
+    # in case of NAs, not necessary
     curr_sst_pup <- ifelse(is.na(sst_pup[t]), 0, sst_pup[t])
     curr_sst_np  <- ifelse(is.na(sst_np[t]), 0, sst_np[t])
     
-    # L <- 0.2
-    # U <- 0.75
-    # pmuP <- L + (U-L)*plogis(par$muP)
-    # muP_trim <- qlogis(pmuP)
-    # pmuPM <- L + (U-L)*plogis(par$muPM)
-    # muPM_trim <- qlogis(pmuPM)
-    
-    # phiP <- plogis(muP_trim + par$b_sstP * curr_sst_pup - b_DD * N_scaled)
     phiP <- plogis(par$muP + par$b_sstP * curr_sst_pup - b_DD * N_scaled)
     phi1 <- plogis(par$mu1 + par$b_sst1 * curr_sst_np)
     phi2_3 <- plogis(par$mu2_3 + par$b_sst2_3 * curr_sst_np)
@@ -520,7 +509,7 @@ csl_ipm <- function(par) {
     real_phiA[t] <- phiA
     real_phiAM[t] <- phiAM
     
-    # if y_pup_counts is missing or out of bounds, use expected; not necessary
+    # if y_pup_counts is missing or out of bounds; not necessary
     if (!is.na(y_pup_counts[t+1])) {
       new_pups <- y_pup_counts[t+1]/2
     } else {
@@ -538,7 +527,6 @@ csl_ipm <- function(par) {
       nll <- nll - dnorm(y_pup_counts[t], expected_pups[t], sd_cnt, log = TRUE)
     }
   }
-  
   
   # MARK RECAPTURE LIKELIHOOD 
   
@@ -610,7 +598,7 @@ csl_ipm <- function(par) {
     }
   }
   
-  # Back-transform and summarize key baseline vital rates to probabilities
+  # Back-transform and summarize baseline vital rates
   b_warm <- par$b_warm
   real_phiPM_med <- mean(real_phiPM)
   real_phiP_med <- mean(real_phiP)
@@ -742,7 +730,7 @@ dat <- list(
   last_seen_f = last_seen_f,
   last_seen_m = last_seen_m,
   pup_counts = round(pup_cnt_filled$US_PupCnt),
-  # sd_cnt = 1500, #e.g., trust the census to within 1000 pups
+  # sd_cnt = 1500, #e.g., trust the census to within X pups
   init_pop_f = init_pop_f, init_pop_m = init_pop_m,
   sst_pup = sst_dat[,2],
   sst_np = sst_dat[,4])
@@ -801,7 +789,6 @@ sd_rep <- RTMB::sdreport(obj)
 # prof_DD <- tmbprofile(obj, name = 'log_b_DD', ytol = 10, trace = F)
 # 
 # plot(prof_DD)
-
 
 ```
 
@@ -1135,8 +1122,6 @@ n_years <- 800
 sst <- sst_dat[,2]
 sst_boot <- sample(sst, n_years, replace = TRUE)
 
-# choose scenario
-# sst_vec <- sst_cyclic 
 sst_vec <- sst_boot 
 
 # extract the joint parameter vector (means) and covariance matrix
@@ -1301,7 +1286,6 @@ empirical_MNPL <- numeric(n_draws)
 
 for (i in 1:n_draws) {
   
-  # (Include all your mu, b_sst, and b_DD extractions here exactly as before)
   mu_P_draw      <- parameter_draws[i, "muP"]
   mu_1_draw      <- parameter_draws[i, "mu1"]
   mu_2_3_draw      <- parameter_draws[i, "mu2_3"]
@@ -1433,17 +1417,13 @@ for (i in 1:n_draws) {
     Nf_vec <- Nf_vec_next
   }
   
-  # Theoretical K is simply the stabilized population at the end of the projection
+  # Theoretical K is stabilized population at the end of the projection
   theoretical_K[i] <- N_tot_history[n_years]
   
-  # To find MNPL, calculate the year-over-year population growth (Delta N)
+  # for MNPL, calculate annual population growth and find pop size in peak year of growth
   pop_growth <- diff(N_tot_history) 
-  
-  # Find the exact index (year) where growth peaked
-  max_growth_year <- which.max(pop_growth)
-  
-  # MNPL is the total population size during that peak growth year
-  empirical_MNPL[i] <- N_tot_history[max_growth_year]
+    max_growth_year <- which.max(pop_growth)
+    empirical_MNPL[i] <- N_tot_history[max_growth_year]
 }
 
 
@@ -1473,7 +1453,7 @@ mnpl_plot <- ggplot(plot_df, aes(x = Population_Size, fill = Metric)) +
     panel.grid.minor = element_blank())
 
 ### summary metrics
-# realized K metrics (from the last 400 years of each draw) 
+# realized K metrics (from the last X years of each draw) 
 real_K_mean <- mean(realized_K)
 real_K_CI <- quantile(realized_K, probs = c(0.025, 0.975), names = F)
 
